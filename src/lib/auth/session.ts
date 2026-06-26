@@ -32,7 +32,7 @@ const ROLE_CODE_MAP: Record<string, Role> = {
 export function sessionCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" && process.env.DISABLE_SECURE_COOKIE !== "true",
     sameSite: "strict" as const,
     path: "/",
     maxAge: SESSION_TTL_SEC,
