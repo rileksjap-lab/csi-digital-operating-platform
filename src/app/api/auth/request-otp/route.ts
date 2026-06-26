@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Demo account: skip OTP generation, return fixed hint
-    const demoEmail = process.env.DEMO_ACCOUNT_EMAIL;
+    const demoEmail = process.env.GUEST_ACCOUNT_EMAIL;
     if (demoEmail && email.toLowerCase() === demoEmail.toLowerCase()) {
-      return ok({ message: "Demo account — use code 000000" });
+      return ok({ message: "Guest account — use code 000000" });
     }
 
     // Rate-limit: max 3 OTPs in last 5 minutes

@@ -24,15 +24,15 @@ export async function POST(request: NextRequest) {
     const { email, code } = parsed.data;
 
     // Demo account: bypass OTP validation with fixed code
-    const demoEmail = process.env.DEMO_ACCOUNT_EMAIL;
-    const demoCode = process.env.DEMO_ACCOUNT_CODE ?? "000000";
+    const demoEmail = process.env.GUEST_ACCOUNT_EMAIL;
+    const demoCode = process.env.GUEST_ACCOUNT_CODE ?? "000000";
     if (demoEmail && email.toLowerCase() === demoEmail.toLowerCase()) {
       if (code !== demoCode) {
-        return unauthorized("Invalid demo code");
+        return unauthorized("Invalid guest code");
       }
       const staff = await findStaffByEmail(email);
       if (!staff) {
-        return unauthorized("Demo account not found or inactive");
+        return unauthorized("Guest account not found or inactive");
       }
       const { cookieValue, session } = await createSessionFromStaff(staff);
       const response = NextResponse.json(
