@@ -31,7 +31,7 @@ interface WoCreateFormProps {
 
 const WO_SOURCES = [
   "CMT", "CSA", "CPO", "CBA", "CST", "CSO", "CGI", "CSF",
-  "Legal", "Procurement", "SVP", "Chairman", "CSI HOD", "Others",
+  "CHO", "Legal", "Procurement", "CSI HOD", "Others",
 ] as const;
 
 const PRIORITIES = ["Critical", "Urgent", "High", "Normal", "Low"] as const;

@@ -32,7 +32,7 @@ Options:
 ### 01_STAFF.csv
 - **StaffCode**: Unique code (e.g., CSI-001)
 - **RoleCode**: One of: HOD, SM, TL, TM, BIM_TL, BIM_MOD
-- **DeptCode**: One of: CSI, CMT, CBA, CGI, CPO, CSA
+- **DeptCode**: One of: CSA, CMT, CSI, CPO, CST, CSO, CGI, CSF, CBA, CHO, Legal, Procurement
 - **SubTeam**: Optional sub-team code: A, B, C, or D (leave empty for HOD/SM)
 - **ProductivityFactor**: 0.0–1.0 (HOD ~0.80, TM ~1.00)
 - **DailyUsableHours**: Typically 8.0
@@ -44,7 +44,7 @@ Options:
 - **TechnologyDomain**: Cloud, Cyber Security, Data Centre, Network, Enterprise Architecture, AI / HPC, BIM, Consultancy
 
 ### 04_WORK_ORDERS.csv
-- **SourceOfWO**: Who sent this WO. One of: CMT, CSA, CPO, CBA, CST, CSO, CGI, CSF, Legal, Procurement, SVP, Chairman, CSI HOD, Others
+- **SourceOfWO**: Who sent this WO. One of: CMT, CSA, CPO, CBA, CST, CSO, CGI, CSF, CHO, Legal, Procurement, CSI HOD, Others
 - **RequesterName**: PIC or requester name from the source department (optional)
 - **RequestTypeName**: Must match an existing request type name. Available types: Leads / Opportunity, Tender / RFP, Documentation, Physical Consultancy, Non-Physical Consultancy, BIM Presales ICT, BIM Presales Total Solution, BIM Presales Management, BIM Postsales ICT, BIM Postsales Total Solution, BIM Postsales Management, Project Monitoring, Others, Training/Event/Knowledge, HR Matters, Google CP (own domain), Partner Engagement (Others domain)
 - **TierCode**: 1 (Simple), 2 (Moderate), or 3 (Complex)

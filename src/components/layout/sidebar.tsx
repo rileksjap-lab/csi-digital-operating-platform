@@ -23,7 +23,12 @@ const ADMIN_ITEM: { href: string; label: string; exact?: boolean; icon: string }
   icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
 };
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
 
@@ -31,14 +36,22 @@ export default function Sidebar() {
     ? [...NAV_ITEMS, ADMIN_ITEM]
     : NAV_ITEMS;
 
-  return (
-    <aside className="flex w-60 flex-col bg-navy-900">
+  const sidebarContent = (
+    <>
       <div className="flex items-center gap-2.5 px-4 py-3">
         <img src="/logo-10cs.svg" alt="10CS" width={36} height={30} className="shrink-0" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold text-white leading-tight">CSI Digital</p>
           <p className="text-[10px] font-medium text-navy-300 leading-tight">Operating Platform</p>
         </div>
+        {/* Close button on mobile */}
+        {onClose && (
+          <button onClick={onClose} className="lg:hidden p-1 text-navy-400 hover:text-white">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {user && (
@@ -72,6 +85,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
                 isActive
                   ? "bg-accent-500 text-white font-medium shadow-lg shadow-accent-500/20"
@@ -97,6 +111,25 @@ export default function Sidebar() {
         <p className="text-[10px] font-medium text-navy-400">10 Creative Solutions</p>
         <p className="text-[10px] text-navy-500">CSI Department</p>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-60 flex-col bg-navy-900">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onClose} />
+          <aside className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-navy-900 lg:hidden">
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+    </>
   );
 }

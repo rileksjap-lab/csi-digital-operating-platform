@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { apiFetcher } from "@/lib/api/fetcher";
 import type { MeResponse } from "@/lib/stores/auth.store";
@@ -10,7 +10,13 @@ import Topbar from "@/components/layout/topbar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isLoading, setUser } = useAuthStore();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     apiFetcher<MeResponse>("/api/auth/me")
@@ -34,10 +40,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar />
+      <Sidebar mobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+        <Topbar onMenuToggle={() => setMobileMenuOpen((v) => !v)} />
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 lg:p-6">
           {children}
         </main>
       </div>
