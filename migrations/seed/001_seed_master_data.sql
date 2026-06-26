@@ -10,12 +10,18 @@
 
 -- ── DEPARTMENT (PRD §4.2) ───────────────────────────────────────────────────
 INSERT INTO DEPARTMENT (DeptCode, DeptName) VALUES
+    ('CSA', 'Customer, Supplier & Alliance'),
+    ('CMT', 'Capture Management Team'),
     ('CSI', 'Consultant, Solution & Innovation'),
-    ('CMT', 'Capacity Management Team'),
-    ('CPO', 'Corporate Project Office'),
-    ('CGI', 'Corporate Governance & Integrity'),
-    ('CSA', 'Corporate Strategy & Alliances'),
-    ('CBA', 'Corporate Business Academy')
+    ('CPO', 'Change & Project Office / Consultancy Project Office'),
+    ('CST', 'Customer Service & Technical'),
+    ('CSO', 'Customer Support Operations / Customization Software Office'),
+    ('CGI', 'Compliance, Governance & Integrity'),
+    ('CSF', 'Corporate Services & Finance'),
+    ('CBA', 'Culture, Branding & Academy'),
+    ('CHO', 'Chairman''s Office'),
+    ('Legal', 'Legal Unit'),
+    ('Procurement', 'Procurement Unit')
 ON CONFLICT (DeptCode) DO NOTHING;
 
 -- ── ROLE (PRD §6) ────────────────────────────────────────────────────────────

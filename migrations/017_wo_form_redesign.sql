@@ -18,13 +18,12 @@ BEGIN;
 ALTER TABLE DEPARTMENT ALTER COLUMN DeptCode TYPE VARCHAR(20);
 
 INSERT INTO DEPARTMENT (DeptCode, DeptName) VALUES
-    ('CST',         'Corporate Strategy & Transformation'),
-    ('CSO',         'Corporate Shared Operations'),
-    ('CSF',         'Corporate Shared Finance'),
-    ('LEGAL',       'Legal'),
-    ('PROCUREMENT', 'Procurement'),
-    ('SVP',         'Senior Vice President Office'),
-    ('CHAIRMAN',    'Chairman Office')
+    ('CST',         'Customer Service & Technical'),
+    ('CSO',         'Customer Support Operations / Customization Software Office'),
+    ('CSF',         'Corporate Services & Finance'),
+    ('Legal',       'Legal Unit'),
+    ('Procurement', 'Procurement Unit'),
+    ('CHO',         'Chairman''s Office')
 ON CONFLICT (DeptCode) DO NOTHING;
 
 -- ── 2. Make ExtWO_Id nullable (internal WOs don't have external reference) ─
