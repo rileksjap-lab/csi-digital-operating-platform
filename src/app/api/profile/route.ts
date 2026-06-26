@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
       deptCode: staff.deptcode,
       deptName: staff.deptname,
       subTeam: staff.subteam,
-      productivityFactor: parseFloat(staff.productivityfactor),
-      dailyUsableHours: parseFloat(staff.dailyusablehours),
+      productivityFactor: parseFloat(String(staff.productivityfactor)),
+      dailyUsableHours: parseFloat(String(staff.dailyusablehours)),
       status: staff.status,
       createdAt: String(staff.createdat),
       skills: skillsRes.rows.map((r) => ({
