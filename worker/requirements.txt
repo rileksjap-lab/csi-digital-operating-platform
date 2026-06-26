@@ -1,0 +1,20 @@
+# FastAPI compute worker dependencies
+# Pin major versions; update in lockstep with SAD §16.1 version table.
+
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-dotenv==1.0.1
+
+# Database (async, matches PostgreSQL 16)
+asyncpg==0.30.0
+
+# Redis (sessions + Celery broker)
+redis==5.2.0
+celery==5.4.0
+
+# Report generation
+python-pptx==1.0.0
+weasyprint==62.3
+
+# Validation (mirrors Zod on the TypeScript side)
+pydantic==2.9.0

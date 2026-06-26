@@ -1,0 +1,8 @@
+StaffCode,Name,Email,RoleCode,DeptCode,SubTeam,ProductivityFactor,DailyUsableHours,Status,SystemConfigFlag
+CSI-001,Ahmad bin Ibrahim,ahmad@10cs.my,HOD,CSI,,0.80,8.0,Active,true
+CSI-002,Siti Nurhaliza,siti@10cs.my,SM,CSI,A,0.85,8.0,Active,false
+CSI-003,Muhammad Farhan,farhan@10cs.my,TL,CSI,B,0.90,8.0,Active,false
+CSI-004,Nurul Aisyah,nurul@10cs.my,TM,CSI,A,1.00,8.0,Active,false
+CSI-005,Lim Wei Ming,weiming@10cs.my,TM,CSI,B,1.00,8.0,Active,false
+CSI-006,Tan Mei Ling,meiling@10cs.my,BIM_TL,CSI,C,0.90,8.0,Active,false
+CSI-007,Kumar Raj,kumar@10cs.my,BIM_MOD,CSI,C,1.00,8.0,Active,false

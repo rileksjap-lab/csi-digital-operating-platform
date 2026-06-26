@@ -1,0 +1,13 @@
+SourceOfWO,Title,RequestTypeName,TierCode,PriorityInterdepart,PriorityInternal,SLAWorkingDays,DueDate,MonitoringEmail,AssigneeEmail,AssignedHours,TenderOrProjectCode,IndicativeValue,ComplexityValue,Remark,ExtWoNo,ProjectCode,SourceDeptCode,EndUser,ReceivedDate,Status
+CMT,Cloud Migration Assessment for PETRONAS,Leads / Opportunity,2,High,High,15,15/7/2026,siti@10cs.my,nurul@10cs.my,40,TND-2026-0001,250000,250000,Assess cloud readiness for PETRONAS upstream division,CMT-20260601-001,PRJ-CMT-001,CMT,PETRONAS IT Dept,1/6/2026,InProgress
+CMT,Network Upgrade Proposal - Bank Negara,Tender / RFP,3,Critical,Urgent,10,1/7/2026,farhan@10cs.my,weiming@10cs.my,60,TND-2026-0002,500000,500000,Full network modernization proposal with SD-WAN,CMT-20260605-002,PRJ-CMT-002,CMT,BNM Network Ops,5/6/2026,Open
+CMT,BIM Modelling - MAHSA University,BIM Presales Total Solution,1,Normal,Normal,20,30/8/2026,meiling@10cs.my,kumar@10cs.my,30,TND-2026-0003,80000,80000,Campus BIM modelling and coordination,CMT-20260610-003,PRJ-CMT-003,CMT,MAHSA Facilities,10/6/2026,Open
+CMT,Cyber Security Assessment - Axiata,Physical Consultancy,2,High,High,12,20/7/2026,ahmad@10cs.my,weiming@10cs.my,50,,150000,150000,Penetration testing and vulnerability assessment,CMT-20260612-004,PRJ-CMT-004,CMT,Axiata CISO,12/6/2026,InProgress
+CMT,Solution Design - TM Smart Building,Non-Physical Consultancy,1,Low,Normal,25,15/9/2026,siti@10cs.my,nurul@10cs.my,20,,45000,45000,IoT architecture design for smart building,CMT-20260615-005,,CMT,TM Enterprise,15/6/2026,Open
+CSA,Data Centre Capacity Study - TNB,Documentation,2,Normal,Normal,15,1/8/2026,ahmad@10cs.my,siti@10cs.my,35,,120000,120000,Review current DC capacity and produce report,CSA-20260618-001,,CSA,TNB IT Infrastructure,18/6/2026,Open
+CMT,BIM Coordination - KLCC Phase 2,BIM Postsales Total Solution,2,High,High,10,10/7/2026,meiling@10cs.my,kumar@10cs.my,45,TND-2026-0008,200000,200000,Post-sales BIM coordination and clash detection,CMT-20260620-007,,CMT,KLCC Project Mgmt,20/6/2026,InProgress
+CSI HOD,Training Workshop - SD-WAN,Training/Event/Knowledge,1,Low,N/A,30,15/8/2026,farhan@10cs.my,farhan@10cs.my,16,,,0,Internal SD-WAN training for team upskilling,,,,,Open,
+CSI HOD,Project Monitoring - Putrajaya Corp,Project Monitoring,1,Normal,Normal,20,30/7/2026,ahmad@10cs.my,nurul@10cs.my,24,,0,0,Monthly progress monitoring and status reporting,CMT-20260625-009,,CMT,Putrajaya IT,25/6/2026,InProgress
+CMT,Cloud Architecture Review - MISC,Leads / Opportunity,2,High,Normal,15,25/7/2026,siti@10cs.my,nurul@10cs.my,30,,180000,180000,Evaluate hybrid cloud architecture options for MISC,CMT-20260628-010,,CMT,MISC Digital,28/6/2026,Open
+,,,,,,,,,,,,,,,,,,,,
+,xzxxz,,,,,,,,,,,,,,,,,,,

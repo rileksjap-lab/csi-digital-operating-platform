@@ -1,0 +1,9 @@
+TenderName,Client,TenderCategory,ClosingDate,EstimatedValue,SubmittedValue,WinValue,Status,OwnerEmail
+Cloud Migration Services - PETRONAS Digital,PETRONAS,GLC,2026-07-30,2500000,,0,InProgress,siti@10cs.my
+Enterprise Network Modernization - BNM,Bank Negara Malaysia,Government,2026-07-15,5000000,,0,InProgress,farhan@10cs.my
+BIM Total Solution - MAHSA Campus,MAHSA University,Private,2026-08-20,800000,,0,InProgress,meiling@10cs.my
+Cyber Security Operations Centre - Axiata,Axiata Group,GLC,2026-09-01,3000000,,0,InProgress,ahmad@10cs.my
+Smart Building IoT Platform - TM,Telekom Malaysia,GLC,2026-06-30,1200000,1150000,0,Submitted,nurul@10cs.my
+Data Centre Consolidation - TNB,TNB,GLC,2026-05-15,4500000,4200000,4200000,Won,siti@10cs.my
+Network Security Upgrade - Maybank,Maybank,GLC,2026-04-01,2000000,1800000,0,Lost,weiming@10cs.my
+KLCC Phase 2 BIM Services,KLCC Holdings,GLC,2026-06-15,2000000,1900000,1900000,Won,meiling@10cs.my

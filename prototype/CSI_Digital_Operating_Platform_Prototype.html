@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CSI Digital Operating Platform — Clickable Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- React -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+
+<!-- Babel (in-browser JSX compiler) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+<!-- Tailwind CSS (official Play CDN script) -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<!-- Note: icons are hand-built inline SVG inside the app code below — -->
+<!-- no external icon library dependency, for maximum reliability.    -->
+
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 4px; }
+  .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#888;">
+    Loading CSI Digital Operating Platform…
+  </div>
+</div>
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect } = React;
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  CSI Digital Operating Platform — High-Fidelity Clickable Prototype
+//  10 Creative Solutions Sdn Bhd (10CS) | CSI Department
+//  Stack: React + Tailwind CSS + Chart.js + self-contained inline SVG icons
+//  Compatible with: Lovable · Bolt.new · v0.dev · Claude Artifacts
+// ══════════════════════════════════════════════════════════════════════════════
+
+
+
+// ── Self-contained icon set (no external library — eliminates CDN reliability issues) ──
+const ICON_PATHS = {
+  AlertTriangle: ["M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z","M12 9v4","M12 17h.01"],
+  ArrowRight: ["M5 12h14","M12 5l7 7-7 7"],
+  Award: ["M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z","M8.21 13.89 7 23l5-3 5 3-1.21-9.11"],
+  Activity: ["M22 12h-4l-3 9L9 3l-3 9H2"],
+  BarChart2: ["M18 20V10","M12 20V4","M6 20v-6"],
+  Bell: ["M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9","M13.73 21a2 2 0 0 1-3.46 0"],
+  BookOpen: ["M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2V3Z","M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7V3Z"],
+  Briefcase: ["M2 7h20v13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7Z","M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"],
+  Calendar: ["M3 4h18v18H3V4Z","M16 2v4","M8 2v4","M3 10h18"],
+  CheckCircle: ["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4 12 14.01l-3-3"],
+  ChevronDown: ["m6 9 6 6 6-6"],
+  ChevronLeft: ["m15 18-6-6 6-6"],
+  ChevronRight: ["m9 18 6-6-6-6"],
+  ClipboardList: ["M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2","M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z","M9 12h6","M9 16h6"],
+  Clock: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z","M12 6v6l4 2"],
+  Download: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","m7 10 5 5 5-5","M12 15V3"],
+  FileText: ["M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8L14 2Z","M14 2v6h6","M16 13H8","M16 17H8","M10 9H8"],
+  Filter: ["M22 3H2l8 9.46V19l4 2v-8.54L22 3Z"],
+  GitMerge: ["M18 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z","M6 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z","M6 9v9","M15 9.5A5.5 5.5 0 0 1 9.5 15"],
+  Layers: ["m12 2 9 5-9 5-9-5 9-5Z","m3 12 9 5 9-5","m3 17 9 5 9-5"],
+  LayoutDashboard: ["M3 3h7v9H3V3Z","M14 3h7v5h-7V3Z","M14 12h7v9h-7v-9Z","M3 16h7v5H3v-5Z"],
+  LogOut: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","m16 17 5-5-5-5","M21 12H9"],
+  MoreVertical: ["M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z","M12 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z","M12 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"],
+  Plus: ["M12 5v14","M5 12h14"],
+  Search: ["M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z","m21 21-4.35-4.35"],
+  Shield: ["M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"],
+  Star: ["m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z"],
+  Target: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z","M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z","M12 12a0.5 0.5 0 1 0 0-1 0.5 0.5 0 0 0 0 1Z"],
+  TrendingDown: ["m23 18-9.5-9.5-5 5L1 6","M17 18h6v-6"],
+  TrendingUp: ["m23 6-9.5 9.5-5-5L1 18","M17 6h6v6"],
+  Upload: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","m17 8-5-5-5 5","M12 3v12"],
+  Users: ["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
+  XCircle: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z","m15 9-6 6","m9 9 6 6"],
+};
+
+const Icon = ({ name, size = 16, className = "", style, ...rest }) => {
+  const d = ICON_PATHS[name];
+  if (!d) return <span style={{display:"inline-block",width:size,height:size}}/>;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      className={className} style={style} {...rest}>
+      {d.map((p,i)=><path key={i} d={p}/>)}
+    </svg>
+  );
+};
+
+// ── Chart.js Canvas Wrapper (replaces Recharts for CDN reliability) ───────────
+const ChartCanvas = ({ type, data, options, height = 200 }) => {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !window.Chart) return;
+    if (chartRef.current) chartRef.current.destroy();
+    chartRef.current = new window.Chart(canvasRef.current, { type, data, options });
+    return () => { if (chartRef.current) chartRef.current.destroy(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, JSON.stringify(data), JSON.stringify(options)]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height }}>
+      <canvas ref={canvasRef} role="img" aria-label={`${type} chart`}></canvas>
+    </div>
+  );
+};
+
+// ── Brand ─────────────────────────────────────────────────────────────────────
+const R  = "#A6192E";
+const DR = "#7A1322";
+const SAFE = "#3B6D11";
+const WARN = "#BA7517";
+const BLUE = "#2E75B6";
+const FREE = "#2E75B6";
+
+const BAND_COLOR = { Free: FREE, Safe: SAFE, Warning: WARN, Overloaded: R };
+const BAND_BG    = { Free:"#EEF4FB", Safe:"#EAF3DE", Warning:"#FAEEDA", Overloaded:"#FCEBEB" };
+
+// ── Sample Data ────────────────────────────────────────────────────────────────
+const WOS = [
+  {id:"w1",no:"300-19062026-001",title:"JPN CAZ — National Network Infrastructure Upgrade",domain:"Solution Design",type:"Tender/RFP",tier:3,priority:"High",assignee:"Ahmad Zaki Bin Ramli",pod:"A",due:"2026-07-15",status:"InProgress",sla:5,effort:32,value:"32000000",tender:"TDR-2026-045"},
+  {id:"w2",no:"300-19062026-002",title:"EPF Cloud Contact Centre — Technical Solutioning",domain:"Solution Design",type:"Tender/RFP",tier:2,priority:"High",assignee:"Nurul Ain Binti Hassan",pod:"A",due:"2026-07-20",status:"PendingApproval",sla:1,effort:18,value:"8500000",tender:"TDR-2026-046"},
+  {id:"w3",no:"300-18062026-003",title:"LHDN e-Perkhidmatan Presales Meeting",domain:"Consultancy",type:"Physical",tier:1,priority:"Normal",assignee:"Faizal Ibrahim",pod:"B",due:"2026-06-25",status:"Open",sla:3,effort:6,value:null,tender:null},
+  {id:"w4",no:"300-17062026-004",title:"Perbadanan Putrajaya SAP HANA Migration Study",domain:"Solution Design",type:"Documentation",tier:2,priority:"Normal",assignee:"Siti Norzakiah",pod:"B",due:"2026-06-30",status:"Closed",sla:0,effort:22,value:"12000000",tender:"TDR-2026-041"},
+  {id:"w5",no:"300-16062026-005",title:"PDRM HPC GPU Cluster — BIM LOD 400",domain:"BIM",type:"BIM Presales ICT",tier:2,priority:"Urgent",assignee:"Mohd Hisham",pod:"C",due:"2026-06-22",status:"InProgress",sla:-1,effort:14,value:"45000000",tender:"TDR-2026-039"},
+  {id:"w6",no:"300-15062026-006",title:"KKM Hospital MyGovCloud Migration Advisory",domain:"Solution Design",type:"Leads / Opportunity",tier:1,priority:"Normal",assignee:"Zulaikha Ahmad",pod:"B",due:"2026-07-05",status:"Open",sla:8,effort:4,value:"28000000",tender:null},
+  {id:"w7",no:"300-14062026-007",title:"JPN PDSA Cisco ACI SRD/SDD Documentation",domain:"Solution Design",type:"Documentation",tier:2,priority:"High",assignee:"Ahmad Zaki Bin Ramli",pod:"A",due:"2026-06-28",status:"OnHold",sla:2,effort:16,value:null,tender:"TDR-2026-038"},
+  {id:"w8",no:"300-13062026-008",title:"SUK Kedah Command Centre — Presales Support",domain:"Consultancy",type:"Physical",tier:1,priority:"Normal",assignee:"Rizal Mansor",pod:"A",due:"2026-07-10",status:"Open",sla:14,effort:8,value:"5500000",tender:null},
+];
+
+const TENDERS = [
+  {id:"t1",no:"TDR-2026-045",name:"JPN CAZ — National Identity Infrastructure Upgrade",client:"Jabatan Pendaftaran Negara",cat:"Network",closing:"2026-07-30",est:"32000000",sub:null,win:null,status:"InProgress",owner:"Farhan Nordin",wos:4},
+  {id:"t2",no:"TDR-2026-046",name:"EPF Contact Centre Cloud Platform",client:"Employees Provident Fund",cat:"Cloud",closing:"2026-08-15",est:"8500000",sub:null,win:null,status:"Qualified",owner:"Farhan Nordin",wos:2},
+  {id:"t3",no:"TDR-2026-044",name:"LHDN Revenue Management Enhancement",client:"Lembaga Hasil Dalam Negeri",cat:"Enterprise Application",closing:"2026-09-01",est:"15000000",sub:null,win:null,status:"Prospect",owner:"Ahmad Zaki Bin Ramli",wos:1},
+  {id:"t4",no:"TDR-2026-041",name:"PPj SAP HANA In-Memory Database Migration",client:"Perbadanan Putrajaya",cat:"Data Centre",closing:"2026-06-30",est:"12000000",sub:"12000000",win:null,status:"Submitted",owner:"Farhan Nordin",wos:3},
+  {id:"t5",no:"TDR-2026-039",name:"PDRM HPC AI Computing Infrastructure",client:"Polis DiRaja Malaysia",cat:"AI / HPC",closing:"2026-07-10",est:"45000000",sub:null,win:null,status:"Clarification",owner:"Farhan Nordin",wos:5},
+  {id:"t6",no:"TDR-2026-035",name:"KKM Hospital MyGovCloud Migration",client:"Kementerian Kesihatan Malaysia",cat:"Cloud",closing:"2026-05-30",est:"28000000",sub:"28000000",win:"28000000",status:"Won",owner:"Ahmad Zaki Bin Ramli",wos:6},
+];
+
+const STAFF = [
+  {id:"s1",name:"Farhan Nordin",role:"HOD",dept:"CSI",pod:"—",util:72,used:5.2,daily:7.2,band:"Safe",certs:3,open:2,avatar:"FN"},
+  {id:"s2",name:"Ahmad Zaki Bin Ramli",role:"SM",dept:"CSI",pod:"—",util:88,used:5.8,daily:6.6,band:"Warning",certs:4,open:5,avatar:"AZ"},
+  {id:"s3",name:"Nurul Ain Binti Hassan",role:"TL",dept:"CSI",pod:"A",util:94,used:6.2,daily:6.6,band:"Overloaded",certs:2,open:3,avatar:"NA"},
+  {id:"s4",name:"Faizal Ibrahim",role:"TM",dept:"CSI",pod:"A",util:65,used:4.4,daily:6.8,band:"Safe",certs:1,open:2,avatar:"FI"},
+  {id:"s5",name:"Siti Norzakiah",role:"TL",dept:"CSI",pod:"B",util:78,used:5.1,daily:6.5,band:"Safe",certs:3,open:4,avatar:"SN"},
+  {id:"s6",name:"Mohd Hisham",role:"BIM_TL",dept:"CSI",pod:"C",util:91,used:5.9,daily:6.5,band:"Overloaded",certs:2,open:3,avatar:"MH"},
+  {id:"s7",name:"Zulaikha Ahmad",role:"TM",dept:"CSI",pod:"B",util:45,used:3.0,daily:6.7,band:"Free",certs:1,open:1,avatar:"ZA"},
+  {id:"s8",name:"Rizal Mansor",role:"TM",dept:"CSI",pod:"A",util:83,used:5.4,daily:6.5,band:"Safe",certs:2,open:3,avatar:"RM"},
+];
+
+const CERTS = [
+  {id:"c1",name:"AWS Solutions Architect Associate",vendor:"Amazon Web Services",staff:"Ahmad Zaki Bin Ramli",avatar:"AZ",issued:"2024-03-15",expiry:"2026-03-15",status:"Expired",days:-96},
+  {id:"c2",name:"Google Cloud Digital Leader",vendor:"Google Cloud",staff:"Nurul Ain Binti Hassan",avatar:"NA",issued:"2025-01-10",expiry:"2026-07-10",status:"Verified",days:21},
+  {id:"c3",name:"TOGAF Enterprise Architecture",vendor:"The Open Group",staff:"Farhan Nordin",avatar:"FN",issued:"2023-06-20",expiry:"2028-06-20",status:"Verified",days:731},
+  {id:"c4",name:"CCNP Enterprise",vendor:"Cisco Systems",staff:"Ahmad Zaki Bin Ramli",avatar:"AZ",issued:"2024-08-05",expiry:"2027-08-05",status:"Verified",days:412},
+  {id:"c5",name:"EXIN Data Centre Specialist",vendor:"EXIN",staff:"Farhan Nordin",avatar:"FN",issued:"2022-11-01",expiry:"2025-11-01",status:"Expired",days:-230},
+  {id:"c6",name:"Google Associate Cloud Engineer",vendor:"Google Cloud",staff:"Faizal Ibrahim",avatar:"FI",issued:"2025-06-01",expiry:"2027-06-01",status:"Unverified",days:347},
+  {id:"c7",name:"BIM Professional Certification",vendor:"CIDB Malaysia",staff:"Mohd Hisham",avatar:"MH",issued:"2024-04-20",expiry:"2027-04-20",status:"Verified",days:305},
+  {id:"c8",name:"CCNA",vendor:"Cisco Systems",staff:"Rizal Mansor",avatar:"RM",issued:"2025-09-10",expiry:"2026-09-10",status:"Verified",days:83},
+];
+
+// ── Chart Data ─────────────────────────────────────────────────────────────────
+const WO_TREND = [
+  {month:"Jan",opened:28,closed:24},{month:"Feb",opened:32,closed:30},{month:"Mar",opened:41,closed:38},
+  {month:"Apr",opened:35,closed:37},{month:"May",opened:38,closed:35},{month:"Jun",opened:29,closed:27},
+];
+const EFFORT_TREND = [
+  {month:"Jan",hours:620},{month:"Feb",hours:710},{month:"Mar",hours:890},
+  {month:"Apr",hours:780},{month:"May",hours:850},{month:"Jun",hours:571},
+];
+const UTIL_TREND = [
+  {week:"W1",csi:74,cmt:68},{week:"W2",csi:78,cmt:72},{week:"W3",csi:82,cmt:75},
+  {week:"W4",csi:79,cmt:71},{week:"W5",csi:85,cmt:76},{week:"W6",csi:81,cmt:74},
+];
+const PIPELINE_DATA = [
+  {name:"Prospect",value:3,fill:"#B5D4F4"},{name:"Qualified",value:2,fill:"#378ADD"},
+  {name:"In Progress",value:4,fill:"#185FA5"},{name:"Submitted",value:3,fill:WARN},
+  {name:"Won",value:2,fill:SAFE},{name:"Lost",value:1,fill:"#D1D5DB"},
+];
+const SKILLS_HEAT = [
+  {staff:"Ahmad Zaki",Cloud:4,Network:5,DataCentre:3,Cyber:2,EA:3,AIHPC:1,BIM:0,Consultancy:4},
+  {staff:"Nurul Ain",Cloud:5,Network:2,DataCentre:2,Cyber:3,EA:2,AIHPC:2,BIM:0,Consultancy:3},
+  {staff:"Faizal",Cloud:3,Network:3,DataCentre:4,Cyber:1,EA:2,AIHPC:1,BIM:0,Consultancy:3},
+  {staff:"Siti Norzakiah",Cloud:2,Network:2,DataCentre:3,Cyber:4,EA:4,AIHPC:2,BIM:1,Consultancy:5},
+  {staff:"Mohd Hisham",Cloud:1,Network:1,DataCentre:2,Cyber:1,EA:2,AIHPC:3,BIM:5,Consultancy:2},
+  {staff:"Rizal Mansor",Cloud:3,Network:4,DataCentre:3,Cyber:2,EA:1,AIHPC:1,BIM:0,Consultancy:3},
+];
+const DOMAINS = ["Cloud","Network","DataCentre","Cyber","EA","AIHPC","BIM","Consultancy"];
+const LEVEL_COLOR = (v) => v===0?"#F9FAFB":v===1?"#DBEAFE":v===2?"#93C5FD":v===3?"#3B82F6":v===4?WARN:R;
+const LEVEL_LABEL = ["—","Beginner","Intermediate","Advanced","Expert","Expert+"];
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const fmtRM = (v) => {
+  if(!v) return "—";
+  const n = parseInt(v);
+  if(n>=1000000) return `RM ${(n/1000000).toFixed(1)}M`;
+  return `RM ${(n/1000).toFixed(0)}K`;
+};
+
+const STATUS_META = {
+  Open:           {label:"Open",          bg:"#EEF4FB", color:BLUE,  dot:BLUE},
+  InProgress:     {label:"In Progress",   bg:"#FEF9EC", color:WARN,  dot:WARN},
+  PendingApproval:{label:"Pending Approval",bg:"#FFF0E6",color:"#C2410C",dot:"#C2410C"},
+  Closed:         {label:"Closed",        bg:"#EAF3DE", color:SAFE,  dot:SAFE},
+  OnHold:         {label:"On Hold",       bg:"#F9FAFB", color:"#6B7280",dot:"#6B7280"},
+  Won:            {label:"Won",           bg:"#EAF3DE", color:SAFE,  dot:SAFE},
+  Lost:           {label:"Lost",          bg:"#FCEBEB", color:R,     dot:R},
+  Submitted:      {label:"Submitted",     bg:"#FEF9EC", color:WARN,  dot:WARN},
+  Qualified:      {label:"Qualified",     bg:"#EEF4FB", color:BLUE,  dot:BLUE},
+  Prospect:       {label:"Prospect",      bg:"#F9FAFB", color:"#6B7280",dot:"#6B7280"},
+  Clarification:  {label:"Clarification", bg:"#FFF0E6", color:"#C2410C",dot:"#C2410C"},
+  Verified:       {label:"Verified",      bg:"#EAF3DE", color:SAFE,  dot:SAFE},
+  Unverified:     {label:"Unverified",    bg:"#FEF9EC", color:WARN,  dot:WARN},
+  Expired:        {label:"Expired",       bg:"#FCEBEB", color:R,     dot:R},
+};
+
+const StatusPill = ({status}) => {
+  const m = STATUS_META[status] || {label:status,bg:"#F9FAFB",color:"#6B7280"};
+  return (
+    <span style={{background:m.bg,color:m.color,border:`1px solid ${m.color}22`}}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
+      <span style={{background:m.dot}} className="w-1.5 h-1.5 rounded-full flex-shrink-0"/>
+      {m.label}
+    </span>
+  );
+};
+
+const SLA = ({days}) => {
+  if(days===null||days===undefined) return null;
+  const cls = days<0?"bg-red-50 text-red-700":days<=2?"bg-orange-50 text-orange-700":"bg-gray-50 text-gray-600";
+  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
+    {days<0?`${Math.abs(days)}d overdue`:`${days}d left`}
+  </span>;
+};
+
+const Avatar = ({initials, size="sm"}) => {
+  const sz = size==="sm"?"w-7 h-7 text-xs":"w-9 h-9 text-sm";
+  return <span style={{background:DR}} className={`${sz} rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0`}>{initials}</span>;
+};
+
+const KPICard = ({label,value,sub,trend,icon:iconName,accent}) => (
+  <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col gap-2">
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
+      {iconName && <span style={{background:accent||"#F9FAFB",color:accent?`${accent}99`:"#6B7280"}} className="w-8 h-8 rounded-lg flex items-center justify-center">
+        <Icon name={iconName} size={16}/>
+      </span>}
+    </div>
+    <span className="text-2xl font-bold text-gray-900">{value}</span>
+    {sub && <span className="text-xs text-gray-500 flex items-center gap-1">
+      {trend==="up"&&<Icon name="TrendingUp" size={12} className="text-green-600"/>}
+      {trend==="down"&&<Icon name="TrendingDown" size={12} style={{color:R}}/>}
+      {sub}
+    </span>}
+  </div>
+);
+
+const PriorityBadge = ({priority}) => {
+  const cls = {High:"bg-orange-50 text-orange-700",Urgent:"bg-red-50 text-red-700",Normal:"bg-gray-50 text-gray-600",Low:"bg-blue-50 text-blue-700"};
+  return <span className={`text-xs px-2 py-0.5 rounded font-medium ${cls[priority]||"bg-gray-50 text-gray-600"}`}>{priority}</span>;
+};
+
+const TierBadge = ({tier}) => {
+  const c = tier===3?R:tier===2?WARN:SAFE;
+  return <span style={{background:`${c}15`,color:c}} className="text-xs px-2 py-0.5 rounded font-medium">T{tier}</span>;
+};
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+const NAV_GROUPS = [
+  {group:"Overview",  items:[
+    {id:"executive",    label:"Executive Dashboard",  icon:"LayoutDashboard"},
+    {id:"department",   label:"Department Dashboard", icon:"BarChart2"},
+  ]},
+  {group:"Work Orders", items:[
+    {id:"wo-list",      label:"Work Orders",          icon:"ClipboardList"},
+    {id:"wo-create",    label:"Create Work Order",    icon:"Plus"},
+    {id:"wo-detail",    label:"WO Detail",            icon:"FileText"},
+    {id:"assignment",   label:"Assignment Workflow",  icon:"GitMerge"},
+  ]},
+  {group:"My Work",   items:[
+    {id:"my-tasks",     label:"My Tasks",             icon:"Target"},
+  ]},
+  {group:"Planning",  items:[
+    {id:"capacity",     label:"Capacity Dashboard",   icon:"Activity"},
+    {id:"tenders",      label:"Tender Registry",      icon:"Briefcase"},
+  ]},
+  {group:"Capability",items:[
+    {id:"skills",       label:"Skills & Competency",  icon:"Star"},
+    {id:"certifications",label:"Certifications",      icon:"Award"},
+  ]},
+  {group:"Performance",items:[
+    {id:"kpi",          label:"KPI Dashboard",        icon:"Target"},
+  ]},
+  {group:"Output",    items:[
+    {id:"reports",      label:"Reports",              icon:"Download"},
+  ]},
+];
+
+const Sidebar = ({current, nav, collapsed, setCollapsed}) => (
+  <aside className={`${collapsed?"w-16":"w-56"} transition-all duration-200 h-screen bg-white border-r border-gray-100 flex flex-col flex-shrink-0`}>
+    {/* Logo */}
+    <div className="h-14 flex items-center px-4 border-b border-gray-100 gap-3">
+      <div style={{background:R}} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-white font-bold text-xs">10</span>
+      </div>
+      {!collapsed && <div>
+        <p className="font-bold text-gray-900 text-sm leading-none">10CS</p>
+        <p className="text-gray-400 text-xs">CSI Platform</p>
+      </div>}
+      <button onClick={()=>setCollapsed(!collapsed)} className="ml-auto text-gray-400 hover:text-gray-600">
+        {collapsed?<Icon name="ChevronRight" size={16}/>:<Icon name="ChevronLeft" size={16}/>}
+      </button>
+    </div>
+    {/* Nav */}
+    <nav className="flex-1 overflow-y-auto py-4 px-2 flex flex-col gap-1">
+      {NAV_GROUPS.map(g=>(
+        <div key={g.group} className="mb-2">
+          {!collapsed && <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-1">{g.group}</p>}
+          {g.items.map(item=>{
+            const active = current===item.id;
+            return (
+              <button key={item.id} onClick={()=>nav(item.id)}
+                style={active?{borderLeft:`3px solid ${R}`,background:"#FEF2F2",color:R}:{borderLeft:"3px solid transparent"}}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-r-lg text-left transition-colors ${active?"font-medium":"text-gray-600 hover:bg-gray-50"}`}>
+                <Icon name={item.icon} size={16} className="flex-shrink-0"/>
+                {!collapsed && <span className="text-sm truncate">{item.label}</span>}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </nav>
+    {/* User */}
+    <div className="border-t border-gray-100 p-3">
+      <div className="flex items-center gap-2">
+        <Avatar initials="FN"/>
+        {!collapsed && <div className="min-w-0">
+          <p className="text-xs font-semibold text-gray-900 truncate">Farhan Nordin</p>
+          <p className="text-xs text-gray-400">HOD, CSI</p>
+        </div>}
+        {!collapsed && <Icon name="LogOut" size={14} className="ml-auto text-gray-400 cursor-pointer hover:text-gray-600 flex-shrink-0"/>}
+      </div>
+    </div>
+  </aside>
+);
+
+const TopBar = ({title,nav}) => (
+  <header className="h-14 bg-white border-b border-gray-100 flex items-center px-6 gap-4 flex-shrink-0">
+    <h1 className="font-semibold text-gray-900 text-base flex-1">{title}</h1>
+    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+      <Icon name="Search" size={14} className="text-gray-400"/>
+      <input placeholder="Search work orders, tenders…" className="bg-transparent text-sm text-gray-600 placeholder-gray-400 outline-none w-48"/>
+    </div>
+    <button className="relative p-2 hover:bg-gray-50 rounded-lg">
+      <Icon name="Bell" size={18} className="text-gray-500"/>
+      <span style={{background:R}} className="absolute top-1 right-1 w-2 h-2 rounded-full"/>
+    </button>
+    <button onClick={()=>nav("my-tasks")} className="flex items-center gap-2 hover:bg-gray-50 rounded-lg p-1.5">
+      <Avatar initials="FN"/>
+      <Icon name="ChevronDown" size={14} className="text-gray-400"/>
+    </button>
+  </header>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 1: LOGIN
+// ══════════════════════════════════════════════════════════════════════════════
+const LoginScreen = ({nav}) => (
+  <div className="min-h-screen flex">
+    {/* Left brand panel */}
+    <div style={{background:R}} className="w-1/2 flex flex-col justify-between p-12 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-10">
+        {[...Array(8)].map((_,i)=>(
+          <div key={i} style={{position:"absolute",border:"1px solid white",borderRadius:"50%",
+            width:`${(i+1)*100}px`,height:`${(i+1)*100}px`,
+            top:"50%",left:"50%",transform:"translate(-50%,-50%)"}}/>
+        ))}
+      </div>
+      <div className="relative">
+        <div className="flex items-center gap-3 mb-16">
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
+            <span style={{color:R}} className="font-black text-sm">10</span>
+          </div>
+          <div>
+            <p className="text-white font-bold text-lg leading-none">10 Creative Solutions</p>
+            <p className="text-red-200 text-xs">Sdn Bhd (10CS)</p>
+          </div>
+        </div>
+        <h1 className="text-white text-4xl font-bold leading-tight mb-4">
+          CSI Digital<br/>Operating Platform
+        </h1>
+        <p className="text-red-100 text-base leading-relaxed max-w-xs">
+          Manage work orders, resource capacity, tender pipeline, KPI evidence and capability — in one system.
+        </p>
+      </div>
+      <div className="relative">
+        <div className="flex gap-8 text-center">
+          {[{v:"383",l:"Work Orders"},{v:"RM 1.8B",l:"Pipeline Value"},{v:"26",l:"CSI Staff"}].map(s=>(
+            <div key={s.l}>
+              <p className="text-white text-2xl font-bold">{s.v}</p>
+              <p className="text-red-200 text-xs">{s.l}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+    {/* Right sign-in panel */}
+    <div className="w-1/2 flex items-center justify-center bg-gray-50 p-12">
+      <div className="w-full max-w-sm">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
+        <p className="text-gray-500 text-sm mb-8">Sign in with your 10CS corporate account to continue.</p>
+        <button onClick={()=>nav("department")}
+          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 rounded-xl py-3.5 font-semibold text-gray-700 hover:bg-gray-50 transition-colors mb-4 shadow-sm">
+          <svg viewBox="0 0 48 48" className="w-5 h-5">
+            <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/>
+            <path fill="#34A853" d="M6.3 14.7l7 5.1C15.2 17 19.3 14 24 14c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2c-7.6 0-14.2 4.3-17.7 10.7z" transform="translate(0 0)"/>
+            <path fill="#FBBC05" d="M24 46c5.9 0 10.9-2 14.6-5.4l-6.7-5.5C29.9 36.9 27.2 38 24 38c-6.1 0-10.7-3.1-11.8-8.5l-7 5.4C8.1 42 15.5 46 24 46z" transform="translate(0 -1)"/>
+            <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-1.2 3.1-3.6 5.5-6.8 7.1l6.7 5.5C39.3 38.1 44 31.7 44 24c0-1.3-.2-2.7-.5-4z"/>
+          </svg>
+          Sign in with Google Workspace
+        </button>
+        <button onClick={()=>nav("department")}
+          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 rounded-xl py-3.5 font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
+          <svg viewBox="0 0 48 48" className="w-5 h-5">
+            <path fill="#0078D4" d="M0 0h22.8v22.8H0zm25.2 0H48v22.8H25.2zM0 25.2h22.8V48H0zm25.2 0H48V48H25.2z"/>
+          </svg>
+          Sign in with Microsoft Entra ID
+        </button>
+        <p className="text-center text-xs text-gray-400 mt-6">Protected by PDPA & 10CS Information Security Policy</p>
+      </div>
+    </div>
+  </div>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 2: EXECUTIVE DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+const ExecutiveDashboard = ({nav}) => {
+  const [tab,setTab] = useState("Operations");
+  const TABS = ["Operations","Resource","Business","Capability","Governance"];
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      {/* Tab bar */}
+      <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 mb-6 w-fit">
+        {TABS.map(t=>(
+          <button key={t} onClick={()=>setTab(t)}
+            style={tab===t?{background:R,color:"white"}:{}}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab!==t?"text-gray-600 hover:text-gray-900":""}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab==="Operations" && <>
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <KPICard label="Open Work Orders" value="47" sub="↑ 3 from last week" trend="up" icon="ClipboardList" accent="#EEF4FB"/>
+          <KPICard label="Closed This Month" value="34" sub="86.9% closure rate" trend="up" icon="CheckCircle" accent="#EAF3DE"/>
+          <KPICard label="Overdue WOs" value="3" sub="Action required today" trend="down" icon="AlertTriangle" accent="#FCEBEB"/>
+          <KPICard label="SLA Achievement" value="91.2%" sub="Target: ≥ 90%" trend="up" icon="Target" accent="#FEF9EC"/>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-4">WO Volume — Monthly Trend</h3>
+            <ChartCanvas type="bar" height={200} data={{
+              labels: WO_TREND.map(d=>d.month),
+              datasets: [
+                { label: "Opened", data: WO_TREND.map(d=>d.opened), backgroundColor: "#EEF4FB", borderColor: BLUE, borderWidth: 1, borderRadius: 3 },
+                { label: "Closed", data: WO_TREND.map(d=>d.closed), backgroundColor: SAFE, borderRadius: 3 },
+              ]
+            }} options={{
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { x: { grid: { display: false } }, y: { grid: { color: "#F3F4F6" } } }
+            }}/>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-4">Total Effort Hours — YTD</h3>
+            <ChartCanvas type="line" height={200} data={{
+              labels: EFFORT_TREND.map(d=>d.month),
+              datasets: [
+                { label: "Hours", data: EFFORT_TREND.map(d=>d.hours), borderColor: R, backgroundColor: "#FCEBEB", fill: true, tension: 0.35, borderWidth: 2, pointBackgroundColor: R, pointRadius: 3 },
+              ]
+            }} options={{
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { x: { grid: { display: false } }, y: { grid: { color: "#F3F4F6" } } }
+            }}/>
+          </div>
+        </div>
+      </>}
+
+      {tab==="Resource" && <>
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <KPICard label="CSI Utilization" value="81.4%" sub="Threshold: 85%" icon="Activity" accent="#EAF3DE"/>
+          <KPICard label="CMT Utilization" value="74.2%" sub="Threshold: 80%" icon="Activity" accent="#EEF4FB"/>
+          <KPICard label="Overloaded Staff" value="2" sub="Nurul Ain, Mohd Hisham" icon="AlertTriangle" accent="#FCEBEB"/>
+          <KPICard label="Available Capacity" value="18.6%" sub="Equivalent: 4.8 FTE" icon="Users" accent="#F9FAFB"/>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <h3 className="font-semibold text-gray-900 text-sm mb-4">Department Utilization — 6-Week Trend</h3>
+          <ChartCanvas type="line" height={220} data={{
+            labels: UTIL_TREND.map(d=>d.week),
+            datasets: [
+              { label: "CSI", data: UTIL_TREND.map(d=>d.csi), borderColor: R, backgroundColor: R, borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: R, tension: 0.3 },
+              { label: "CMT", data: UTIL_TREND.map(d=>d.cmt), borderColor: BLUE, backgroundColor: BLUE, borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: BLUE, borderDash: [5,5], tension: 0.3 },
+            ]
+          }} options={{
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { grid: { display: false } }, y: { min: 60, max: 100, grid: { color: "#F3F4F6" } } }
+          }}/>
+        </div>
+      </>}
+
+      {tab==="Business" && <>
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <KPICard label="Active Tenders" value="4" sub="4 in pursuit" icon="Briefcase" accent="#EEF4FB"/>
+          <KPICard label="Pipeline Value" value="RM 1.79B" sub="Submitted: RM 40M" icon="TrendingUp" accent="#EAF3DE"/>
+          <KPICard label="Won Value (YTD)" value="RM 28M" sub="KKM MyGovCloud" icon="Star" accent="#FEF9EC"/>
+          <KPICard label="OI Progress" value="6 / 8" sub="HOD annual target" icon="Target" accent="#F9FAFB"/>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-4">Tender Pipeline by Status</h3>
+            <ChartCanvas type="doughnut" height={220} data={{
+              labels: PIPELINE_DATA.map(d=>d.name),
+              datasets: [{ data: PIPELINE_DATA.map(d=>d.value), backgroundColor: PIPELINE_DATA.map(d=>d.fill), borderWidth: 2, borderColor: "#FFFFFF" }]
+            }} options={{
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+            }}/>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+              {PIPELINE_DATA.map(d=>(
+                <span key={d.name} className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <span style={{background:d.fill}} className="w-2.5 h-2.5 rounded-sm flex-shrink-0"/>
+                  {d.name}: {d.value}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-1">Top Active Tenders</h3>
+            <p className="text-xs text-gray-400 mb-4">By estimated value</p>
+            {TENDERS.filter(t=>!["Won","Lost","Cancelled"].includes(t.status)).slice(0,5).map(t=>(
+              <div key={t.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate pr-2">{t.name}</p>
+                  <p className="text-xs text-gray-400">{t.client}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-semibold text-gray-900">{fmtRM(t.est)}</p>
+                  <StatusPill status={t.status}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>}
+
+      {tab==="Capability" && <>
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <KPICard label="Cert Achievement" value="75%" sub="9 of 12 active" icon="Award" accent="#EAF3DE"/>
+          <KPICard label="Expiring < 90 Days" value="2" sub="CCNA · Google CDL" icon="AlertTriangle" accent="#FEF9EC"/>
+          <KPICard label="Critical Skill Coverage" value="7/8" sub="AI/HPC: 1 staff only" icon="Shield" accent="#FCEBEB"/>
+          <KPICard label="Single-Point Risks" value="2" sub="BIM, AI/HPC domains" icon="AlertTriangle" accent="#FCEBEB"/>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <h3 className="font-semibold text-gray-900 text-sm mb-1">Competency Heatmap</h3>
+          <p className="text-xs text-gray-400 mb-4">Technology domain coverage across CSI team</p>
+          <div className="overflow-x-auto">
+            <table className="text-xs w-full">
+              <thead>
+                <tr>
+                  <th className="text-left text-gray-500 font-medium py-1 pr-4 w-28">Staff</th>
+                  {DOMAINS.map(d=><th key={d} className="text-center text-gray-500 font-medium py-1 px-1 whitespace-nowrap">{d}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {SKILLS_HEAT.map(row=>(
+                  <tr key={row.staff}>
+                    <td className="text-gray-700 font-medium py-1 pr-4 whitespace-nowrap">{row.staff}</td>
+                    {DOMAINS.map(d=>(
+                      <td key={d} className="py-1 px-1 text-center">
+                        <span style={{background:LEVEL_COLOR(row[d]),color:row[d]===0?"#D1D5DB":"#1F2937"}}
+                          className="inline-block w-8 h-6 rounded text-xs leading-6 font-medium">
+                          {row[d]>0?LEVEL_LABEL[row[d]].slice(0,3):"—"}
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>}
+
+      {tab==="Governance" && <>
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <KPICard label="Open Risks" value="2" sub="Medium severity" icon="AlertTriangle" accent="#FEF9EC"/>
+          <KPICard label="Audit Findings" value="0" sub="All resolved" icon="CheckCircle" accent="#EAF3DE"/>
+          <KPICard label="Compliance Status" value="Green" sub="ISO 9001 aligned" icon="Shield" accent="#EAF3DE"/>
+          <KPICard label="Audit Log Entries" value="1,247" sub="This month" icon="Layers" accent="#F9FAFB"/>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-4">Open Risk Register</h3>
+            {[{r:"Resource capacity risk — Nurul Ain at 94% utilization",sev:"High"},{r:"CCNA certification expiring for Rizal Mansor (83 days)",sev:"Medium"}].map((r,i)=>(
+              <div key={i} className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
+                <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${r.sev==="High"?"bg-red-500":"bg-orange-400"}`}/>
+                <p className="text-sm text-gray-700">{r.r}</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-4">Compliance Checklist</h3>
+            {[{l:"ISO 9001 process evidence current",ok:true},{l:"PDPA data handling procedures reviewed",ok:true},{l:"MAMPU/KRISA SOC mapping completed",ok:true},{l:"Audit log integrity check passed",ok:true},{l:"AI/HPC domain succession plan",ok:false}].map((c,i)=>(
+              <div key={i} className="flex items-center gap-3 py-2">
+                {c.ok?<Icon name="CheckCircle" size={16} style={{color:SAFE}}/>:<Icon name="XCircle" size={16} style={{color:R}}/>}
+                <p className={`text-sm ${c.ok?"text-gray-700":"text-gray-900 font-medium"}`}>{c.l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 3: DEPARTMENT DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+const DepartmentDashboard = ({nav}) => {
+  const [stream, setStream] = useState("All");
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <KPICard label="Active WOs" value="47" sub="7 assigned today" icon="ClipboardList" accent="#EEF4FB"/>
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">CSI Utilization</p>
+          <div className="flex items-end gap-2 mb-2">
+            <span className="text-2xl font-bold text-gray-900">81.4%</span>
+            <span className="text-xs text-gray-400 mb-1">/ 85% threshold</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full">
+            <div style={{width:"81.4%",background:SAFE}} className="h-2 rounded-full"/>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">CMT Utilization</p>
+          <div className="flex items-end gap-2 mb-2">
+            <span className="text-2xl font-bold text-gray-900">74.2%</span>
+            <span className="text-xs text-gray-400 mb-1">/ 80% threshold</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full">
+            <div style={{width:"74.2%",background:BLUE}} className="h-2 rounded-full"/>
+          </div>
+        </div>
+        <KPICard label="Pending Approval" value="3" sub="Awaiting your review" icon="Clock" accent="#FEF9EC"/>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        {/* Kanban board */}
+        <div className="col-span-2 bg-white rounded-xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 text-sm">Team Workload</h3>
+            <div className="flex gap-1">
+              {["All","Solution Design","Consultancy","BIM"].map(s=>(
+                <button key={s} onClick={()=>setStream(s)}
+                  style={stream===s?{background:R,color:"white"}:{}}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${stream!==s?"text-gray-500 hover:bg-gray-50":""}`}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {["Open","In Progress","Pending Approval"].map(col=>{
+              const colWos = WOS.filter(w=>
+                (stream==="All"||w.domain===stream) &&
+                (col==="Open"?w.status==="Open":col==="In Progress"?w.status==="InProgress":w.status==="PendingApproval")
+              );
+              return (
+                <div key={col} className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center justify-between">
+                    {col}<span className="bg-gray-200 text-gray-600 rounded-full w-5 h-5 flex items-center justify-center text-xs">{colWos.length}</span>
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {colWos.slice(0,3).map(w=>(
+                      <div key={w.id} onClick={()=>nav("wo-detail")}
+                        className="bg-white rounded-lg p-2.5 border border-gray-100 cursor-pointer hover:border-red-200 transition-colors">
+                        <p className="text-xs text-gray-500 mb-1">{w.no.slice(0,14)}…</p>
+                        <p className="text-xs font-medium text-gray-900 leading-tight mb-2 line-clamp-2">{w.title}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1"><Avatar initials={w.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)} size="xs"/><span className="text-xs text-gray-400 truncate">{w.assignee.split(" ")[0]}</span></div>
+                          <SLA days={w.sla}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Staff utilization */}
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <h3 className="font-semibold text-gray-900 text-sm mb-4">Capacity at a Glance</h3>
+          <div className="flex flex-col gap-3">
+            {STAFF.map(s=>(
+              <div key={s.id} className="flex items-center gap-3">
+                <Avatar initials={s.avatar} size="sm"/>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-medium text-gray-900 truncate">{s.name.split(" ")[0]}</p>
+                    <span style={{color:BAND_COLOR[s.band],background:BAND_BG[s.band]}} className="text-xs px-1.5 py-0.5 rounded font-medium">{s.util}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full">
+                    <div style={{width:`${s.util}%`,background:BAND_COLOR[s.band]}} className="h-1.5 rounded-full transition-all"/>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={()=>nav("capacity")} style={{color:R}} className="mt-4 text-xs font-semibold flex items-center gap-1 hover:underline">
+            View full capacity dashboard <Icon name="ArrowRight" size={12}/>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 4: INTERNAL WO LIST
+// ══════════════════════════════════════════════════════════════════════════════
+const WOList = ({nav}) => {
+  const [statusFilter,setStatusFilter] = useState("All");
+  const STATUSES = ["All","Open","InProgress","PendingApproval","Closed","OnHold"];
+  const filtered = statusFilter==="All"?WOS:WOS.filter(w=>w.status===statusFilter);
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      {/* Filter bar */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1">
+          {STATUSES.map(s=>(
+            <button key={s} onClick={()=>setStatusFilter(s)}
+              style={statusFilter===s?{background:R,color:"white"}:{}}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${statusFilter!==s?"text-gray-600 hover:bg-gray-50":""}`}>
+              {s==="InProgress"?"In Progress":s==="PendingApproval"?"Pending":s==="OnHold"?"On Hold":s}
+            </button>
+          ))}
+        </div>
+        <button className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50">
+          <Icon name="Filter" size={13}/> Filter
+        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-gray-400">{filtered.length} work orders</span>
+          <button onClick={()=>nav("wo-create")} style={{background:R}} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white hover:opacity-90">
+            <Icon name="Plus" size={13}/> New WO
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              {["WO Number","Title","Domain","Assignee","Due / SLA","Status","Priority","Value",""].map(h=>(
+                <th key={h} className="text-left text-xs font-semibold text-gray-500 px-4 py-3 whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((w,i)=>(
+              <tr key={w.id} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${i%2===1?"bg-gray-50/40":""}`}
+                onClick={()=>nav("wo-detail")}>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="text-xs font-mono text-gray-500">{w.no}</span>
+                </td>
+                <td className="px-4 py-3 max-w-xs">
+                  <p className="text-sm font-medium text-gray-900 truncate">{w.title}</p>
+                  {w.tender && <p className="text-xs text-gray-400">{w.tender}</p>}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-medium">{w.domain}</span>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    <Avatar initials={w.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)} size="sm"/>
+                    <span className="text-xs text-gray-700">{w.assignee.split(" ")[0]}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <p className="text-xs text-gray-500">{w.due}</p>
+                  <SLA days={w.sla}/>
+                </td>
+                <td className="px-4 py-3"><StatusPill status={w.status}/></td>
+                <td className="px-4 py-3"><PriorityBadge priority={w.priority}/></td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="text-xs font-medium text-gray-700">{fmtRM(w.value)}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <Icon name="MoreVertical" size={15} className="text-gray-400"/>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 5: CREATE WORK ORDER
+// ══════════════════════════════════════════════════════════════════════════════
+const CreateWO = ({nav}) => {
+  const [step,setStep] = useState(1);
+  const STEPS = ["External Linkage","Classification","Assignment"];
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="max-w-2xl mx-auto">
+        {/* Progress rail */}
+        <div className="flex items-center gap-0 mb-8">
+          {STEPS.map((s,i)=>(
+            <div key={s} className="flex items-center flex-1">
+              <div className="flex flex-col items-center gap-1">
+                <div style={i+1<=step?{background:R}:{}} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${i+1<=step?"text-white":"bg-gray-200 text-gray-400"}`}>
+                  {i+1<step?<Icon name="CheckCircle" size={16}/>:i+1}
+                </div>
+                <p className={`text-xs font-medium whitespace-nowrap ${i+1===step?"text-gray-900":i+1<step?"text-green-700":"text-gray-400"}`}>{s}</p>
+              </div>
+              {i<STEPS.length-1 && <div style={{background:i+1<step?SAFE:"#E5E7EB"}} className="flex-1 h-0.5 mx-2 mt-0 mb-5"/>}
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-8">
+          {step===1 && <>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Step 1: External Linkage</h2>
+            <p className="text-sm text-gray-500 mb-6">Link this internal WO to the external corporate Work Order reference.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">External WO Reference <span style={{color:R}}>*</span></label>
+                <div className="flex gap-2">
+                  <input defaultValue="200-19062026-047" className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2" style={{"--tw-ring-color":R}} placeholder="Search or enter WO reference…"/>
+                  <button className="px-4 py-2.5 bg-gray-100 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200">Lookup</button>
+                </div>
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <p className="text-xs font-semibold text-blue-800">Found: 200-19062026-047</p>
+                  <p className="text-xs text-blue-600">Source: CMT | Client: Jabatan Kastam Malaysia | Received: 19 Jun 2026</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Parent Tender (Optional)</label>
+                <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none">
+                  <option value="">No tender linkage</option>
+                  {TENDERS.map(t=><option key={t.id}>{t.no} — {t.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </>}
+
+          {step===2 && <>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Step 2: Classification</h2>
+            <p className="text-sm text-gray-500 mb-6">Define the request type, domain and complexity for this work order.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">WO Title <span style={{color:R}}>*</span></label>
+                <input className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none" defaultValue="Jabatan Kastam — Custom Software Advisory" placeholder="Descriptive title…"/>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Request Type <span style={{color:R}}>*</span></label>
+                  <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm">
+                    <option>Type 5 — Non-Physical Consultancy</option>
+                    <option>Type 1 — Leads / Opportunity</option>
+                    <option>Type 2 — Tender / RFP</option>
+                    <option>Type 3 — Documentation</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Priority</label>
+                  <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm">
+                    <option>Normal</option><option>High</option><option>Urgent</option><option>Low</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Complexity Tier <span style={{color:R}}>*</span></label>
+                  <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm">
+                    <option>Tier 1 — Team Lead approval</option>
+                    <option>Tier 2 — Solution Manager approval</option>
+                    <option>Tier 3 — HOD approval</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Due Date</label>
+                  <input type="date" defaultValue="2026-07-15" className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"/>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Indicative Value (RM)</label>
+                <input className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none" placeholder="e.g. 500000" defaultValue="500000"/>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">System-Computed Task Score</p>
+                  <p className="text-xs text-gray-500">Based on complexity value and tier rules</p>
+                </div>
+                <span className="text-xl font-bold" style={{color:WARN}}>3.4</span>
+              </div>
+            </div>
+          </>}
+
+          {step===3 && <>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Step 3: Assignment</h2>
+            <p className="text-sm text-gray-500 mb-6">Optionally assign this WO now. You can assign later from WO Detail.</p>
+            <div className="space-y-3">
+              {STAFF.filter(s=>["TM","TL","SM"].includes(s.role)).map(s=>(
+                <label key={s.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="radio" name="assignee" className="accent-red-700"/>
+                  <Avatar initials={s.avatar}/>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{s.name}</p>
+                    <p className="text-xs text-gray-400">{s.role} · Pod {s.pod}</p>
+                  </div>
+                  <div className="text-right">
+                    <p style={{color:BAND_COLOR[s.band]}} className="text-sm font-bold">{s.util}%</p>
+                    <span style={{color:BAND_COLOR[s.band],background:BAND_BG[s.band]}} className="text-xs px-2 py-0.5 rounded font-medium">{s.band}</span>
+                  </div>
+                </label>
+              ))}
+              <div className="mt-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Assigned Hours</label>
+                <input type="number" defaultValue="16" className="w-32 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"/>
+              </div>
+            </div>
+          </>}
+
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+            <button onClick={()=>step>1?setStep(step-1):nav("wo-list")} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50">
+              {step===1?"Cancel":"Back"}
+            </button>
+            <button onClick={()=>step<3?setStep(step+1):nav("wo-detail")} style={{background:R}} className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90">
+              {step===3?"Create Work Order →":"Continue →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 6: WO DETAIL
+// ══════════════════════════════════════════════════════════════════════════════
+const WODetail = ({nav}) => {
+  const [tab,setTab] = useState("Overview");
+  const wo = WOS[0];
+  const TABS = ["Overview","Assignment History","Effort Log","Evidence","Approval Trail"];
+  const effortRows = [
+    {date:"2026-06-18",staff:"Ahmad Zaki Bin Ramli",hours:6.0,notes:"Network topology review and vendor shortlist"},
+    {date:"2026-06-17",staff:"Ahmad Zaki Bin Ramli",hours:4.5,notes:"JPN requirements analysis"},
+    {date:"2026-06-16",staff:"Rizal Mansor",hours:5.0,notes:"Cisco vs Juniper comparative solutioning"},
+    {date:"2026-06-13",staff:"Ahmad Zaki Bin Ramli",hours:8.0,notes:"Site visit to JPN Putrajaya — pre-bid meeting"},
+    {date:"2026-06-12",staff:"Faizal Ibrahim",hours:4.5,notes:"Bill of Materials preparation"},
+    {date:"2026-06-11",staff:"Rizal Mansor",hours:4.0,notes:"Compliance checklist — KRISA SOC mapping"},
+  ];
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <p className="text-xs font-mono text-gray-400 mb-1">{wo.no}</p>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">{wo.title}</h2>
+            <p style={{color:R}} className="text-xs font-medium cursor-pointer hover:underline" onClick={()=>nav("tenders")}>↗ {wo.tender}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <StatusPill status={wo.status}/>
+            <SLA days={wo.sla}/>
+            <TierBadge tier={wo.tier}/>
+          </div>
+        </div>
+        <div className="flex gap-6 text-sm">
+          {[["Domain",wo.domain],["Type",wo.type],["Priority",wo.priority],["Due",wo.due],["Effort",`${wo.effort}h logged`],["Value",fmtRM(wo.value)]].map(([l,v])=>(
+            <div key={l}><p className="text-xs text-gray-400">{l}</p><p className="font-medium text-gray-900">{v}</p></div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        {/* Tabs */}
+        <div className="col-span-2">
+          <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 mb-4">
+            {TABS.map(t=>(
+              <button key={t} onClick={()=>setTab(t)} style={tab===t?{background:R,color:"white"}:{}}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-1 ${tab!==t?"text-gray-600 hover:text-gray-900":""}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            {tab==="Overview" && <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-xs text-gray-400 mb-0.5">Created By</p><p className="text-sm font-medium text-gray-900">Farhan Nordin (HOD)</p></div>
+                <div><p className="text-xs text-gray-400 mb-0.5">External WO</p><p className="text-sm font-medium text-gray-900">200-19062026-001</p></div>
+                <div><p className="text-xs text-gray-400 mb-0.5">Source Department</p><p className="text-sm font-medium text-gray-900">CMT</p></div>
+                <div><p className="text-xs text-gray-400 mb-0.5">End Client</p><p className="text-sm font-medium text-gray-900">Jabatan Pendaftaran Negara</p></div>
+              </div>
+              <div className="pt-3 border-t border-gray-50">
+                <p className="text-xs text-gray-400 mb-1">MAMPU/KRISA SOC Mapping</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["SOC-05 Network","SOC-07 Data Centre","SOC-11 Cloud","SOC-14 Security"].map(s=>(
+                    <span key={s} style={{background:"#EEF4FB",color:BLUE}} className="text-xs px-2 py-0.5 rounded font-medium">{s}</span>
+                  ))}
+                </div>
+              </div>
+            </div>}
+            {tab==="Effort Log" && <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-gray-900">Total: {wo.effort}h logged</p>
+                <button style={{background:R}} className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><Icon name="Plus" size={12}/>Log Hours</button>
+              </div>
+              <table className="w-full text-sm">
+                <thead><tr className="text-xs text-gray-400 border-b border-gray-100">{["Date","Staff","Hours","Notes"].map(h=><th key={h} className="text-left font-medium pb-2 pr-4">{h}</th>)}</tr></thead>
+                <tbody>
+                  {effortRows.map((r,i)=>(
+                    <tr key={i} className="border-b border-gray-50">
+                      <td className="py-2 pr-4 text-xs text-gray-500 whitespace-nowrap">{r.date}</td>
+                      <td className="py-2 pr-4 text-xs text-gray-700">{r.staff.split(" ")[0]}</td>
+                      <td className="py-2 pr-4 text-sm font-semibold text-gray-900">{r.hours}h</td>
+                      <td className="py-2 text-xs text-gray-500">{r.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>}
+            {tab==="Evidence" && <div>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-gray-900">3 evidence items</p>
+                <button style={{background:R}} className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><Icon name="Upload" size={12}/>Upload Evidence</button>
+              </div>
+              {[{name:"JPN_Requirements_Brief_v2.pdf",type:"Deliverable",by:"Ahmad Zaki",date:"2026-06-18",size:"2.4 MB"},
+                {name:"Prebid_Meeting_Minutes_JPN.docx",type:"Meeting Minutes",by:"Faizal Ibrahim",date:"2026-06-13",size:"180 KB"},
+                {name:"BOM_Network_Infrastructure.xlsx",type:"Deliverable",by:"Ahmad Zaki",date:"2026-06-17",size:"448 KB"}].map((e,i)=>(
+                <div key={i} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl mb-2">
+                  <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center"><Icon name="FileText" size={20} className="text-gray-400"/></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{e.name}</p>
+                    <p className="text-xs text-gray-400">{e.type} · {e.by} · {e.date} · {e.size}</p>
+                  </div>
+                  <button className="text-gray-400 hover:text-gray-600"><Icon name="Download" size={15}/></button>
+                </div>
+              ))}
+            </div>}
+            {tab==="Approval Trail" && <div>
+              <div className="relative pl-6">
+                {[{d:"Pending",who:"—",by:"—",note:"Waiting for Team Lead (Tier 1) review",time:"Now"},
+                  {d:"InProgress",who:"Ahmad Zaki",by:"Farhan Nordin",note:"WO assigned and execution started",time:"2026-06-11"},
+                  {d:"Open",who:"—",by:"Farhan Nordin (HOD)",note:"WO created and classified",time:"2026-06-10"}].map((a,i)=>(
+                  <div key={i} className="relative pb-6 last:pb-0">
+                    <div style={{background:i===0?WARN:SAFE}} className="absolute left-0 top-1.5 -translate-x-1/2 w-3 h-3 rounded-full border-2 border-white"/>
+                    <div className="ml-2">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <StatusPill status={a.d}/>
+                        <span className="text-xs text-gray-400">{a.time}</span>
+                      </div>
+                      <p className="text-sm text-gray-700">{a.note}</p>
+                      {a.by!=="—" && <p className="text-xs text-gray-400 mt-0.5">by {a.by}</p>}
+                    </div>
+                    {i<2 && <div className="absolute left-0 top-4 bottom-0 w-px bg-gray-200"/>}
+                  </div>
+                ))}
+              </div>
+            </div>}
+            {tab==="Assignment History" && <div>
+              {[{to:"Ahmad Zaki Bin Ramli",by:"Farhan Nordin",hrs:32,date:"2026-06-10",current:true,reason:null},
+                {to:"Rizal Mansor",by:"Farhan Nordin",hrs:16,date:"2026-06-09",current:false,reason:"Supporting role for network solutioning"}].map((a,i)=>(
+                <div key={i} className={`p-4 rounded-xl border mb-3 ${a.current?"border-green-200 bg-green-50":"border-gray-100 bg-gray-50"}`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Avatar initials={a.to.split(" ").map(n=>n[0]).join("").slice(0,2)}/>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{a.to}</p>
+                        <p className="text-xs text-gray-400">{a.hrs}h allocated · {a.date}</p>
+                        {a.reason && <p className="text-xs text-gray-500 mt-0.5">Reason: {a.reason}</p>}
+                      </div>
+                    </div>
+                    {a.current?<span style={{background:"#EAF3DE",color:SAFE}} className="text-xs px-2 py-0.5 rounded-full font-medium">Current</span>
+                      :<span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">Previous</span>}
+                  </div>
+                </div>
+              ))}
+            </div>}
+          </div>
+        </div>
+
+        {/* Sidebar quick actions */}
+        <div className="flex flex-col gap-3">
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick Actions</p>
+            <div className="flex flex-col gap-2">
+              <button onClick={()=>nav("assignment")} className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <Icon name="Users" size={14}/> Reassign
+              </button>
+              <button style={{background:R,color:"white"}} className="flex items-center gap-2 p-2.5 rounded-lg text-sm font-medium hover:opacity-90">
+                <Icon name="CheckCircle" size={14}/> Request Closure
+              </button>
+              <button className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <Icon name="Upload" size={14}/> Upload Evidence
+              </button>
+              <button className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <Icon name="Plus" size={14}/> Log Hours
+              </button>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Assigned To</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Avatar initials="AZ"/>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Ahmad Zaki</p>
+                <p className="text-xs text-gray-400">Solution Manager</p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Utilization</span><span style={{color:WARN}}>88%</span></div>
+              <div className="h-2 bg-gray-100 rounded-full"><div style={{width:"88%",background:WARN}} className="h-2 rounded-full"/></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">SLA Status</p>
+            <div className="flex items-center gap-2">
+              <Icon name="Clock" size={16} className="text-orange-500"/>
+              <span className="text-sm font-semibold text-orange-600">5 days remaining</span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Stage: Routing/Assignment · 3 day target</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 7: ASSIGNMENT WORKFLOW
+// ══════════════════════════════════════════════════════════════════════════════
+const AssignmentWorkflow = ({nav}) => {
+  const [selected,setSelected] = useState(null);
+  const [pod,setPod] = useState("All");
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="grid grid-cols-2 gap-6 max-w-5xl">
+        {/* WO context */}
+        <div>
+          <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
+            <p className="text-xs font-mono text-gray-400 mb-1">{WOS[0].no}</p>
+            <h3 className="font-semibold text-gray-900 mb-3">{WOS[0].title}</h3>
+            <div className="flex gap-4 text-sm">
+              <div><p className="text-xs text-gray-400">Type</p><p className="font-medium text-gray-900">{WOS[0].type}</p></div>
+              <div><p className="text-xs text-gray-400">Tier</p><TierBadge tier={WOS[0].tier}/></div>
+              <div><p className="text-xs text-gray-400">Due</p><p className="font-medium text-gray-900">{WOS[0].due}</p></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <p className="text-sm font-semibold text-gray-900 mb-2">Assigned Hours</p>
+            <input type="number" defaultValue={24} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold text-gray-900 focus:outline-none" placeholder="Hours"/>
+            <p className="text-xs text-gray-400 mt-2">Must be greater than 0</p>
+            {selected && <>
+              <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-100">
+                <p className="text-xs font-semibold text-green-800">Selected: {selected}</p>
+                <p className="text-xs text-green-600">Assignment will be logged to the audit trail</p>
+              </div>
+              <button onClick={()=>nav("wo-detail")} style={{background:R}} className="mt-3 w-full py-3 rounded-xl text-sm font-semibold text-white hover:opacity-90">
+                Confirm Assignment →
+              </button>
+            </>}
+          </div>
+        </div>
+
+        {/* Staff picker */}
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 text-sm">Select Assignee</h3>
+            <div className="flex gap-1">
+              {["All","A","B","C"].map(p=>(
+                <button key={p} onClick={()=>setPod(p)} style={pod===p?{background:R,color:"white"}:{}}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium ${pod!==p?"text-gray-500 hover:bg-gray-50":""}`}>
+                  {p==="All"?"All Pods":`Pod ${p}`}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            {STAFF.filter(s=>pod==="All"||s.pod===pod).map(s=>{
+              const isSel = selected===s.name;
+              return (
+                <button key={s.id} onClick={()=>setSelected(s.name)}
+                  style={isSel?{borderColor:R,background:"#FEF2F2"}:{}}
+                  className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:bg-gray-50 ${isSel?"border-red-200":"border-gray-200"}`}>
+                  <Avatar initials={s.avatar}/>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{s.name}</p>
+                    <p className="text-xs text-gray-400">{s.role} · {s.pod!=="—"?`Pod ${s.pod}`:s.dept} · {s.open} open WOs</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span style={{color:BAND_COLOR[s.band],background:BAND_BG[s.band]}} className="text-xs px-2 py-0.5 rounded font-bold">{s.band}</span>
+                    </div>
+                    <div className="w-24 h-2 bg-gray-100 rounded-full">
+                      <div style={{width:`${s.util}%`,background:BAND_COLOR[s.band]}} className="h-2 rounded-full"/>
+                    </div>
+                    <p style={{color:BAND_COLOR[s.band]}} className="text-xs font-bold mt-0.5 text-right">{s.util}%</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4 p-3 bg-gray-50 rounded-xl">
+            <div className="flex gap-4 text-xs text-gray-500">
+              {[{c:FREE,l:"Free < 50%"},{c:SAFE,l:"Safe 50-84%"},{c:WARN,l:"Warning 85-89%"},{c:R,l:"Overloaded ≥ 90%"}].map(b=>(
+                <span key={b.l} className="flex items-center gap-1"><span style={{background:b.c}} className="w-2 h-2 rounded-full"/>{b.l}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 8: MY TASKS
+// ══════════════════════════════════════════════════════════════════════════════
+const MyTasks = ({nav}) => {
+  const [filter,setFilter] = useState("All");
+  const myWos = WOS.filter(w=>w.assignee.includes("Ahmad Zaki"));
+  const filtered = filter==="All"?myWos:myWos.filter(w=>w.status===filter);
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6 max-w-2xl">
+      <div className="flex gap-3 mb-4">
+        {[{l:"Open",n:2},{l:"In Progress",n:1},{l:"Pending Approval",n:0}].map(s=>(
+          <div key={s.l} className="bg-white rounded-xl border border-gray-100 p-3 flex-1 text-center">
+            <p className="text-xl font-bold text-gray-900">{s.n}</p>
+            <p className="text-xs text-gray-400">{s.l}</p>
+          </div>
+        ))}
+        <div className="bg-white rounded-xl border border-gray-100 p-3 flex-1 text-center">
+          <p className="text-xl font-bold" style={{color:WARN}}>3</p>
+          <p className="text-xs text-gray-400">Due This Week</p>
+        </div>
+      </div>
+      <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 mb-4">
+        {["All","Open","InProgress","Closed"].map(s=>(
+          <button key={s} onClick={()=>setFilter(s)} style={filter===s?{background:R,color:"white"}:{}}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex-1 ${filter!==s?"text-gray-600":""}`}>
+            {s==="InProgress"?"In Progress":s}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col gap-3">
+        {filtered.concat(WOS.slice(2,4)).map(w=>(
+          <div key={w.id} onClick={()=>nav("wo-detail")}
+            className="bg-white rounded-xl border border-gray-100 p-4 cursor-pointer hover:border-red-200 transition-colors">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1 min-w-0 pr-2">
+                <p className="text-xs font-mono text-gray-400 mb-0.5">{w.no}</p>
+                <p className="text-sm font-semibold text-gray-900 leading-tight">{w.title}</p>
+              </div>
+              <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                <StatusPill status={w.status}/>
+                <SLA days={w.sla}/>
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Icon name="Calendar" size={12}/> Due {w.due}
+                <span className="mx-1">·</span>
+                <Icon name="Clock" size={12}/> {w.effort}h logged
+              </div>
+              <button onClick={e=>{e.stopPropagation()}} style={{color:R,borderColor:`${R}33`}} className="text-xs font-semibold border rounded-lg px-2.5 py-1.5 hover:bg-red-50 transition-colors">
+                + Log Hours
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 9: CAPACITY DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+const CapacityDashboard = ({nav}) => {
+  const [dept,setDept] = useState("CSI");
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      {/* Dual gauges */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        {[{dept:"CSI",util:81.4,threshold:85,color:SAFE},{dept:"CMT",util:74.2,threshold:80,color:BLUE}].map(d=>(
+          <div key={d.dept} className="bg-white rounded-xl border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg">{d.dept} Department</h3>
+                <p className="text-xs text-gray-400">Threshold: {d.threshold}%</p>
+              </div>
+              <div className="text-right">
+                <p style={{color:d.color}} className="text-3xl font-black">{d.util}%</p>
+                <span style={{background:`${d.color}20`,color:d.color}} className="text-xs px-2 py-0.5 rounded-full font-semibold">Safe Zone</span>
+              </div>
+            </div>
+            <div className="relative h-4 bg-gray-100 rounded-full overflow-hidden">
+              <div style={{width:`${d.util}%`,background:d.color}} className="h-4 rounded-full transition-all duration-500"/>
+              <div style={{left:`${d.threshold}%`}} className="absolute top-0 bottom-0 w-0.5 bg-gray-700 opacity-40"/>
+            </div>
+            <div className="flex justify-between mt-1 text-xs text-gray-400">
+              <span>0%</span>
+              <span style={{color:"#6B7280"}}>Threshold {d.threshold}%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <KPICard label="Staff at Warning" value="1" sub="Ahmad Zaki: 88%" icon="AlertTriangle" accent="#FEF9EC"/>
+        <KPICard label="Staff Overloaded" value="2" sub="Nurul Ain, Mohd Hisham" icon="AlertTriangle" accent="#FCEBEB"/>
+        <button onClick={()=>nav("tenders")} className="bg-white rounded-xl border border-gray-100 p-4 text-left hover:border-red-200 transition-colors">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Evaluate New Commitment</p>
+          <p style={{color:R}} className="text-sm font-semibold flex items-center gap-1">Go/No-Go Evaluator <Icon name="ArrowRight" size={14}/></p>
+          <p className="text-xs text-gray-400 mt-1">Tender scoring + capacity projection</p>
+        </button>
+      </div>
+
+      {/* Staff table */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900 text-sm">Staff Utilization Detail</h3>
+          <div className="flex gap-1">
+            {["CSI","CMT"].map(d=>(
+              <button key={d} onClick={()=>setDept(d)} style={dept===d?{background:R,color:"white"}:{}}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${dept!==d?"text-gray-600 hover:bg-gray-50":""}`}>{d}</button>
+            ))}
+          </div>
+        </div>
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-gray-100 bg-gray-50">
+            {["Staff","Role","Pod","Daily Hrs","Assigned","Worked","Remaining","Utilization","Band","Open WOs"].map(h=>(
+              <th key={h} className="text-left text-xs font-semibold text-gray-500 px-4 py-2.5 whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {STAFF.filter(s=>s.dept===dept).map((s,i)=>(
+              <tr key={s.id} className={`border-b border-gray-50 hover:bg-gray-50 ${i%2===1?"bg-gray-50/40":""}`}>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2"><Avatar initials={s.avatar} size="sm"/>
+                    <span className="text-sm font-medium text-gray-900">{s.name}</span></div>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">{s.role}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{s.pod}</td>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">{s.daily}h</td>
+                <td className="px-4 py-3 text-sm text-gray-700">{(s.util/100*s.daily*10).toFixed(1)}h</td>
+                <td className="px-4 py-3 text-sm text-gray-700">{s.used}h</td>
+                <td className="px-4 py-3 text-sm text-gray-700">{(s.daily-s.used).toFixed(1)}h</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-20 h-2 bg-gray-100 rounded-full"><div style={{width:`${s.util}%`,background:BAND_COLOR[s.band]}} className="h-2 rounded-full"/></div>
+                    <span style={{color:BAND_COLOR[s.band]}} className="text-sm font-bold">{s.util}%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span style={{color:BAND_COLOR[s.band],background:BAND_BG[s.band]}} className="text-xs px-2 py-0.5 rounded font-medium">{s.band}</span>
+                </td>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">{s.open}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 10: TENDER REGISTRY
+// ══════════════════════════════════════════════════════════════════════════════
+const TenderRegistry = ({nav}) => {
+  const [statusF,setStatusF] = useState("All");
+  const filtered = statusF==="All"?TENDERS:TENDERS.filter(t=>t.status===statusF);
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <KPICard label="Active Tenders" value="4" sub="Worth RM 100.5M" icon="Briefcase" accent="#EEF4FB"/>
+        <KPICard label="Pipeline Value" value="RM 1.79B" sub="All active + submitted" icon="TrendingUp" accent="#EAF3DE"/>
+        <KPICard label="Win Rate (YTD)" value="33.3%" sub="1 Won / 3 Decided" icon="Star" accent="#FEF9EC"/>
+        <KPICard label="Upcoming Closing" value="2" sub="Within 30 days" icon="Clock" accent="#FEF9EC"/>
+      </div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
+          {["All","Prospect","Qualified","InProgress","Submitted","Won","Lost"].map(s=>(
+            <button key={s} onClick={()=>setStatusF(s)} style={statusF===s?{background:R,color:"white"}:{}}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${statusF!==s?"text-gray-600 hover:bg-gray-50":""}`}>
+              {s==="InProgress"?"In Progress":s}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto">
+          <button style={{background:R}} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white hover:opacity-90">
+            <Icon name="Plus" size={13}/> New Tender
+          </button>
+        </div>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-gray-100 bg-gray-50">
+            {["Tender No","Name & Client","Category","Closing","Est. Value","Status","Owner","WOs",""].map(h=>(
+              <th key={h} className="text-left text-xs font-semibold text-gray-500 px-4 py-3 whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {filtered.map((t,i)=>(
+              <tr key={t.id} className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer ${i%2===1?"bg-gray-50/40":""}`}>
+                <td className="px-4 py-3"><span className="text-xs font-mono text-gray-500">{t.no}</span></td>
+                <td className="px-4 py-3 max-w-xs">
+                  <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
+                  <p className="text-xs text-gray-400">{t.client}</p>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-medium">{t.cat}</span>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{t.closing}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="text-sm font-semibold text-gray-900">{fmtRM(t.est)}</span>
+                </td>
+                <td className="px-4 py-3"><StatusPill status={t.status}/></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <Avatar initials={t.owner.split(" ").map(n=>n[0]).join("").slice(0,2)} size="sm"/>
+                    <span className="text-xs text-gray-600">{t.owner.split(" ")[0]}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span style={{color:BLUE}} className="text-sm font-bold">{t.wos}</span>
+                </td>
+                <td className="px-4 py-3"><Icon name="MoreVertical" size={15} className="text-gray-400"/></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 11: SKILLS & COMPETENCY DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+const SkillsDashboard = () => {
+  const [view,setView] = useState("Domain");
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <KPICard label="Skill Coverage" value="87.5%" sub="7/8 domains adequate" icon="Star" accent="#EAF3DE"/>
+        <KPICard label="Single-Point Risk" value="2" sub="BIM, AI/HPC" icon="AlertTriangle" accent="#FCEBEB"/>
+        <KPICard label="Succession Coverage" value="6/8" sub="Domains with ≥2 advanced" icon="Users" accent="#EEF4FB"/>
+        <KPICard label="Assessments Pending" value="4" sub="Overdue this quarter" icon="Clock" accent="#FEF9EC"/>
+      </div>
+
+      <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 w-fit mb-6">
+        {["Domain","Staff"].map(v=>(
+          <button key={v} onClick={()=>setView(v)} style={view===v?{background:R,color:"white"}:{}}
+            className={`px-4 py-1.5 rounded-lg text-xs font-medium ${view!==v?"text-gray-600":""}`}>
+            By {v}
+          </button>
+        ))}
+      </div>
+
+      {view==="Domain" && <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <h3 className="font-semibold text-gray-900 text-sm mb-1">Competency Heatmap — By Technology Domain</h3>
+        <p className="text-xs text-gray-400 mb-5">CSI team competency levels across all 8 technology areas</p>
+        <div className="overflow-x-auto">
+          <table className="text-xs w-full border-separate border-spacing-1">
+            <thead>
+              <tr>
+                <th className="text-left text-gray-500 font-medium p-1 w-28"/>
+                {DOMAINS.map(d=><th key={d} className="text-center text-gray-600 font-semibold p-1 min-w-16 whitespace-nowrap">{d}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {SKILLS_HEAT.map(row=>(
+                <tr key={row.staff}>
+                  <td className="text-gray-700 font-semibold p-1 whitespace-nowrap">{row.staff}</td>
+                  {DOMAINS.map(d=>{
+                    const v = row[d];
+                    return (
+                      <td key={d} className="p-1 text-center">
+                        <div style={{background:LEVEL_COLOR(v),color:v===0?"#D1D5DB":v>=4?"#7A1322":"#1F2937",minWidth:56}}
+                          className="rounded-lg py-2 px-1 font-semibold text-xs">
+                          {v===0?"—":LEVEL_LABEL[v]}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex items-center gap-4 mt-5 text-xs text-gray-500">
+          <p className="font-semibold">Legend:</p>
+          {[{c:"#F9FAFB",l:"None"},{c:LEVEL_COLOR(1),l:"Beginner"},{c:LEVEL_COLOR(2),l:"Intermediate"},{c:LEVEL_COLOR(3),l:"Advanced"},{c:LEVEL_COLOR(4),l:"Expert"},{c:R,l:"Expert+"}].map(b=>(
+            <span key={b.l} className="flex items-center gap-1"><span style={{background:b.c,border:"1px solid #E5E7EB"}} className="w-3 h-3 rounded"/> {b.l}</span>
+          ))}
+        </div>
+        <div className="mt-4 p-3 rounded-xl" style={{background:"#FCEBEB"}}>
+          <p style={{color:DR}} className="text-xs font-semibold flex items-center gap-1.5">
+            <Icon name="AlertTriangle" size={13}/>  2 Single-Point Dependencies Detected
+          </p>
+          <p className="text-xs text-red-600 mt-0.5">BIM (Mohd Hisham only at Expert) · AI/HPC (no staff at Advanced or above)</p>
+        </div>
+      </div>}
+
+      {view==="Staff" && <div className="grid grid-cols-2 gap-4">
+        {SKILLS_HEAT.map(row=>(
+          <div key={row.staff} className="bg-white rounded-xl border border-gray-100 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Avatar initials={row.staff.split(" ").map(n=>n[0]).join("").slice(0,2)}/>
+              <p className="font-semibold text-gray-900 text-sm">{row.staff}</p>
+            </div>
+            <div className="space-y-2">
+              {DOMAINS.map(d=>(
+                <div key={d} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-24 flex-shrink-0">{d}</span>
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full">
+                    <div style={{width:`${(row[d]/5)*100}%`,background:LEVEL_COLOR(row[d])}} className="h-2 rounded-full"/>
+                  </div>
+                  <span className="text-xs text-gray-400 w-20 text-right">{LEVEL_LABEL[row[d]]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 12: CERTIFICATION DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+const CertDashboard = () => {
+  const [filter,setFilter] = useState("All");
+  const filtered = filter==="All"?CERTS:CERTS.filter(c=>c.status===filter);
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <KPICard label="Active Certifications" value="6" sub="Of 8 total recorded" icon="Award" accent="#EAF3DE"/>
+        <KPICard label="Expiring ≤ 90 Days" value="2" sub="CCNA, Google CDL" icon="Clock" accent="#FEF9EC"/>
+        <KPICard label="Expired" value="2" sub="Action required" icon="XCircle" accent="#FCEBEB"/>
+        <KPICard label="Unverified" value="1" sub="Awaiting evidence upload" icon="AlertTriangle" accent="#FEF9EC"/>
+      </div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1">
+          {["All","Verified","Unverified","Expired"].map(s=>(
+            <button key={s} onClick={()=>setFilter(s)} style={filter===s?{background:R,color:"white"}:{}}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filter!==s?"text-gray-600 hover:bg-gray-50":""}`}>{s}</button>
+          ))}
+        </div>
+        <div className="ml-auto">
+          <button style={{background:R}} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white hover:opacity-90">
+            <Icon name="Plus" size={13}/> Add Certification
+          </button>
+        </div>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-gray-100 bg-gray-50">
+            {["Staff","Certification","Vendor","Issued","Expiry","Days","Status",""].map(h=>(
+              <th key={h} className="text-left text-xs font-semibold text-gray-500 px-4 py-3 whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {filtered.map((c,i)=>(
+              <tr key={c.id} className={`border-b border-gray-50 hover:bg-gray-50 ${i%2===1?"bg-gray-50/40":""}`}>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2"><Avatar initials={c.avatar} size="sm"/>
+                    <span className="text-sm font-medium text-gray-900">{c.staff.split(" ")[0]}</span></div>
+                </td>
+                <td className="px-4 py-3 max-w-xs">
+                  <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-medium">{c.vendor}</span>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{c.issued}</td>
+                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{c.expiry||"—"}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {c.days!==null && (
+                    <span className={`text-xs font-bold ${c.days<0?"text-red-600":c.days<=90?"text-orange-600":"text-gray-600"}`}>
+                      {c.days<0?`${Math.abs(c.days)}d expired`:`${c.days}d left`}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3"><StatusPill status={c.status}/></td>
+                <td className="px-4 py-3">
+                  <button className="text-xs font-medium" style={{color:R}}>
+                    {c.status==="Expired"?"Renew":c.status==="Unverified"?"Verify":"View"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 13: KPI DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+const KPIDashboard = () => {
+  const [period,setPeriod] = useState("2026-Q2");
+  const KPIS = [
+    {label:"OI Registered",target:8,achieved:6,unit:"opportunities",note:"Annual target"},
+    {label:"OI Won",target:3,achieved:2,unit:"opportunities",note:"Annual target"},
+    {label:"WO Closure Rate",target:90,achieved:86.9,unit:"%",note:"Department average"},
+    {label:"SLA Achievement",target:90,achieved:91.2,unit:"%",note:"All SLA stages"},
+    {label:"Team KPI Rollup",target:100,achieved:78,unit:"%",note:"Average team score"},
+  ];
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">Viewing as</p>
+          <p className="text-sm font-semibold text-gray-900">Farhan Nordin — HOD</p>
+        </div>
+        <select value={period} onChange={e=>setPeriod(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none">
+          {["2026-Q1","2026-Q2","2025","2026"].map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {KPIS.slice(0,3).map(k=>{
+          const pct = (k.achieved/k.target)*100;
+          const onTrack = pct>=90;
+          return (
+            <div key={k.label} className="bg-white rounded-xl border border-gray-100 p-5">
+              <p className="text-xs font-medium text-gray-500 mb-3">{k.label}</p>
+              <div className="flex items-end justify-between mb-3">
+                <div>
+                  <span className="text-3xl font-black text-gray-900">{k.achieved}{k.unit==="%"?"%":""}</span>
+                  <span className="text-sm text-gray-400 ml-1">/ {k.target}{k.unit==="%"?"%":""}</span>
+                </div>
+                <span style={{background:onTrack?"#EAF3DE":"#FCEBEB",color:onTrack?SAFE:R}} className="text-xs px-2 py-0.5 rounded-full font-semibold">
+                  {onTrack?"On Track":"At Risk"}
+                </span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full">
+                <div style={{width:`${Math.min(pct,100)}%`,background:onTrack?SAFE:R}} className="h-2 rounded-full"/>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">{k.note} · {pct.toFixed(0)}% achieved</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        {KPIS.slice(3).map(k=>{
+          const pct = (k.achieved/k.target)*100;
+          const onTrack = pct>=90;
+          return (
+            <div key={k.label} className="bg-white rounded-xl border border-gray-100 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-gray-900">{k.label}</p>
+                <span style={{background:onTrack?"#EAF3DE":"#FCEBEB",color:onTrack?SAFE:R}} className="text-xs px-2 py-0.5 rounded-full font-semibold">
+                  {onTrack?"Achieved":"At Risk"}
+                </span>
+              </div>
+              <div className="flex items-end gap-2 mb-2">
+                <span className="text-2xl font-black text-gray-900">{k.achieved}{k.unit}</span>
+                <span className="text-sm text-gray-400 mb-0.5">target {k.target}{k.unit}</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full">
+                <div style={{width:`${Math.min(pct,100)}%`,background:onTrack?SAFE:WARN}} className="h-2 rounded-full"/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Team rollup */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <h3 className="font-semibold text-gray-900 text-sm mb-4">Team KPI Rollup</h3>
+        <table className="w-full text-sm">
+          <thead><tr className="text-xs text-gray-400 border-b border-gray-100">
+            {["Staff","Role","OI Reg","OI Won","Closure Rate","SLA Ach.","Overall"].map(h=>(
+              <th key={h} className="text-left font-medium pb-2 pr-4">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {[{name:"Ahmad Zaki",role:"SM",oi_r:3,oi_w:1,cl:88,sla:90,score:82},
+              {name:"Nurul Ain",role:"TL",oi_r:2,oi_w:1,cl:91,sla:88,score:87},
+              {name:"Faizal Ibrahim",role:"TM",oi_r:0,oi_w:0,cl:100,sla:94,score:71},
+              {name:"Siti Norzakiah",role:"TL",oi_r:1,oi_w:0,cl:83,sla:92,score:69},
+              {name:"Mohd Hisham",role:"BIM_TL",oi_r:0,oi_w:0,cl:89,sla:91,score:76},
+            ].map((r,i)=>(
+              <tr key={i} className="border-b border-gray-50">
+                <td className="py-2.5 pr-4">
+                  <div className="flex items-center gap-2">
+                    <Avatar initials={r.name.split(" ").map(n=>n[0]).join("").slice(0,2)} size="sm"/>
+                    <span className="text-sm font-medium text-gray-900">{r.name}</span>
+                  </div>
+                </td>
+                <td className="py-2.5 pr-4 text-xs text-gray-500">{r.role}</td>
+                <td className="py-2.5 pr-4 text-sm text-gray-700">{r.oi_r}</td>
+                <td className="py-2.5 pr-4 text-sm text-gray-700">{r.oi_w}</td>
+                <td className="py-2.5 pr-4 text-sm text-gray-700">{r.cl}%</td>
+                <td className="py-2.5 pr-4 text-sm text-gray-700">{r.sla}%</td>
+                <td className="py-2.5">
+                  <span style={{background:r.score>=80?"#EAF3DE":r.score>=70?"#FEF9EC":"#FCEBEB",color:r.score>=80?SAFE:r.score>=70?WARN:R}} className="text-sm font-bold px-2 py-0.5 rounded">{r.score}%</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN 14: REPORTS
+// ══════════════════════════════════════════════════════════════════════════════
+const Reports = () => {
+  const [selected,setSelected] = useState(null);
+  const RPTS = [
+    {code:"WO_TREND",name:"Monthly WO Trend Report",desc:"Volume, hours and closure rate by month",formats:["pptx","excel"],icon:"BarChart2",cat:"Operations"},
+    {code:"CAPACITY",name:"Capacity & Utilization Report",desc:"Department and individual utilization against thresholds",formats:["pptx","excel"],icon:"Activity",cat:"Resource"},
+    {code:"CMT_LINKAGE",name:"CMT-to-CSI WO Linkage Report",desc:"Business value evidence — CMT opportunities linked to CSI WOs",formats:["pptx","excel"],icon:"GitMerge",cat:"Business"},
+    {code:"AUDIT_TRAIL",name:"Governance & Compliance Audit Trail",desc:"Assignment, approval and closure history for ISO 9001 / PDPA / MAMPU-KRISA",formats:["pdf","excel"],icon:"Shield",cat:"Governance"},
+    {code:"KPI_ACHV",name:"KPI Achievement Report",desc:"Role-level KPI achievement-to-date",formats:["excel"],icon:"Target",cat:"Performance"},
+    {code:"OI_COMM",name:"OI & Commission Report",desc:"Registered/won OI counts and commission ledger per staff",formats:["excel"],icon:"Star",cat:"Performance"},
+    {code:"RESOURCE_CAP",name:"Resource Capacity Report",desc:"Staff-level capacity worksheet for offline tender resourcing",formats:["excel"],icon:"Users",cat:"Resource"},
+    {code:"COMP_GAP",name:"Competency Gap Analysis",desc:"Gap between required and current competency per technology domain",formats:["pdf","excel"],icon:"BookOpen",cat:"Capability"},
+    {code:"CERT_COMP",name:"Certification Compliance Report",desc:"Certification status and upcoming expiries against requirements",formats:["pdf","excel"],icon:"Award",cat:"Capability"},
+    {code:"TENDER_PIPE",name:"Tender Pipeline Report",desc:"Active and historical tenders with status, value and resource load",formats:["pptx","excel"],icon:"Briefcase",cat:"Business"},
+    {code:"CHAIRMAN",name:"Chairman Executive Summary",desc:"Single consolidated export of the Executive Dashboard — all five domains",formats:["pptx","pdf"],icon:"LayoutDashboard",cat:"Executive"},
+    {code:"RISK_REG",name:"Risk Register Report",desc:"Open risks, dependencies and escalation status",formats:["pdf","excel"],icon:"AlertTriangle",cat:"Governance"},
+  ];
+  const cats = [...new Set(RPTS.map(r=>r.cat))];
+  const [catF,setCatF] = useState("All");
+  const filtRpts = catF==="All"?RPTS:RPTS.filter(r=>r.cat===catF);
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="flex items-center gap-2 mb-6 overflow-x-auto">
+        {["All",...cats].map(c=>(
+          <button key={c} onClick={()=>setCatF(c)} style={catF===c?{background:R,color:"white"}:{}}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap border ${catF!==c?"border-gray-200 text-gray-600 bg-white hover:bg-gray-50":"border-transparent"}`}>
+            {c}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {filtRpts.map(r=>{
+          const isSel = selected===r.code;
+          return (
+            <div key={r.code} onClick={()=>setSelected(isSel?null:r.code)}
+              style={isSel?{borderColor:R,boxShadow:`0 0 0 2px ${R}22`}:{}}
+              className={`bg-white rounded-xl border cursor-pointer transition-all hover:border-red-200 ${isSel?"border-red-300":"border-gray-100"}`}>
+              <div className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div style={{background:`${R}15`,color:R}} className="w-10 h-10 rounded-xl flex items-center justify-center">
+                    <Icon name={r.icon} size={20}/>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">{r.cat}</span>
+                </div>
+                <h4 className="text-sm font-semibold text-gray-900 mb-1 leading-tight">{r.name}</h4>
+                <p className="text-xs text-gray-400 leading-relaxed">{r.desc}</p>
+                <div className="flex gap-1.5 mt-3">
+                  {r.formats.map(f=>(
+                    <span key={f} style={{background:f==="pptx"?"#FEF9EC":f==="pdf"?"#FCEBEB":"#EAF3DE",color:f==="pptx"?WARN:f==="pdf"?R:SAFE}}
+                      className="text-xs px-2 py-0.5 rounded font-medium uppercase">{f}</span>
+                  ))}
+                </div>
+              </div>
+              {isSel && <div className="border-t border-gray-100 p-4 bg-gray-50 rounded-b-xl">
+                <p className="text-xs font-semibold text-gray-700 mb-3">Generate Report</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Period From</label>
+                    <input type="date" defaultValue="2026-01-01" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"/>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Format</label>
+                    <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none">
+                      {r.formats.map(f=><option key={f} className="uppercase">{f.toUpperCase()}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button style={{background:R}} className="w-full py-2 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1.5 hover:opacity-90">
+                  <Icon name="Download" size={13}/> Generate Report
+                </button>
+              </div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCREEN TITLES
+// ══════════════════════════════════════════════════════════════════════════════
+const TITLES = {
+  login:"Sign In",executive:"Executive Dashboard",department:"Department Dashboard",
+  "wo-list":"Internal Work Orders","wo-create":"Create Work Order","wo-detail":"WO Detail · 300-19062026-001",
+  assignment:"Assignment Workflow","my-tasks":"My Tasks",
+  capacity:"Capacity Dashboard",tenders:"Tender Registry",
+  skills:"Skills & Competency",certifications:"Certifications",
+  kpi:"KPI Dashboard",reports:"Reports",
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  MAIN APP
+// ══════════════════════════════════════════════════════════════════════════════
+function App() {
+  const [screen,setScreen] = useState("login");
+  const [collapsed,setCollapsed] = useState(false);
+
+  const SCREENS = {
+    login:     <LoginScreen nav={setScreen}/>,
+    executive: <ExecutiveDashboard nav={setScreen}/>,
+    department:<DepartmentDashboard nav={setScreen}/>,
+    "wo-list": <WOList nav={setScreen}/>,
+    "wo-create":<CreateWO nav={setScreen}/>,
+    "wo-detail":<WODetail nav={setScreen}/>,
+    assignment:<AssignmentWorkflow nav={setScreen}/>,
+    "my-tasks":<MyTasks nav={setScreen}/>,
+    capacity:  <CapacityDashboard nav={setScreen}/>,
+    tenders:   <TenderRegistry nav={setScreen}/>,
+    skills:    <SkillsDashboard/>,
+    certifications:<CertDashboard/>,
+    kpi:       <KPIDashboard/>,
+    reports:   <Reports/>,
+  };
+
+  if(screen==="login") return SCREENS.login;
+
+  return (
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <Sidebar current={screen} nav={setScreen} collapsed={collapsed} setCollapsed={setCollapsed}/>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <TopBar title={TITLES[screen]||screen} nav={setScreen}/>
+        {SCREENS[screen]||<div className="p-8 text-gray-500">Screen not found</div>}
+      </div>
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>

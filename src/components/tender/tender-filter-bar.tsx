@@ -1,0 +1,135 @@
+"use client";
+
+import { useCallback, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+const STATUSES = [
+  "Prospect",
+  "Qualified",
+  "InProgress",
+  "Submitted",
+  "Clarification",
+  "Won",
+  "Lost",
+  "Cancelled",
+];
+
+const STATUS_LABELS: Record<string, string> = {
+  Prospect: "Prospect",
+  Qualified: "Qualified",
+  InProgress: "In Progress",
+  Submitted: "Submitted",
+  Clarification: "Clarification",
+  Won: "Won",
+  Lost: "Lost",
+  Cancelled: "Cancelled",
+};
+
+const CATEGORIES = [
+  "Government",
+  "Private",
+  "GLC",
+  "International",
+];
+
+export default function TenderFilterBar() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [searchInput, setSearchInput] = useState(
+    searchParams.get("q") ?? ""
+  );
+
+  const activeStatuses = (searchParams.get("status") ?? "")
+    .split(",")
+    .filter(Boolean);
+  const activeCategory = searchParams.get("category") ?? "";
+
+  const updateParam = useCallback(
+    (key: string, value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+      params.delete("after");
+      router.replace(`?${params.toString()}`);
+    },
+    [searchParams, router]
+  );
+
+  function toggleStatus(status: string) {
+    const current = new Set(activeStatuses);
+    if (current.has(status)) {
+      current.delete(status);
+    } else {
+      current.add(status);
+    }
+    updateParam("status", Array.from(current).join(","));
+  }
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateParam("q", searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, updateParam]);
+
+  return (
+    <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+      {/* Status pills */}
+      <div className="flex flex-wrap gap-2">
+        {STATUSES.map((s) => {
+          const isActive = activeStatuses.includes(s);
+          return (
+            <button
+              key={s}
+              onClick={() => toggleStatus(s)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                isActive
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {STATUS_LABELS[s]}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Second row: category + search */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={activeCategory}
+          onChange={(e) => updateParam("category", e.target.value)}
+          className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-primary-500 focus:outline-none"
+        >
+          <option value="">All Categories</option>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="text"
+          placeholder="Search tender number, name, or client..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="flex-1 min-w-[200px] rounded border border-gray-300 px-3 py-1.5 text-sm placeholder-gray-400 focus:border-primary-500 focus:outline-none"
+        />
+
+        {(activeStatuses.length > 0 || activeCategory || searchInput) && (
+          <button
+            onClick={() => router.replace("/workloads")}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

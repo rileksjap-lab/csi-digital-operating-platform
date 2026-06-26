@@ -1,0 +1,1280 @@
+import pool, { query } from "@/lib/db/pool";
+import type { PoolClient } from "pg";
+import type { ScopeFilter } from "@/lib/auth/guards";
+import type { AuthSession } from "@/lib/types/api";
+import {
+  type CursorPage,
+  encodeCursor,
+  decodeCursor,
+  buildCursorWhere,
+  applyScopeFilter,
+} from "@/lib/db/repo-utils";
+import { insertAuditEntry } from "@/lib/db/audit";
+
+// ─── List types ─────────────────────────────────────────────────────────────
+
+export type SlaStatus = "OnTime" | "Warning" | "Breached";
+
+export interface WoListItem {
+  id: string;
+  csiWoNo: string;
+  extWoNo: string | null;
+  tenderNo: string | null;
+  title: string;
+  domain: string;
+  requestTypeName: string;
+  priority: string;
+  sourceOfWO: string | null;
+  slaWorkingDays: number | null;
+  tierCode: number;
+  tierName: string;
+  assignedToName: string | null;
+  dueDate: string | null;
+  slaDaysRemaining: number | null;
+  slaStatus: SlaStatus | null;
+  status: string;
+  effortHoursTotal: number;
+  evidenceCount: number;
+  progressPercent: number;
+  createdAt: string;
+}
+
+export interface WoListFilters {
+  status?: string;
+  domain?: string;
+  requestTypeId?: string;
+  tierId?: string;
+  tenderId?: string;
+  assignedTo?: string;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+  q?: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  limit: number;
+  after?: string;
+}
+
+const SORT_MAP: Record<string, string> = {
+  csiWoNo: "w.csi_wo_no",
+  title: "w.title",
+  priority: "w.priorityinterdepart",
+  dueDate: "w.duedate",
+  status: "w.status",
+  createdAt: "w.createdat",
+};
+
+export async function listWorkOrders(
+  filters: WoListFilters,
+  scope: ScopeFilter
+): Promise<CursorPage<WoListItem>> {
+  const params: unknown[] = [];
+  const wheres: string[] = [];
+  let paramIdx = 1;
+
+  // Scope filter
+  const sf = applyScopeFilter(scope, "w", paramIdx);
+  if (sf.clause) {
+    wheres.push(sf.clause);
+    params.push(...sf.params);
+    paramIdx += sf.params.length;
+  }
+
+  // Optional filters
+  if (filters.status) {
+    const statuses = filters.status.split(",").map((s) => s.trim());
+    wheres.push(`AND w.status = ANY($${paramIdx}::varchar[])`);
+    params.push(statuses);
+    paramIdx++;
+  }
+  if (filters.domain) {
+    wheres.push(`AND rt.domain = $${paramIdx}`);
+    params.push(filters.domain);
+    paramIdx++;
+  }
+  if (filters.requestTypeId) {
+    wheres.push(`AND w.requesttypeid = $${paramIdx}`);
+    params.push(filters.requestTypeId);
+    paramIdx++;
+  }
+  if (filters.tierId) {
+    wheres.push(`AND w.tierid = $${paramIdx}`);
+    params.push(filters.tierId);
+    paramIdx++;
+  }
+  if (filters.tenderId) {
+    wheres.push(`AND w.tenderid = $${paramIdx}`);
+    params.push(filters.tenderId);
+    paramIdx++;
+  }
+  if (filters.assignedTo) {
+    wheres.push(`AND w.assignedto = $${paramIdx}`);
+    params.push(filters.assignedTo);
+    paramIdx++;
+  }
+  if (filters.dueDateFrom) {
+    wheres.push(`AND w.duedate >= $${paramIdx}`);
+    params.push(filters.dueDateFrom);
+    paramIdx++;
+  }
+  if (filters.dueDateTo) {
+    wheres.push(`AND w.duedate <= $${paramIdx}`);
+    params.push(filters.dueDateTo);
+    paramIdx++;
+  }
+  if (filters.q) {
+    wheres.push(
+      `AND (w.title ILIKE $${paramIdx} OR w.csi_wo_no ILIKE $${paramIdx})`
+    );
+    params.push(`%${filters.q}%`);
+    paramIdx++;
+  }
+
+  // Cursor
+  const sortCol = SORT_MAP[filters.sortBy] ?? "w.createdat";
+  const cursor = filters.after ? decodeCursor(filters.after) : null;
+  const cursorWhere = buildCursorWhere(
+    cursor,
+    sortCol,
+    filters.sortDir,
+    paramIdx
+  );
+  if (cursorWhere.clause) {
+    wheres.push(cursorWhere.clause);
+    params.push(...cursorWhere.params);
+    paramIdx += cursorWhere.params.length;
+  }
+
+  const whereStr = wheres.join("\n      ");
+  const dir = filters.sortDir;
+  const limitPlus1 = filters.limit + 1;
+
+  const dataQuery = `
+    SELECT
+      w.id AS "Id", w.csi_wo_no AS "CSI_WO_No", ew.extwo_no AS "ExtWO_No", t.tenderno AS "TenderNo",
+      w.title AS "Title", rt.domain AS "Domain", rt.typename AS "RequestTypeName",
+      w.priorityinterdepart AS "Priority", w.sourceofwo AS "SourceOfWO",
+      w.slaworkingdays AS "SLAWorkingDays",
+      ct.tiercode AS "TierCode", ct.tiername AS "TierName",
+      sa.name AS "AssignedToName",
+      w.duedate AS "DueDate", w.status AS "Status", w.createdat AS "CreatedAt",
+      (rt.slaackdays + rt.slaclassifydays + rt.slaroutedays) AS "SlaTotalDays",
+      COALESCE((SELECT SUM(e.hours) FROM effort_log e WHERE e.csi_wo_id = w.id), 0) AS "EffortTotal",
+      (SELECT COUNT(*) FROM evidence_deliverable ed WHERE ed.csi_wo_id = w.id AND ed.removedat IS NULL) AS "EvidenceCount",
+      COALESCE((SELECT ROUND(AVG(wt.progress)) FROM wo_task wt WHERE wt.csi_wo_id = w.id AND wt.status = 'Active'), 0) AS "ProgressPercent"
+    FROM csi_wo w
+    JOIN request_type rt ON rt.id = w.requesttypeid
+    JOIN complexity_tier ct ON ct.id = w.tierid
+    LEFT JOIN external_wo ew ON ew.id = w.extwo_id
+    LEFT JOIN staff sa ON sa.id = w.assignedto
+    LEFT JOIN tender t ON t.id = w.tenderid
+    WHERE 1=1
+      ${whereStr}
+    ORDER BY ${sortCol} ${dir}, w.id ${dir}
+    LIMIT $${paramIdx}`;
+
+  params.push(limitPlus1);
+
+  const countQuery = `
+    SELECT COUNT(*) AS "total"
+    FROM csi_wo w
+    JOIN request_type rt ON rt.id = w.requesttypeid
+    JOIN complexity_tier ct ON ct.id = w.tierid
+    LEFT JOIN external_wo ew ON ew.id = w.extwo_id
+    LEFT JOIN staff sa ON sa.id = w.assignedto
+    LEFT JOIN tender t ON t.id = w.tenderid
+    WHERE 1=1
+      ${whereStr}`;
+
+  // Count query uses the same params minus the limit and cursor params
+  const countParams = params.slice(
+    0,
+    params.length - 1 - cursorWhere.params.length
+  );
+
+  const [dataResult, countResult] = await Promise.all([
+    query(dataQuery, params),
+    query<{ total: string }>(countQuery, countParams),
+  ]);
+
+  const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
+  const hasNextPage = dataResult.rows.length > filters.limit;
+  const rows = dataResult.rows.slice(0, filters.limit);
+
+  const lastRow = rows[rows.length - 1];
+  const nextCursor = hasNextPage && lastRow
+    ? encodeCursor(
+        lastRow.Id as string,
+        String(lastRow[sortColKey(filters.sortBy)] ?? lastRow.CreatedAt)
+      )
+    : null;
+
+  return {
+    rows: rows.map(mapWoListItem),
+    total,
+    hasNextPage,
+    nextCursor,
+  };
+}
+
+function sortColKey(sortBy: string): string {
+  const map: Record<string, string> = {
+    csiWoNo: "CSI_WO_No",
+    title: "Title",
+    priority: "Priority",
+    dueDate: "DueDate",
+    status: "Status",
+    createdAt: "CreatedAt",
+  };
+  return map[sortBy] ?? "CreatedAt";
+}
+
+function computeSla(
+  createdAt: unknown,
+  slaTotalDays: unknown,
+  status: string
+): { slaDaysRemaining: number | null; slaStatus: SlaStatus | null } {
+  if (status === "Closed") return { slaDaysRemaining: null, slaStatus: null };
+  const total = Number(slaTotalDays);
+  if (!total || isNaN(total)) return { slaDaysRemaining: null, slaStatus: null };
+
+  const created = new Date(String(createdAt));
+  const deadline = new Date(created);
+  deadline.setDate(deadline.getDate() + total);
+
+  const now = new Date();
+  const diffMs = deadline.getTime() - now.getTime();
+  const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  let slaStatus: SlaStatus;
+  if (daysRemaining < 0) slaStatus = "Breached";
+  else if (daysRemaining <= 1) slaStatus = "Warning";
+  else slaStatus = "OnTime";
+
+  return { slaDaysRemaining: daysRemaining, slaStatus };
+}
+
+function mapWoListItem(row: Record<string, unknown>): WoListItem {
+  const status = row.Status as string;
+  const { slaDaysRemaining, slaStatus } = computeSla(row.CreatedAt, row.SlaTotalDays, status);
+
+  return {
+    id: row.Id as string,
+    csiWoNo: row.CSI_WO_No as string,
+    extWoNo: (row.ExtWO_No as string) ?? null,
+    tenderNo: (row.TenderNo as string) ?? null,
+    title: row.Title as string,
+    domain: row.Domain as string,
+    requestTypeName: row.RequestTypeName as string,
+    priority: row.Priority as string,
+    sourceOfWO: (row.SourceOfWO as string) ?? null,
+    slaWorkingDays: row.SLAWorkingDays != null ? Number(row.SLAWorkingDays) : null,
+    tierCode: Number(row.TierCode),
+    tierName: row.TierName as string,
+    assignedToName: (row.AssignedToName as string) ?? null,
+    dueDate: row.DueDate ? String(row.DueDate) : null,
+    slaDaysRemaining,
+    slaStatus,
+    status,
+    effortHoursTotal: parseFloat(String(row.EffortTotal)),
+    evidenceCount: parseInt(String(row.EvidenceCount), 10),
+    progressPercent: parseInt(String(row.ProgressPercent ?? 0), 10),
+    createdAt: String(row.CreatedAt),
+  };
+}
+
+// ─── Detail ─────────────────────────────────────────────────────────────────
+
+export interface WoTaskItem {
+  id: string;
+  taskNo: number;
+  description: string;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  progress: number;
+  scope: string;
+  status: string;
+  dateCreated: string;
+  dateCompleted: string | null;
+}
+
+export interface WoDetail {
+  id: string;
+  csiWoNo: string;
+  extWoNo: string | null;
+  sourceOfWO: string | null;
+  tenderOrProjectCode: string | null;
+  tender: { id: string; tenderNo: string; tenderName: string; status: string } | null;
+  requestType: { id: string; typeCode: number; typeName: string; domain: string };
+  tier: { id: string; tierCode: number; tierName: string };
+  priorityInterdepart: string;
+  priorityInternal: string | null;
+  title: string;
+  indicativeValue: number | null;
+  complexityValue: number | null;
+  taskScore: number | null;
+  slaWorkingDays: number | null;
+  dueDate: string | null;
+  slaDaysRemaining: number | null;
+  slaStatus: SlaStatus | null;
+  status: string;
+  requesterName: string | null;
+  remark: string | null;
+  monitoringStaff: { id: string; name: string } | null;
+  progressPercent: number;
+  createdAt: string;
+  updatedAt: string | null;
+  createdBy: { id: string; name: string; roleCode: string };
+  assignedTo: { id: string; name: string; roleCode: string; subTeam: string | null } | null;
+  tasks: WoTaskItem[];
+  assignmentHistory: AssignmentItem[];
+  effortLog: EffortItem[];
+  evidenceItems: EvidenceItem[];
+  approvalTrail: ApprovalItem[];
+}
+
+interface AssignmentItem {
+  assignedTo: string;
+  assignedBy: string;
+  assignedHours: number;
+  assignedDate: string;
+  isCurrent: boolean;
+  reassignReason: string | null;
+}
+
+interface EffortItem {
+  id: string;
+  staffName: string;
+  logDate: string;
+  hours: number;
+  notes: string | null;
+}
+
+interface EvidenceItem {
+  id: string;
+  fileRef: string;
+  evidenceType: string;
+  uploadedByName: string;
+  uploadedDate: string;
+}
+
+interface ApprovalItem {
+  tierCode: number;
+  tierName: string;
+  approvedByName: string;
+  decision: string;
+  reason: string | null;
+  decisionDate: string;
+}
+
+export async function getWorkOrderById(
+  id: string,
+  scope: ScopeFilter
+): Promise<WoDetail | null> {
+  let paramIdx = 2; // $1 = id
+  const scopeF = applyScopeFilter(scope, "w", paramIdx);
+
+  const mainResult = await query(
+    `SELECT
+      w.id AS "Id", w.csi_wo_no AS "CSI_WO_No", ew.extwo_no AS "ExtWO_No",
+      w.title AS "Title", w.priorityinterdepart AS "PriorityInterdepart",
+      w.priorityinternal AS "PriorityInternal", w.status AS "Status",
+      w.sourceofwo AS "SourceOfWO", w.requestername AS "RequesterName", w.tenderorprojectcode AS "TenderOrProjectCode",
+      w.slaworkingdays AS "SLAWorkingDays", w.remark AS "Remark",
+      w.indicativevalue AS "IndicativeValue", w.complexityvalue AS "ComplexityValue", w.taskscore AS "TaskScore",
+      w.duedate AS "DueDate", w.createdat AS "CreatedAt", w.updatedat AS "UpdatedAt",
+      rt.id AS "RtId", rt.typecode AS "TypeCode", rt.typename AS "TypeName", rt.domain AS "Domain",
+      ct.id AS "CtId", ct.tiercode AS "TierCode", ct.tiername AS "TierName",
+      (rt.slaackdays + rt.slaclassifydays + rt.slaroutedays) AS "SlaTotalDays",
+      cs.id AS "CreatorId", cs.name AS "CreatorName", cr.rolecode AS "CreatorRoleCode",
+      sa.id AS "AssigneeId", sa.name AS "AssigneeName",
+      sr.rolecode AS "AssigneeRoleCode", sa.subteam AS "AssigneeSubTeam",
+      t.id AS "TenderId", t.tenderno AS "TenderNo", t.tendername AS "TenderName", t.status AS "TenderStatus",
+      ms.id AS "MonitorId", ms.name AS "MonitorName"
+    FROM csi_wo w
+    LEFT JOIN external_wo ew ON ew.id = w.extwo_id
+    JOIN request_type rt ON rt.id = w.requesttypeid
+    JOIN complexity_tier ct ON ct.id = w.tierid
+    JOIN staff cs ON cs.id = w.createdby
+    JOIN role cr ON cr.id = cs.roleid
+    LEFT JOIN staff sa ON sa.id = w.assignedto
+    LEFT JOIN role sr ON sr.id = sa.roleid
+    LEFT JOIN tender t ON t.id = w.tenderid
+    LEFT JOIN staff ms ON ms.id = w.monitoringstaffid
+    WHERE w.id = $1
+      ${scopeF.clause}`,
+    [id, ...scopeF.params]
+  );
+
+  if (mainResult.rows.length === 0) return null;
+  const r = mainResult.rows[0];
+
+  const [assignments, efforts, evidence, approvals, tasks] = await Promise.all([
+    query(
+      `SELECT a.assignedhours AS "AssignedHours", a.assigneddate AS "AssignedDate",
+              a.iscurrent AS "IsCurrent", a.reassignreason AS "ReassignReason",
+              s.name AS "StaffName", ab.name AS "AssignedByName"
+       FROM assignment a
+       JOIN staff s ON s.id = a.staffid
+       JOIN staff ab ON ab.id = a.assignedby
+       WHERE a.csi_wo_id = $1
+       ORDER BY a.createdat DESC`,
+      [id]
+    ),
+    query(
+      `SELECT e.id AS "Id", e.logdate AS "LogDate", e.hours AS "Hours", e.notes AS "Notes",
+              s.name AS "StaffName"
+       FROM effort_log e
+       JOIN staff s ON s.id = e.staffid
+       WHERE e.csi_wo_id = $1
+       ORDER BY e.logdate DESC`,
+      [id]
+    ),
+    query(
+      `SELECT ed.id AS "Id", ed.fileref AS "FileRef", ed.evidencetype AS "EvidenceType",
+              ed.uploadeddate AS "UploadedDate", s.name AS "UploadedByName"
+       FROM evidence_deliverable ed
+       JOIN staff s ON s.id = ed.uploadedby
+       WHERE ed.csi_wo_id = $1 AND ed.removedat IS NULL
+       ORDER BY ed.uploadeddate DESC`,
+      [id]
+    ),
+    query(
+      `SELECT ar.decision AS "Decision", ar.reason AS "Reason", ar.decisiondate AS "DecisionDate",
+              s.name AS "ApproverName",
+              ct.tiercode AS "TierCode", ct.tiername AS "TierName"
+       FROM approval_record ar
+       JOIN staff s ON s.id = ar.approvedby
+       JOIN complexity_tier ct ON ct.id = ar.tierid
+       WHERE ar.csi_wo_id = $1
+       ORDER BY ar.decisiondate DESC`,
+      [id]
+    ),
+    query(
+      `SELECT wt.id AS "Id", wt.taskno AS "TaskNo", wt.description AS "Description",
+              wt.assignedto AS "AssignedToId", s.name AS "AssignedToName",
+              wt.progress AS "Progress", wt.scope AS "Scope", wt.status AS "Status",
+              wt.datecreated AS "DateCreated", wt.datecompleted AS "DateCompleted"
+       FROM wo_task wt
+       LEFT JOIN staff s ON s.id = wt.assignedto
+       WHERE wt.csi_wo_id = $1
+       ORDER BY wt.taskno`,
+      [id]
+    ),
+  ]);
+
+  const taskRows: WoTaskItem[] = tasks.rows.map((t) => ({
+    id: t.Id as string,
+    taskNo: Number(t.TaskNo),
+    description: t.Description as string,
+    assignedToId: (t.AssignedToId as string) ?? null,
+    assignedToName: (t.AssignedToName as string) ?? null,
+    progress: Number(t.Progress),
+    scope: t.Scope as string,
+    status: (t.Status as string) ?? "Active",
+    dateCreated: String(t.DateCreated),
+    dateCompleted: t.DateCompleted ? String(t.DateCompleted) : null,
+  }));
+
+  const activeTasks = taskRows.filter((t) => t.status === "Active");
+  const progressPercent = activeTasks.length > 0
+    ? Math.round(activeTasks.reduce((sum, t) => sum + t.progress, 0) / activeTasks.length)
+    : 0;
+
+  return {
+    id: r.Id as string,
+    csiWoNo: r.CSI_WO_No as string,
+    extWoNo: (r.ExtWO_No as string) ?? null,
+    sourceOfWO: (r.SourceOfWO as string) ?? null,
+    requesterName: (r.RequesterName as string) ?? null,
+    tenderOrProjectCode: (r.TenderOrProjectCode as string) ?? null,
+    tender: r.TenderId
+      ? {
+          id: r.TenderId as string,
+          tenderNo: r.TenderNo as string,
+          tenderName: r.TenderName as string,
+          status: r.TenderStatus as string,
+        }
+      : null,
+    requestType: {
+      id: r.RtId as string,
+      typeCode: Number(r.TypeCode),
+      typeName: r.TypeName as string,
+      domain: r.Domain as string,
+    },
+    tier: {
+      id: r.CtId as string,
+      tierCode: Number(r.TierCode),
+      tierName: r.TierName as string,
+    },
+    priorityInterdepart: r.PriorityInterdepart as string,
+    priorityInternal: (r.PriorityInternal as string) ?? null,
+    title: r.Title as string,
+    indicativeValue: r.IndicativeValue != null ? parseFloat(String(r.IndicativeValue)) : null,
+    complexityValue: r.ComplexityValue != null ? parseFloat(String(r.ComplexityValue)) : null,
+    taskScore: r.TaskScore != null ? parseFloat(String(r.TaskScore)) : null,
+    slaWorkingDays: r.SLAWorkingDays != null ? Number(r.SLAWorkingDays) : null,
+    dueDate: r.DueDate ? String(r.DueDate) : null,
+    ...computeSla(r.CreatedAt, r.SlaTotalDays, r.Status as string),
+    status: r.Status as string,
+    remark: (r.Remark as string) ?? null,
+    monitoringStaff: r.MonitorId
+      ? { id: r.MonitorId as string, name: r.MonitorName as string }
+      : null,
+    progressPercent,
+    createdAt: String(r.CreatedAt),
+    updatedAt: r.UpdatedAt ? String(r.UpdatedAt) : null,
+    createdBy: {
+      id: r.CreatorId as string,
+      name: r.CreatorName as string,
+      roleCode: r.CreatorRoleCode as string,
+    },
+    assignedTo: r.AssigneeId
+      ? {
+          id: r.AssigneeId as string,
+          name: r.AssigneeName as string,
+          roleCode: r.AssigneeRoleCode as string,
+          subTeam: (r.AssigneeSubTeam as string) ?? null,
+        }
+      : null,
+    tasks: taskRows,
+    assignmentHistory: assignments.rows.map((a) => ({
+      assignedTo: a.StaffName as string,
+      assignedBy: a.AssignedByName as string,
+      assignedHours: parseFloat(String(a.AssignedHours)),
+      assignedDate: String(a.AssignedDate),
+      isCurrent: a.IsCurrent as boolean,
+      reassignReason: (a.ReassignReason as string) ?? null,
+    })),
+    effortLog: efforts.rows.map((e) => ({
+      id: e.Id as string,
+      staffName: e.StaffName as string,
+      logDate: String(e.LogDate),
+      hours: parseFloat(String(e.Hours)),
+      notes: (e.Notes as string) ?? null,
+    })),
+    evidenceItems: evidence.rows.map((ev) => ({
+      id: ev.Id as string,
+      fileRef: ev.FileRef as string,
+      evidenceType: ev.EvidenceType as string,
+      uploadedByName: ev.UploadedByName as string,
+      uploadedDate: String(ev.UploadedDate),
+    })),
+    approvalTrail: approvals.rows.map((ap) => ({
+      tierCode: Number(ap.TierCode),
+      tierName: ap.TierName as string,
+      approvedByName: ap.ApproverName as string,
+      decision: ap.Decision as string,
+      reason: (ap.Reason as string) ?? null,
+      decisionDate: String(ap.DecisionDate),
+    })),
+  };
+}
+
+// ─── Create ─────────────────────────────────────────────────────────────────
+
+export interface WoCreateInput {
+  sourceOfWO: string;
+  requesterName?: string;
+  requestTypeId: string;
+  tenderOrProjectCode?: string;
+  title: string;
+  priorityInterdepart?: string;
+  priorityInternal?: string;
+  slaWorkingDays?: number;
+  tierId: string;
+  complexityValue?: number;
+  monitoringStaffId?: string;
+  remark?: string;
+  // External WO fields — optional for internal WOs
+  extWoNo?: string;
+  projectCode?: string;
+  sourceDeptId?: string;
+  endUser?: string;
+  receivedDate?: string;
+  // Optional initial assignment
+  assigneeId?: string;
+  assignedHours?: number;
+  // Legacy
+  tenderId?: string;
+  indicativeValue?: number;
+  dueDate?: string;
+}
+
+export interface WoCreated {
+  id: string;
+  csiWoNo: string;
+  status: string;
+  createdAt: string;
+}
+
+export async function createWorkOrder(
+  input: WoCreateInput,
+  session: AuthSession
+): Promise<WoCreated> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1. Insert EXTERNAL_WO only if external WO number provided
+    let extWoId: string | null = null;
+    if (input.extWoNo) {
+      const extResult = await client.query<{ Id: string }>(
+        `INSERT INTO external_wo
+          (extwo_no, projectcode, sourcedeptid, enduser, receiveddate)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id AS "Id"`,
+        [
+          input.extWoNo,
+          input.projectCode ?? null,
+          input.sourceDeptId ?? null,
+          input.endUser ?? null,
+          input.receivedDate ?? new Date().toISOString().slice(0, 10),
+        ]
+      );
+      extWoId = extResult.rows[0].Id;
+    }
+
+    // 2. Generate CSI_WO_No: 300-DDMMYYYY-NNN
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const dateStr = `${dd}${mm}${yyyy}`;
+    const prefix = `300-${dateStr}-`;
+
+    const seqResult = await client.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS "cnt" FROM csi_wo WHERE csi_wo_no LIKE $1`,
+      [`${prefix}%`]
+    );
+    const seq = parseInt(seqResult.rows[0].cnt, 10) + 1;
+    const csiWoNo = `${prefix}${String(seq).padStart(3, "0")}`;
+
+    // 3. Insert CSI_WO with new fields
+    const woResult = await client.query<{ Id: string; CreatedAt: string }>(
+      `INSERT INTO csi_wo
+        (csi_wo_no, extwo_id, tenderid, requesttypeid, title,
+         priorityinterdepart, priorityinternal, indicativevalue,
+         complexityvalue, tierid, createdby, duedate,
+         sourceofwo, slaworkingdays, monitoringstaffid,
+         tenderorprojectcode, remark, requestername)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+       RETURNING id AS "Id", createdat AS "CreatedAt"`,
+      [
+        csiWoNo,
+        extWoId,
+        input.tenderId ?? null,
+        input.requestTypeId,
+        input.title,
+        input.priorityInterdepart ?? "Normal",
+        input.priorityInternal ?? null,
+        input.indicativeValue ?? null,
+        input.complexityValue ?? null,
+        input.tierId,
+        session.staffId,
+        input.dueDate ?? null,
+        input.sourceOfWO,
+        input.slaWorkingDays ?? null,
+        input.monitoringStaffId ?? null,
+        input.tenderOrProjectCode ?? null,
+        input.remark ?? null,
+        input.requesterName ?? null,
+      ]
+    );
+    const wo = woResult.rows[0];
+
+    // 4. Auto-populate tender baseline tasks if request type is Tender/RFP
+    const rtResult = await client.query<{ TypeName: string }>(
+      `SELECT typename AS "TypeName" FROM request_type WHERE id = $1`,
+      [input.requestTypeId]
+    );
+    const typeName = rtResult.rows[0]?.TypeName ?? "";
+    if (typeName === "Tender / RFP") {
+      const baselineTasks = [
+        "Initial Review & Requirement Understanding",
+        "Solution Recommendation / Proposal Strategy",
+        "Product / Solution Definition",
+        "Culcu Fill-up for CMT Partner Request",
+        "Implementation Schedule / Gantt Chart",
+        "Project Team & Organisation Chart",
+        "Experience Profile / Track Record / Brochure",
+        "Risk Assessment",
+        "Partner / Vendor Quotation & Technical Confirmation",
+        "Bill of Materials",
+        "Compliance Matrix",
+        "Solution Architecture Diagram",
+        "Technical Proposal Write-up",
+        "Final Review & Submission",
+      ];
+      for (let i = 0; i < baselineTasks.length; i++) {
+        await client.query(
+          `INSERT INTO wo_task (csi_wo_id, taskno, description, scope)
+           VALUES ($1, $2, $3, 'Internal')`,
+          [wo.Id, i + 1, baselineTasks[i]]
+        );
+      }
+    }
+
+    // 5. Audit log
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: wo.Id,
+        action: "Insert",
+        newValue: JSON.stringify({ csiWoNo, title: input.title, sourceOfWO: input.sourceOfWO }),
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    // 6. Optional initial assignment
+    if (input.assigneeId && input.assignedHours) {
+      const today = new Date().toISOString().slice(0, 10);
+      await client.query(
+        `INSERT INTO assignment (csi_wo_id, staffid, assignedhours, assigneddate, assignedby, iscurrent)
+         VALUES ($1, $2, $3, $4, $5, true)`,
+        [wo.Id, input.assigneeId, input.assignedHours, today, session.staffId]
+      );
+      await client.query(
+        `UPDATE csi_wo SET assignedto = $1, status = 'InProgress', updatedat = now() WHERE id = $2`,
+        [input.assigneeId, wo.Id]
+      );
+      await insertAuditEntry(
+        {
+          entityName: "CSI_WO",
+          entityId: wo.Id,
+          action: "Update",
+          fieldName: "AssignedTo",
+          newValue: input.assigneeId,
+          performedBy: session.staffId,
+        },
+        client
+      );
+    }
+
+    await client.query("COMMIT");
+
+    return {
+      id: wo.Id,
+      csiWoNo,
+      status: "Open",
+      createdAt: String(wo.CreatedAt),
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── PATCH (FR-09) ────────────────────────────────────────────────────────────
+
+export interface WoPatchInput {
+  priority?: string;
+  dueDate?: string;
+  tierId?: string;
+  amendReason?: string;
+}
+
+export async function patchWorkOrder(
+  id: string,
+  input: WoPatchInput,
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<WoDetail | null> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Verify WO exists and is within scope
+    let paramIdx = 2;
+    const sf = applyScopeFilter(scope, "w", paramIdx);
+    const existing = await client.query(
+      `SELECT w.id, w.priorityinterdepart, w.duedate, w.tierid, w.status
+       FROM csi_wo w
+       LEFT JOIN staff sa ON sa.id = w.assignedto
+       WHERE w.id = $1 ${sf.clause}`,
+      [id, ...sf.params]
+    );
+    if (existing.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const old = existing.rows[0];
+
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    let pi = 1;
+
+    if (input.priority !== undefined && input.priority !== old.priorityinterdepart) {
+      sets.push(`priorityinterdepart = $${pi}`);
+      params.push(input.priority);
+      await auditField(client, id, "PriorityInterdepart", old.priorityinterdepart, input.priority, input.amendReason, session.staffId);
+      pi++;
+    }
+    if (input.dueDate !== undefined && String(input.dueDate) !== String(old.duedate ?? "")) {
+      sets.push(`duedate = $${pi}`);
+      params.push(input.dueDate);
+      await auditField(client, id, "DueDate", old.duedate ? String(old.duedate) : null, input.dueDate, input.amendReason!, session.staffId);
+      pi++;
+    }
+    if (input.tierId !== undefined && input.tierId !== old.tierid) {
+      sets.push(`tierid = $${pi}`);
+      params.push(input.tierId);
+      await auditField(client, id, "TierId", old.tierid, input.tierId, input.amendReason!, session.staffId);
+      pi++;
+    }
+
+    if (sets.length > 0) {
+      sets.push(`updatedat = now()`);
+      params.push(id);
+      await client.query(
+        `UPDATE csi_wo SET ${sets.join(", ")} WHERE id = $${pi}`,
+        params
+      );
+    }
+
+    await client.query("COMMIT");
+    return getWorkOrderById(id, scope);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function auditField(
+  client: PoolClient,
+  entityId: string,
+  fieldName: string,
+  oldValue: string | null,
+  newValue: string,
+  reason: string | undefined,
+  performedBy: string
+) {
+  await insertAuditEntry(
+    {
+      entityName: "CSI_WO",
+      entityId,
+      action: "Update",
+      fieldName,
+      oldValue,
+      newValue,
+      reason,
+      performedBy,
+    },
+    client
+  );
+}
+
+// ─── Assign (FR-10–12) ───────────────────────────────────────────────────────
+
+export interface WoAssignResult {
+  assignmentId: string;
+  staffId: string;
+  staffName: string;
+  assignedHours: number;
+  assignedDate: string;
+  isCurrent: boolean;
+}
+
+export async function assignWorkOrder(
+  woId: string,
+  input: { staffId: string; assignedHours: number; reassignReason?: string },
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<WoAssignResult | null> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Verify WO exists within scope
+    let paramIdx = 2;
+    const sf = applyScopeFilter(scope, "w", paramIdx);
+    const woResult = await client.query(
+      `SELECT w.id, w.status, w.assignedto
+       FROM csi_wo w
+       LEFT JOIN staff sa ON sa.id = w.assignedto
+       WHERE w.id = $1 ${sf.clause}`,
+      [woId, ...sf.params]
+    );
+    if (woResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const wo = woResult.rows[0];
+
+    // Check if reassignment — if existing assignment, reason is required
+    const existingAssignment = await client.query(
+      `SELECT id FROM assignment WHERE csi_wo_id = $1 AND iscurrent = true`,
+      [woId]
+    );
+    const isReassign = existingAssignment.rows.length > 0;
+
+    if (isReassign) {
+      // Deactivate current assignment
+      await client.query(
+        `UPDATE assignment SET iscurrent = false, updatedat = now()
+         WHERE csi_wo_id = $1 AND iscurrent = true`,
+        [woId]
+      );
+    }
+
+    // Create new assignment
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await client.query<{ Id: string }>(
+      `INSERT INTO assignment (csi_wo_id, staffid, assignedhours, assigneddate, assignedby, iscurrent, reassignreason)
+       VALUES ($1, $2, $3, $4, $5, true, $6)
+       RETURNING id AS "Id"`,
+      [woId, input.staffId, input.assignedHours, today, session.staffId, input.reassignReason ?? null]
+    );
+
+    // Update CSI_WO.AssignedTo
+    await client.query(
+      `UPDATE csi_wo SET assignedto = $1, updatedat = now() WHERE id = $2`,
+      [input.staffId, woId]
+    );
+
+    // If WO status is Open, transition to InProgress
+    if (wo.status === "Open") {
+      await client.query(
+        `UPDATE csi_wo SET status = 'InProgress', updatedat = now() WHERE id = $1`,
+        [woId]
+      );
+    }
+
+    // Audit
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: woId,
+        action: "Update",
+        fieldName: "AssignedTo",
+        oldValue: wo.assignedto ?? null,
+        newValue: input.staffId,
+        reason: input.reassignReason,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+
+    // Get staff name
+    const staffResult = await query(
+      `SELECT name AS "Name" FROM staff WHERE id = $1`,
+      [input.staffId]
+    );
+
+    return {
+      assignmentId: result.rows[0].Id,
+      staffId: input.staffId,
+      staffName: (staffResult.rows[0]?.Name as string) ?? "",
+      assignedHours: input.assignedHours,
+      assignedDate: today,
+      isCurrent: true,
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── Complete (FR-31) ─────────────────────────────────────────────────────────
+
+export interface WoStatusUpdate {
+  id: string;
+  status: string;
+  approverRole?: string;
+  approverName?: string | null;
+}
+
+export async function completeWorkOrder(
+  woId: string,
+  completionNote: string | undefined,
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<{ result: WoStatusUpdate | null; error?: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    let paramIdx = 2;
+    const sf = applyScopeFilter(scope, "w", paramIdx);
+    const woResult = await client.query(
+      `SELECT w.id, w.status, w.tierid,
+              ct.tiercode AS "tiercode"
+       FROM csi_wo w
+       JOIN complexity_tier ct ON ct.id = w.tierid
+       LEFT JOIN staff sa ON sa.id = w.assignedto
+       WHERE w.id = $1 ${sf.clause}`,
+      [woId, ...sf.params]
+    );
+    if (woResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { result: null };
+    }
+    const wo = woResult.rows[0];
+
+    if (wo.status !== "Open" && wo.status !== "InProgress") {
+      await client.query("ROLLBACK");
+      return { result: null, error: "INVALID_STATUS_TRANSITION" };
+    }
+
+    // Check evidence exists
+    const evResult = await client.query(
+      `SELECT COUNT(*) AS cnt FROM evidence_deliverable WHERE csi_wo_id = $1 AND removedat IS NULL`,
+      [woId]
+    );
+    if (parseInt(evResult.rows[0].cnt, 10) === 0) {
+      await client.query("ROLLBACK");
+      return { result: null, error: "NO_EVIDENCE" };
+    }
+
+    await client.query(
+      `UPDATE csi_wo SET status = 'PendingApproval', updatedat = now() WHERE id = $1`,
+      [woId]
+    );
+
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: woId,
+        action: "Update",
+        fieldName: "Status",
+        oldValue: wo.status,
+        newValue: "PendingApproval",
+        reason: completionNote,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+
+    const tierCode = Number(wo.tiercode);
+    const approverRole = tierCode === 1 ? "TeamLead" : tierCode === 2 ? "SolutionManager" : "HOD";
+
+    return {
+      result: {
+        id: woId,
+        status: "PendingApproval",
+        approverRole,
+        approverName: null,
+      },
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── Approve / Return (FR-33) ─────────────────────────────────────────────────
+
+export async function approveWorkOrder(
+  woId: string,
+  input: { decision: "Approved" | "Returned"; reason?: string },
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<{ result: WoStatusUpdate | null; error?: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    let paramIdx = 2;
+    const sf = applyScopeFilter(scope, "w", paramIdx);
+    const woResult = await client.query(
+      `SELECT w.id, w.status, w.tierid
+       FROM csi_wo w
+       LEFT JOIN staff sa ON sa.id = w.assignedto
+       WHERE w.id = $1 ${sf.clause}`,
+      [woId, ...sf.params]
+    );
+    if (woResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { result: null };
+    }
+    const wo = woResult.rows[0];
+
+    if (wo.status !== "PendingApproval") {
+      await client.query("ROLLBACK");
+      return { result: null, error: "INVALID_STATUS_TRANSITION" };
+    }
+
+    const newStatus = input.decision === "Approved" ? "Closed" : "InProgress";
+
+    // Insert APPROVAL_RECORD
+    await client.query(
+      `INSERT INTO approval_record (csi_wo_id, tierid, approvedby, decision, reason)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [woId, wo.tierid, session.staffId, input.decision, input.reason ?? null]
+    );
+
+    await client.query(
+      `UPDATE csi_wo SET status = $1, updatedat = now() WHERE id = $2`,
+      [newStatus, woId]
+    );
+
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: woId,
+        action: "Update",
+        fieldName: "Status",
+        oldValue: "PendingApproval",
+        newValue: newStatus,
+        reason: input.reason,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+
+    return {
+      result: {
+        id: woId,
+        status: newStatus,
+      },
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── WO Tasks (checklist) ───────────────────────────────────────────────────
+
+export async function addWoTask(
+  woId: string,
+  input: { description: string; assignedTo?: string; scope?: string },
+  session: AuthSession
+): Promise<WoTaskItem> {
+  const seqResult = await query<{ maxNo: string | null }>(
+    `SELECT MAX(taskno) AS "maxNo" FROM wo_task WHERE csi_wo_id = $1`,
+    [woId]
+  );
+  const nextNo = (parseInt(seqResult.rows[0]?.maxNo ?? "0", 10) || 0) + 1;
+
+  const result = await query<{ Id: string; DateCreated: string }>(
+    `INSERT INTO wo_task (csi_wo_id, taskno, description, assignedto, scope)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id AS "Id", datecreated AS "DateCreated"`,
+    [woId, nextNo, input.description, input.assignedTo ?? null, input.scope ?? "Internal"]
+  );
+
+  let assignedToName: string | null = null;
+  if (input.assignedTo) {
+    const staffResult = await query<{ Name: string }>(
+      `SELECT name AS "Name" FROM staff WHERE id = $1`,
+      [input.assignedTo]
+    );
+    assignedToName = (staffResult.rows[0]?.Name as string) ?? null;
+  }
+
+  return {
+    id: result.rows[0].Id,
+    taskNo: nextNo,
+    description: input.description,
+    assignedToId: input.assignedTo ?? null,
+    assignedToName,
+    progress: 0,
+    scope: input.scope ?? "Internal",
+    status: "Active",
+    dateCreated: String(result.rows[0].DateCreated),
+    dateCompleted: null,
+  };
+}
+
+export async function updateWoTask(
+  taskId: string,
+  input: { description?: string; assignedTo?: string | null; progress?: number; scope?: string; status?: string }
+): Promise<WoTaskItem | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let pi = 1;
+
+  if (input.description !== undefined) {
+    sets.push(`description = $${pi}`);
+    params.push(input.description);
+    pi++;
+  }
+  if (input.assignedTo !== undefined) {
+    sets.push(`assignedto = $${pi}`);
+    params.push(input.assignedTo);
+    pi++;
+  }
+  if (input.progress !== undefined) {
+    sets.push(`progress = $${pi}`);
+    params.push(input.progress);
+    pi++;
+    if (input.progress === 100) {
+      sets.push(`datecompleted = CURRENT_DATE`);
+    } else {
+      sets.push(`datecompleted = NULL`);
+    }
+  }
+  if (input.scope !== undefined) {
+    sets.push(`scope = $${pi}`);
+    params.push(input.scope);
+    pi++;
+  }
+  if (input.status !== undefined) {
+    sets.push(`status = $${pi}`);
+    params.push(input.status);
+    pi++;
+    if (input.status === "NA") {
+      sets.push(`progress = 0`);
+      sets.push(`datecompleted = NULL`);
+    }
+  }
+
+  if (sets.length === 0) return null;
+
+  sets.push(`updatedat = now()`);
+  params.push(taskId);
+
+  await query(
+    `UPDATE wo_task SET ${sets.join(", ")} WHERE id = $${pi}`,
+    params
+  );
+
+  const result = await query(
+    `SELECT wt.id AS "Id", wt.taskno AS "TaskNo", wt.description AS "Description",
+            wt.assignedto AS "AssignedToId", s.name AS "AssignedToName",
+            wt.progress AS "Progress", wt.scope AS "Scope",
+            wt.datecreated AS "DateCreated", wt.datecompleted AS "DateCompleted"
+     FROM wo_task wt
+     LEFT JOIN staff s ON s.id = wt.assignedto
+     WHERE wt.id = $1`,
+    [taskId]
+  );
+
+  if (result.rows.length === 0) return null;
+  const t = result.rows[0];
+  return {
+    id: t.Id as string,
+    taskNo: Number(t.TaskNo),
+    description: t.Description as string,
+    assignedToId: (t.AssignedToId as string) ?? null,
+    assignedToName: (t.AssignedToName as string) ?? null,
+    progress: Number(t.Progress),
+    scope: t.Scope as string,
+    status: (t.Status as string) ?? "Active",
+    dateCreated: String(t.DateCreated),
+    dateCompleted: t.DateCompleted ? String(t.DateCompleted) : null,
+  };
+}
+
+export async function deleteWoTask(taskId: string): Promise<boolean> {
+  const result = await query(`DELETE FROM wo_task WHERE id = $1`, [taskId]);
+  return (result.rowCount ?? 0) > 0;
+}

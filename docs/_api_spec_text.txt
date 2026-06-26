@@ -1,0 +1,3540 @@
+10 CREATIVE SOLUTIONS SDN BHD (10CS)
+Consultant, Solution & Innovation (CSI) Department
+CSI DIGITAL OPERATING PLATFORM
+API Specification
+REST API Contract — All 10 Route Groups · Endpoints · Request / Response Schemas · Error Codes · Pagination · Rate Limiting
+Companion to PRD v1.1 · UI/UX Wireframe Spec v1.0 · Database Design Spec v1.0 · System Architecture Design v1.0
+Document Type
+API Specification
+Reference Documents
+CSI Digital Operating Platform PRD v1.1; UI/UX Wireframe Specification v1.0; Database Design Specification v1.0; System Architecture Design v1.0
+API Base URL
+https://csidop.10cs.com.my/api  (production)
+Protocol
+REST / JSON  ·  HTTPS / TLS 1.3
+Authentication
+Bearer JWT (OIDC) via HttpOnly session cookie
+Version
+v1.0 (no versioning prefix in Phase 1–3 — see SAD §8)
+Status
+Draft — For Developer and Solution Architect Review
+Date Prepared
+19 June 2026
+Prepared By
+Farhan Nordin, Head of Department, CSI
+Classification
+Internal — 10CS Confidential
+Document Control
+Revision History
+Version
+Date
+Author
+Description
+1.0
+19 Jun 2026
+Farhan Nordin
+Initial API Specification covering all 10 route groups defined in the System Architecture Design v1.0, with endpoint definitions, request/response schemas, error codes, pagination and global conventions
+Approval Sign-Off
+This specification is the contract between the backend Developer and the frontend Developer. Changes to request/response shape after approval require a revision to this document and a corresponding frontend change ticket.
+Role
+Name
+Signature
+Date
+Prepared by — Solution Architect / HOD, CSI
+Farhan Nordin
+Reviewed by — Backend Developer
+Reviewed by — Frontend Developer
+Table of Contents
+1. Global Conventions
+1.1 Base URL & Versioning
+All endpoints in this specification are relative to the base URL below. The production domain and staging domain differ only in subdomain; both use TLS 1.3.
+Environment
+Base URL
+Production
+https://csidop.10cs.com.my/api
+Staging
+https://staging.csidop.10cs.com.my/api
+Local development
+http://localhost:3000/api
+Routes are not version-prefixed in Phase 1–3 (single consumer: the platform's own frontend). If Phase 4 external integrations require a stable contract alongside a breaking change, a /v2/ prefix will be introduced at that point without disturbing Phase 1–3 clients still on un-prefixed routes (SAD §8).
+1.2 Authentication
+Every endpoint in Sections 2–11 except /api/auth/* requires a valid session. The platform uses HttpOnly, Secure, SameSite=Strict cookies set by the /api/auth/callback endpoint after OIDC exchange. The cookie carries a signed JWT; the API middleware verifies the signature on every request using the IdP's public key set (JWKS endpoint), with no database round-trip.
+Header / Mechanism
+Value
+Notes
+Cookie: csidop_session
+Signed JWT (RS256)
+Set by server; HttpOnly + Secure; never readable by JavaScript
+CSRF protection
+SameSite=Strict cookie attribute
+Browsers refuse to send the cookie on cross-site requests; no separate CSRF token needed
+401 trigger
+Missing, expired or invalid JWT
+Clients must redirect to /api/auth/login on receiving 401
+1.3 Request Format
+Content-Type: application/json for all POST, PUT and PATCH request bodies
+Date-time values: ISO 8601 with time zone — e.g. 2026-06-19T09:30:00+08:00
+Date-only values: ISO 8601 date — e.g. 2026-06-30
+Monetary values: numeric string with two decimal places — e.g. "150000.00" — never a float
+UUIDs: lowercase hyphenated — e.g. "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+Idempotency: POST endpoints for WO creation, effort log and evidence upload accept an optional Idempotency-Key: <uuid> header; duplicate submissions within 24 h return HTTP 200 with the original response body
+1.4 Response Envelope
+All successful responses use the same JSON envelope, so the frontend client has a predictable shape regardless of which endpoint is called.
+{ "success": true, "data": <resource or array>, "meta": <pagination | null> }
+All error responses use a mirror envelope:
+{ "success": false, "error": { "code": "<CODE>", "message": "<human-readable>", "errors": [<Zod field errors>] } }
+1.5 Pagination
+List endpoints use cursor-based pagination (stable on high-velocity tables such as EFFORT_LOG). Offset-based pagination is not supported.
+Parameter
+Location
+Type
+Default
+Description
+limit
+Query
+integer
+20
+Number of records to return; maximum 100
+after
+Query
+UUID
+—
+Cursor: return records with Id > this value (next page)
+before
+Query
+UUID
+—
+Cursor: return records with Id < this value (previous page)
+The meta object in a paginated response:
+{ "total": 383, "limit": 20, "hasNextPage": true, "nextCursor": "<uuid>", "hasPrevPage": false }
+1.6 HTTP Status Code Summary
+Status
+Meaning
+When
+200 OK
+Request succeeded
+GET, PUT, PATCH returning a resource
+201 Created
+Resource created
+POST that creates a new record
+204 No Content
+Success, no body
+DELETE or status-only PATCH
+400 Bad Request
+Validation failure
+Zod schema rejection; errors[] array populated
+401 Unauthenticated
+No valid session
+JWT missing, expired or revoked
+403 Forbidden
+Authorisation failure
+Role not permitted, or scope filter excludes the resource
+404 Not Found
+Resource missing
+Id not found, or excluded by scope filter
+409 Conflict
+Duplicate
+Idempotency key match, duplicate CSI_WO_No, duplicate ExtWO_Id
+429 Too Many Requests
+Rate limited
+Per-IP (60/min) or per-user (120/min) limit exceeded; Retry-After header set
+500 Internal Server Error
+Unexpected failure
+Logged to Sentry; correlation ID in X-Request-Id response header
+1.7 Rate Limiting
+Limit
+Value
+Applied to
+Per-IP (unauthenticated)
+60 requests / minute
+Login endpoint and any pre-auth probe
+Per-authenticated user
+120 requests / minute
+All authenticated routes
+Report generation
+10 requests / hour / user
+/api/reports/generate — document generation is CPU-intensive
+FastAPI compute
+30 requests / minute / user
+/api/capacity/* and /api/tender/score — scoring is compute-intensive
+1.8 Field-Level Permissions
+Some fields within a response body are visible only to specific roles. Where this applies it is called out in the endpoint's Response section. The pattern is: the API always returns the full record shape to the caller's role; fields the caller's role is not permitted to see are omitted entirely (not returned as null), so the frontend can test for the presence of a key rather than checking a permission flag.
+1.9 Scope Enforcement Reminder
+Row-level scope filtering (PRD §6; SAD §5) is enforced server-side on every list and detail endpoint. The filters documented in each endpoint's Parameters section are additional filters a user may apply on top of their implicit scope — they cannot widen the scope beyond what the caller's role permits. A Team Lead passing another team's pod ID as a filter parameter receives an empty result, not a 403, so the frontend does not need to manage scope visibility — it can simply display what the API returns.
+2. Authentication  /api/auth/*
+The auth route group handles the OIDC callback, session validation and sign-out. These are the only routes that do not require a pre-existing valid session. All other routes in Sections 3–11 require a valid csidop_session cookie set by /api/auth/callback.
+GET  /api/auth/login
+Redirect the browser to the configured Identity Provider's OIDC authorisation endpoint. Generates a PKCE code_verifier, stores it in a short-lived HttpOnly cookie, and returns HTTP 302.
+Roles: Public (unauthenticated)
+Parameters
+Name
+In
+Type
+Required
+Description
+redirect_to
+Query
+string
+No
+URL to return to after sign-in; validated against an allowlist to prevent open redirect
+Error Responses
+Status
+Code
+When
+302
+REDIRECT
+Browser is redirected to IdP authorisation URL
+400
+INVALID_REDIRECT
+redirect_to URL not in the configured allowlist
+💡 Notes: The frontend should call this endpoint by navigating (not fetch()) so the browser follows the redirect.
+GET  /api/auth/callback
+Receives the OIDC authorisation code from the Identity Provider, exchanges it for tokens via PKCE, looks up the matching STAFF record by email, and sets the csidop_session cookie. Returns HTTP 302 to the role-appropriate landing screen.
+Roles: Public (unauthenticated — called by IdP redirect)
+Parameters
+Name
+In
+Type
+Required
+Description
+code
+Query
+string
+Yes
+OIDC authorisation code from IdP
+state
+Query
+string
+Yes
+State value for CSRF validation
+Error Responses
+Status
+Code
+When
+302
+REDIRECT
+Session cookie set; browser redirected to role landing screen
+401
+NO_STAFF_RECORD
+Authenticated IdP identity has no matching STAFF.Email; show 'no access' page
+500
+TOKEN_EXCHANGE_FAILED
+IdP token endpoint returned an error
+💡 Notes: This endpoint is called by the IdP, not by frontend JavaScript. The frontend never sees the authorisation code.
+GET  /api/auth/me
+Return the current session's staff profile — used by the frontend shell to display the user name, role badge and navigation items on initial load.
+Roles: All authenticated roles
+Response 200 — StaffProfile
+Field
+Type
+Description
+id
+UUID
+Current staff member's surrogate Id (STAFF.Id)
+staffCode
+string
+STAFF.StaffCode
+name
+string
+STAFF.Name
+email
+string
+STAFF.Email
+roleCode
+string
+ROLE.RoleCode — e.g. HOD, SM, TL, TM, BIM_TL, BIM_MOD
+roleName
+string
+ROLE.RoleName — display label
+deptCode
+string
+DEPARTMENT.DeptCode — e.g. CSI, CMT
+subTeam
+string | null
+STAFF.SubTeam — pod grouping A/B/C/D
+systemConfigFlag
+boolean
+Whether the caller has Admin & Master Data write access (FR-48)
+capacityScope
+string
+ROLE.CapacityScope — Department / Stream / Pod / Self
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+💡 Notes: Cache this response in Zustand state for the session lifetime; re-fetch only on role-change events.
+POST  /api/auth/logout
+Invalidate the session: delete the Redis session key and clear the csidop_session cookie. Returns 204.
+Roles: All authenticated roles
+Error Responses
+Status
+Code
+When
+204
+—
+Session cleared; frontend should redirect to /api/auth/login
+401
+UNAUTHENTICATED
+No valid session to invalidate
+💡 Notes: Always returns 204 even if the Redis key was already expired, so the frontend can safely call this from an expired-session state.
+3. Work Orders  /api/wo/*
+The work order route group covers the full CSI_WO lifecycle: list, create, retrieve, update, assign, log effort, upload evidence, request closure, and approve or return. All endpoints enforce the caller's row-level scope (PRD §6). The base resource is CSI_WO as defined in the Database Design Specification §3.8.
+GET  /api/wo
+Paginated list of CSI_WO records visible to the caller within their scope. Supports filtering by every field the Internal WO List screen (Wireframe Spec Screen 6) exposes.
+Roles: All roles (scoped)
+Parameters
+Name
+In
+Type
+Required
+Description
+status
+Query
+string
+No
+Comma-separated status values: Open,InProgress,PendingApproval,Closed,OnHold
+domain
+Query
+string
+No
+Solution Design | Consultancy | BIM | Project Monitoring
+requestTypeId
+Query
+UUID
+No
+Filter by REQUEST_TYPE
+tierId
+Query
+UUID
+No
+Filter by COMPLEXITY_TIER
+tenderId
+Query
+UUID
+No
+Filter by parent TENDER (returns all WOs linked to that tender)
+assignedTo
+Query
+UUID
+No
+Filter by STAFF.Id — Team Lead may only pass Ids within their pod
+dueDateFrom
+Query
+date
+No
+ISO date — filter WOs with DueDate ≥ this value
+dueDateTo
+Query
+date
+No
+ISO date — filter WOs with DueDate ≤ this value
+q
+Query
+string
+No
+Full-text search on CSI_WO_No and Title
+sortBy
+Query
+string
+No
+Field to sort by: dueDate | createdAt | status | priority (default: createdAt)
+sortDir
+Query
+string
+No
+asc | desc (default: desc)
+limit
+Query
+integer
+No
+Page size, max 100, default 20
+after
+Query
+UUID
+No
+Cursor for next page
+Response 200 — WoListItem[]
+Field
+Type
+Description
+id
+UUID
+Surrogate PK
+csiWoNo
+string
+300-DDMMYYYY-NNN (CSI) auto-generated reference
+extWoNo
+string
+Linked EXTERNAL_WO.ExtWO_No
+tenderNo
+string | null
+Parent TENDER.TenderNo if linked
+title
+string
+WO title
+domain
+string
+Classification domain
+requestTypeName
+string
+REQUEST_TYPE.TypeName
+priority
+string
+Low | Normal | High | Urgent
+tierCode
+integer
+1 | 2 | 3
+assignedToName
+string | null
+Assigned staff member's display name
+dueDate
+date | null
+ISO date
+slaDaysRemaining
+integer | null
+Computed: calendar days until nearest SLA breach; negative = already breached
+status
+string
+Current WO status
+effortHoursTotal
+number
+Sum of EFFORT_LOG.Hours for this WO
+evidenceCount
+integer
+Count of non-removed EVIDENCE_DELIVERABLE rows
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+💡 Notes: slaDaysRemaining is computed server-side from the applicable REQUEST_TYPE SLA target and the WO's CreatedAt timestamp; it is not stored in the database.
+POST  /api/wo
+Create a new internal CSI WO. Auto-generates CSI_WO_No, starts the acknowledgement SLA clock, and optionally assigns to a staff member in the same request.
+Roles: HOD, Solution Manager
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+extWoId
+UUID
+Yes
+Must resolve to an existing EXTERNAL_WO.Id (FR-01)
+External WO reference — seed record for the new WO
+tenderId
+UUID
+No
+Must resolve to an existing TENDER.Id if provided
+v1.1: parent Tender link (nullable)
+requestTypeId
+UUID
+Yes
+Must resolve to a REQUEST_TYPE.Id
+Type 1–12 classification
+title
+string
+Yes
+Max 200 characters
+priority
+string
+No
+One of: Low Normal High Urgent; default Normal
+indicativeValue
+number
+No
+≥ 0
+Indicative monetary value
+complexityValue
+number
+No
+≥ 0
+Complexity scoring input
+tierId
+UUID
+Yes
+Must resolve to a COMPLEXITY_TIER.Id
+Tier 1 / 2 / 3
+assignedTo
+UUID
+No
+Must resolve to an active STAFF.Id within the caller's scope
+If omitted, WO is unassigned and can be assigned later via /api/wo/:id/assign
+assignedHours
+number
+Conditional
+Required and > 0 if assignedTo is provided
+dueDate
+date
+No
+Must be a future date
+ISO date
+Response 200 — WoDetail
+Field
+Type
+Description
+id
+UUID
+New WO surrogate Id
+csiWoNo
+string
+Auto-generated reference number
+taskScore
+number
+System-computed TaskScore based on ComplexityValue and tier rules
+status
+string
+Always 'Open' on creation
+createdAt
+datetime
+ISO 8601 with TZ
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+409
+DUPLICATE_EXTERNAL_WO
+An internal WO already exists for this ExtWO_Id — see FR-05; override by setting allowDuplicate: true and providing duplicateReason
+💡 Notes: The SLA acknowledgement clock (REQUEST_TYPE.SlaAckDays) starts at the moment of successful creation. If assignedTo is provided, ASSIGNMENT is also created and IsCurrent is set to true.
+GET  /api/wo/:id
+Full detail record for one WO including assignment history, effort log summary, evidence list and approval trail. Used by WO Detail screen (Wireframe Spec Screen 8).
+Roles: All roles (scoped to caller's scope; 404 if out of scope)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+CSI_WO surrogate Id
+Response 200 — WoDetail (full)
+Field
+Type
+Description
+id / csiWoNo / extWoNo
+—
+Identifiers as per list response
+tender
+object | null
+{ id, tenderNo, tenderName, status } if linked
+requestType
+object
+{ id, typeCode, typeName, domain }
+tier
+object
+{ id, tierCode, tierName, approverRoleCode }
+priority / title / indicativeValue / complexityValue / taskScore
+—
+Classification fields
+dueDate / status / createdAt / updatedAt
+—
+Lifecycle fields
+createdBy
+object
+{ id, name, roleCode }
+assignedTo
+object | null
+{ id, name, roleCode, subTeam } — current assignee
+slaDaysRemaining / slaStatus
+—
+Computed SLA position: OnTime | Warning | Breached
+assignmentHistory
+AssignmentRecord[]
+Full ASSIGNMENT chain including reassignments; each record: { assignedTo, assignedBy, assignedHours, assignedDate, isCurrent, reassignReason }
+effortLog
+EffortLogEntry[]
+All EFFORT_LOG rows: { id, staffName, logDate, hours, notes }
+evidenceCount / evidenceItems
+—
+Count and list of EVIDENCE_DELIVERABLE rows: { id, fileRef, evidenceType, uploadedByName, uploadedDate }
+approvalTrail
+ApprovalRecord[]
+All APPROVAL_RECORD rows: { tierCode, approvedByName, decision, reason, decisionDate }
+closureEligible
+boolean
+true if evidenceCount ≥ 1 and status is InProgress or Open
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+PATCH  /api/wo/:id
+Update editable fields on an existing WO. Only fields provided in the request body are changed. Triggers an AUDIT_LOG entry for each changed field.
+Roles: HOD, Solution Manager (all); Team Lead (priority and dueDate only within own pod)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+CSI_WO surrogate Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+priority
+string
+No
+Low | Normal | High | Urgent
+dueDate
+date
+No
+Must be a future date if status ≠ Closed
+tierId
+UUID
+No
+Must resolve to a valid COMPLEXITY_TIER.Id
+Tier re-classification; triggers re-routing if WO is in PendingApproval
+amendReason
+string
+Conditional
+Required if dueDate or tierId changes
+Logged to AUDIT_LOG
+Response 200 — WoDetail (updated)
+Field
+Type
+Description
+—
+—
+Full WoDetail as per GET /api/wo/:id
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+💡 Notes: PATCH is deliberately limited to non-structural fields. Reassignment uses /api/wo/:id/assign; status changes use the dedicated status endpoints below.
+POST  /api/wo/:id/assign
+Assign or re-assign the WO to a staff member. Creates an ASSIGNMENT row with IsCurrent = true and sets the previous current row to IsCurrent = false. Writes to AUDIT_LOG.
+Roles: HOD, Solution Manager (any in scope); Team Lead (within own pod)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+CSI_WO surrogate Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+staffId
+UUID
+Yes
+Must be an active STAFF.Id within the caller's scope
+The new assignee
+assignedHours
+number
+Yes
+Must be > 0
+Hours allocated to this assignment
+reassignReason
+string
+Conditional
+Required if a current ASSIGNMENT row already exists
+Logged to AUDIT_LOG and ASSIGNMENT.ReassignReason
+Response 200 — AssignmentRecord
+Field
+Type
+Description
+assignmentId
+UUID
+New ASSIGNMENT.Id
+staffId / staffName
+—
+The new assignee
+assignedHours
+number
+assignedDate
+date
+isCurrent
+boolean
+Always true for the newly created row
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+OVERLOADED_WARNING
+The assignee's current utilization band is Overloaded (≥ 90%); this is a non-blocking warning returned in the response body alongside the 201, not a hard error — see notes
+💡 Notes: An Overloaded assignee is flagged in the response warnings[] array but the assignment is still created. The frontend should display the warning prominently (SAD §5 — scope filter, not a hard stop).
+POST  /api/wo/:id/complete
+Team Member or Team Lead signals that work on the WO is complete. Transitions status from InProgress to PendingApproval and triggers routing to the correct approver tier. Evidence must exist before this can be called.
+Roles: Team Member (own assigned WOs), Team Lead (within pod), BIM Modeler (own)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+CSI_WO surrogate Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+completionNote
+string
+No
+Max 500 characters
+Optional completion note appended to the audit trail
+Response 200 — WoStatusUpdate
+Field
+Type
+Description
+id
+UUID
+status
+string
+Always 'PendingApproval'
+approverRole
+string
+The role expected to approve: TL | SM | HOD based on TierCode
+approverName
+string | null
+Name of the currently assigned approver if determinable
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+NO_EVIDENCE
+WO has no attached evidence; closureEligible = false (FR-30)
+400
+INVALID_STATUS_TRANSITION
+WO is not in Open or InProgress status
+POST  /api/wo/:id/approve
+Approve or return a WO that is in PendingApproval status. Only the role matching the WO's complexity tier may call this endpoint. Approved WOs move to Closed; returned WOs move back to InProgress.
+Roles: Team Lead (Tier 1), Solution Manager (Tier 2), HOD (Tier 3)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+CSI_WO surrogate Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+decision
+string
+Yes
+Approved | Returned
+reason
+string
+Conditional
+Required if decision = Returned
+Logged to APPROVAL_RECORD.Reason and AUDIT_LOG
+Response 200 — WoStatusUpdate
+Field
+Type
+Description
+id
+UUID
+status
+string
+Closed (if Approved) or InProgress (if Returned)
+decisionDate
+datetime
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+403
+WRONG_APPROVER_TIER
+The caller's role does not match the WO's tier approval routing
+400
+INVALID_STATUS_TRANSITION
+WO is not in PendingApproval status
+💡 Notes: A Return requires a reason — the reason field is mandatory when decision = Returned. The frontend should enforce this in the modal form.
+4. Effort Log  /api/effort/*
+Daily effort logging replaces the manual Daily_Log spreadsheet (PRD §7.9, FR-29). Effort entries are the primary input to utilization calculations (PRD §13) and KPI rollup (PRD §14). All writes to EFFORT_LOG also trigger a Redis cache invalidation for the affected staff member's utilization figure.
+GET  /api/effort
+List effort log entries. Used by the Daily Effort Log screen's 'today's entries' strip and the WO Detail effort log tab.
+Roles: All roles (scoped; Team Member sees own entries only)
+Parameters
+Name
+In
+Type
+Required
+Description
+woId
+Query
+UUID
+No
+Filter by CSI_WO.Id
+staffId
+Query
+UUID
+No
+Filter by STAFF.Id — scoped; a Team Member can only pass their own Id
+logDateFrom
+Query
+date
+No
+ISO date
+logDateTo
+Query
+date
+No
+ISO date
+limit / after
+Query
+—
+No
+Pagination (default limit 50)
+Response 200 — EffortLogEntry[]
+Field
+Type
+Description
+id
+UUID
+EFFORT_LOG.Id
+woId
+UUID
+csiWoNo
+string
+Parent WO reference — included to avoid a join on the frontend
+staffId
+UUID
+staffName
+string
+logDate
+date
+ISO date
+hours
+number
+Decimal hours, e.g. 3.5
+notes
+string | null
+createdAt
+datetime
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/effort
+Log a new daily effort entry. Triggers utilization recalculation for the staff member and invalidates their dashboard cache key in Redis.
+Roles: Team Member, Team Lead, BIM Team Lead, BIM Modeler
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+woId
+UUID
+Yes
+Must be an active CSI_WO.Id where the caller is the current assignee
+logDate
+date
+Yes
+ISO date; cannot be in the future; cannot be for a date when the WO was Closed
+hours
+number
+Yes
+Must be > 0 and ≤ 8 per single entry (FR-29); decimal values accepted (e.g. 2.5)
+notes
+string
+No
+Max 500 characters
+Response 200 — EffortLogEntry
+Field
+Type
+Description
+—
+—
+As per GET response shape
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+HOURS_EXCEED_LIMIT
+hours > 8 in a single entry; create multiple entries for a longer session
+400
+WO_CLOSED
+Cannot log effort against a Closed WO
+400
+INVALID_ASSIGNEE
+Caller is not the current assignee of this WO
+💡 Notes: Utilization figures on the Capacity Dashboard and Department Dashboard reflect new entries within the 5-minute Redis TTL window (PRD §8).
+PATCH  /api/effort/:id
+Edit an existing effort entry. Allowed on same-day entries only, and only while the parent WO has not yet moved to Closed. Triggers re-calculation and cache invalidation.
+Roles: Team Member, Team Lead, BIM Modeler (own entries only)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+EFFORT_LOG.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+hours
+number
+No
+Must be > 0 and ≤ 8
+Updated hours value
+notes
+string
+No
+Max 500 characters
+Response 200 — EffortLogEntry
+Field
+Type
+Description
+—
+—
+Updated entry
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+403
+NOT_OWN_ENTRY
+Caller is not the staff member who created the entry
+400
+NOT_SAME_DAY
+Entry was logged on a previous date; same-day edits only
+400
+WO_CLOSED
+Cannot edit effort on a Closed WO
+5. Evidence & Deliverables  /api/evidence/*
+Manages EVIDENCE_DELIVERABLE records. File binaries are stored in object storage; the API stores only the FileRef path/URL in the database. Uploads generate a pre-signed PUT URL that the frontend uses to push the binary directly to object storage, avoiding routing the binary through the API server.
+GET  /api/evidence
+List evidence items for a WO. Used by the WO Detail Evidence tab.
+Roles: All roles (scoped to WO visibility)
+Parameters
+Name
+In
+Type
+Required
+Description
+woId
+Query
+UUID
+Yes
+Must be provided — evidence is always listed per WO
+evidenceType
+Query
+string
+No
+Filter by tag
+Response 200 — EvidenceItem[]
+Field
+Type
+Description
+id
+UUID
+EVIDENCE_DELIVERABLE.Id
+woId
+UUID
+fileRef
+string
+Object storage path
+downloadUrl
+string
+Pre-signed GET URL; expires after 1 hour
+evidenceType
+string
+Tag assigned at upload
+uploadedByName
+string
+uploadedDate
+datetime
+removedAt
+datetime | null
+Non-null if soft-deleted
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/evidence/upload-url
+Request a pre-signed object storage PUT URL for a new evidence file. The frontend uses this URL to upload the binary directly, then calls POST /api/evidence/confirm to create the database record.
+Roles: Team Member, Team Lead, BIM Modeler
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+woId
+UUID
+Yes
+Must be an active, non-Closed CSI_WO.Id within caller's scope
+filename
+string
+Yes
+Original filename; used to construct the storage key; max 200 chars
+mimeType
+string
+Yes
+Must be one of the configured allowed types (e.g. application/pdf, image/jpeg, image/png)
+fileSizeBytes
+integer
+Yes
+Must be > 0 and within the configured max (default 25 MB)
+Response 200 — UploadIntent
+Field
+Type
+Description
+uploadIntentId
+UUID
+Short-lived token linking the upload URL to the pending DB record; TTL 15 min
+presignedPutUrl
+string
+Pre-signed PUT URL for direct upload to object storage
+expiresAt
+datetime
+When the presigned URL expires
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+MIME_TYPE_NOT_ALLOWED
+Provided MIME type is not in the configured allowlist
+400
+FILE_TOO_LARGE
+fileSizeBytes exceeds the configured maximum
+💡 Notes: Two-step upload: (1) POST /upload-url → get presigned URL; (2) browser PUTs binary to presigned URL; (3) POST /confirm with uploadIntentId and evidenceType to create the DB record.
+POST  /api/evidence/confirm
+Confirm that a file upload to object storage succeeded and create the EVIDENCE_DELIVERABLE database record. Must be called within 15 minutes of /upload-url.
+Roles: Team Member, Team Lead, BIM Modeler
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+uploadIntentId
+UUID
+Yes
+Token returned by /upload-url
+evidenceType
+string
+Yes
+Must be one of the configured evidence types (FR-30)
+Response 200 — EvidenceItem
+Field
+Type
+Description
+—
+—
+Newly created record as per GET response shape
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+UPLOAD_INTENT_EXPIRED
+uploadIntentId is older than 15 minutes or has already been confirmed
+400
+UPLOAD_NOT_VERIFIED
+Object storage key does not exist — binary upload did not complete
+DELETE  /api/evidence/:id
+Soft-delete an evidence item. Sets RemovedAt and RemovedBy; does not delete the binary from object storage. Writes to AUDIT_LOG. Removing an evidence item after PendingApproval requires Team Lead-or-above.
+Roles: Uploader (own items, before PendingApproval); Team Lead / SM / HOD (any in scope)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+EVIDENCE_DELIVERABLE.Id
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+403
+APPROVAL_LOCK
+WO is in PendingApproval or Closed; Team Lead-or-above role required to remove
+400
+ALREADY_REMOVED
+Evidence item has already been soft-deleted
+💡 Notes: Soft-delete only — the binary remains in object storage and the row remains in the database with RemovedAt set. This preserves the complete evidence history for audit.
+6. Tender  /api/tender/*
+The Tender route group manages TENDER records — the v1.1 top-level business object (PRD §4.3) — and the Tender Scoring / Go/No-Go evaluation flow. The Tender → WO → Task → Effort hierarchy is navigable via the linkedWoCount rollup and the /api/wo?tenderId= filter.
+GET  /api/tender
+Paginated, filterable list of tenders. Used by the Tender Registry screen (Wireframe Spec Screen 4) and the Tender Pipeline Dashboard widget.
+Roles: HOD, Solution Manager (full); Team Lead (read — own linked tenders only)
+Parameters
+Name
+In
+Type
+Required
+Description
+status
+Query
+string
+No
+Comma-separated: Prospect,Qualified,InProgress,Submitted,Clarification,Won,Lost,Cancelled
+tenderOwnerId
+Query
+UUID
+No
+Filter by tender owner Staff Id
+closingDateFrom / closingDateTo
+Query
+date
+No
+ISO date range for closing date
+q
+Query
+string
+No
+Search on TenderNo and TenderName
+sortBy
+Query
+string
+No
+closingDate | estimatedValue | status | createdAt (default: createdAt)
+sortDir
+Query
+string
+No
+asc | desc
+limit / after
+Query
+—
+No
+Pagination (default limit 20)
+Response 200 — TenderListItem[]
+Field
+Type
+Description
+id
+UUID
+tenderNo
+string
+Auto-generated
+tenderName
+string
+client
+string
+tenderCategory
+string | null
+closingDate
+date
+estimatedValue
+string
+Numeric string e.g. '2500000.00'
+submittedValue
+string | null
+winValue
+string | null
+status
+string
+tenderOwnerName
+string
+linkedWoCount
+integer
+Derived: count of CSI_WO rows where TenderId = this tender
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/tender
+Create a new Tender record. TenderNo is auto-generated. ClosingDate must be in the future.
+Roles: HOD, Solution Manager
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+tenderName
+string
+Yes
+Max 200 characters
+client
+string
+Yes
+Max 150 characters
+tenderCategory
+string
+No
+Max 50 characters
+closingDate
+date
+Yes
+Must be a future date (application-layer rule, Wireframe Spec §4 validation)
+estimatedValue
+number
+Yes
+Must be > 0
+tenderOwnerId
+UUID
+Yes
+Must be an active HOD or SM STAFF.Id
+Response 200 — TenderListItem
+Field
+Type
+Description
+id
+UUID
+New TENDER.Id
+tenderNo
+string
+Auto-generated TenderNo
+status
+string
+Always 'Prospect' on creation
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+GET  /api/tender/:id
+Full tender detail including all linked WO summaries and rolled-up resource load. Used by the Tender Detail screen (Wireframe Spec Screen 5).
+Roles: HOD, Solution Manager; Team Lead (own linked tenders)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+TENDER.Id
+Response 200 — TenderDetail
+Field
+Type
+Description
+—
+—
+All TenderListItem fields
+linkedWos
+WoListItem[]
+Array of CSI_WO summaries linked to this tender; same shape as GET /api/wo items
+resourceLoad
+object
+{ totalAssignedHours, totalWorkedHours, remainingHours } — rolled-up from all linked WOs (FR-60)
+goNoGoEvaluation
+object | null
+Most recent GONOGO_EVALUATION for this tender, if one exists
+activityHistory
+AuditEntry[]
+Tender-scoped AUDIT_LOG entries (last 50)
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+PATCH  /api/tender/:id
+Update tender fields or change status. Status transitions are validated server-side (FR-58). WinValue is editable only when status = Won.
+Roles: HOD, Solution Manager
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+TENDER.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+tenderName / client / tenderCategory / closingDate / estimatedValue / submittedValue
+various
+No
+Same type/validation as POST
+winValue
+number
+Conditional
+Only accepted when status = Won
+tenderOwnerId
+UUID
+No
+Active HOD or SM STAFF.Id
+status
+string
+No
+Must follow the allowed transition sequence
+Prospect→Qualified→InProgress→Submitted→Clarification→Won|Lost; Cancelled from any state
+Response 200 — TenderDetail
+Field
+Type
+Description
+—
+—
+Updated full tender detail
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+INVALID_STATUS_TRANSITION
+Requested status transition is not permitted — see PRD §7.16 (FR-58)
+400
+WIN_VALUE_LOCKED
+winValue can only be set when status = Won
+POST  /api/tender/:id/link-wo
+Link an existing, unlinked CSI_WO to this Tender. A WO can be linked to at most one Tender at a time.
+Roles: HOD, Solution Manager
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+TENDER.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+woId
+UUID
+Yes
+Must be an existing CSI_WO.Id; must not already have a TenderId set
+Response 200 — LinkResult
+Field
+Type
+Description
+woId
+UUID
+tenderId
+UUID
+linkedAt
+datetime
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+409
+WO_ALREADY_LINKED
+The WO is already linked to another tender — unlink it first
+POST  /api/tender/:id/score
+Submit the six-criterion scoring form for a tender and receive the calculated WeightedScore, size tier and adjusted hour estimates. Persists a TENDER_SCORING record and links it to the tender.
+Roles: HOD, Solution Manager
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+TENDER.Id (nullable — can score before a tender record exists; see notes)
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+functionalBreadth / integrationCount / complianceDepth / solutionNovelty / commercialComplexity / stakeholderIntensity
+integer (×6)
+Yes
+Each 0–5
+Scoring criteria (PRD §13.3)
+isRush / isConsortium / isSecurityHeavy / isCustomDev / isManyQA / isOnsite
+boolean (×6)
+No
+Default false
+Complexity multiplier flags (FR-38)
+planningHorizonDays
+integer
+No
+Default 10; range 1–90
+Planning horizon for the Go/No-Go projection step
+Response 200 — ScoringResult
+Field
+Type
+Description
+scoringId
+UUID
+TENDER_SCORING.Id
+weightedScore
+number
+Computed weighted score
+baselineTierSize
+string
+Small | Medium | Large | Mega
+baselineCSIHours / baselineCMTHours
+number
+From BASELINE_TIER
+adjustedCSIHours / adjustedCMTHours
+number
+After multiplier factors applied
+roleBreakdown
+object[]
+[{ roleCode, csiHours, cmtHours }] — based on ROLE_SPLIT configuration
+projectedCSIUtilization / projectedCMTUtilization
+number
+Utilization % if this commitment is taken on within the planning horizon
+recommendation
+string
+Go | NoGo
+goNoGoId
+UUID
+GONOGO_EVALUATION.Id — created automatically with the scoring result
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+VALIDATION_ERROR
+Any criterion score outside 0–5
+💡 Notes: The Go/No-Go evaluation is created automatically alongside the scoring record — no separate API call needed. The HOD may override a NoGo recommendation via POST /api/tender/:id/gonogo/:goNoGoId/override.
+POST  /api/tender/:id/gonogo/:goNoGoId/override
+HOD-only: override a NoGo recommendation with a mandatory justification. Writes to AUDIT_LOG with Action = 'Override'.
+Roles: HOD only (SystemConfigFlag not required — role check alone)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+TENDER.Id
+goNoGoId
+Path
+UUID
+Yes
+GONOGO_EVALUATION.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+overrideReason
+string
+Yes
+Min 20 characters — must be substantive, not a placeholder
+Mandatory justification (FR-40)
+Response 200 — GoNoGoResult
+Field
+Type
+Description
+goNoGoId
+UUID
+overrideBy
+string
+HOD staff name
+overrideReason
+string
+overriddenAt
+datetime
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+403
+HOD_ONLY
+Only staff with RoleCode = HOD may call this endpoint
+400
+ALREADY_GO
+The evaluation is already a Go recommendation — override only applies to NoGo
+💡 Notes: Every override is immutable once saved. The HOD cannot delete or change a saved override — only a new scoring evaluation can supersede it.
+7. Capacity  /api/capacity/*
+Live utilization data for the Capacity Dashboard (Wireframe Spec Screen 13) and the capacity-projection input to the Go/No-Go Evaluator. Utilization figures are derived from live EFFORT_LOG data via the FastAPI compute worker and cached in Redis with a 5-minute TTL (PRD §8 NFR).
+GET  /api/capacity/utilization
+Return current utilization for all staff within the caller's scope. Feeds the Department Dashboard gauges, the Capacity Dashboard staff table, and the assignment picker's utilization chips.
+Roles: HOD, Solution Manager
+Parameters
+Name
+In
+Type
+Required
+Description
+deptCode
+Query
+string
+No
+CSI | CMT — filter to one department
+subTeam
+Query
+string
+No
+Filter by pod (A/B/C/D)
+bandFilter
+Query
+string
+No
+Comma-separated bands: Free,Safe,Warning,Overloaded
+Response 200 — UtilizationResponse
+Field
+Type
+Description
+departmentSummary
+object
+{ csiUtilization, cmtUtilization, csiThreshold (%), cmtThreshold (%), csiStatus, cmtStatus }
+staff
+StaffUtilization[]
+Array, one row per staff in scope
+cacheTimestamp
+datetime
+When the utilization figures were last recomputed
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+💡 Notes: StaffUtilization fields: { staffId, name, roleCode, subTeam, deptCode, dailyUsableHours, assignedHoursThisPeriod, workedHoursThisPeriod, remainingCapacityHours, utilizationPct, band (Free|Safe|Warning|Overloaded), openWoCount }
+GET  /api/capacity/utilization/:staffId
+Utilization breakdown for a single staff member — per-WO effort breakdown and a 30-day trend. Used by Capacity Dashboard staff-row drill-down.
+Roles: HOD, Solution Manager (any in scope); Team Lead (own pod); staff member (own)
+Parameters
+Name
+In
+Type
+Required
+Description
+staffId
+Path
+UUID
+Yes
+STAFF.Id
+Response 200 — StaffUtilizationDetail
+Field
+Type
+Description
+—
+—
+All StaffUtilization fields from the list endpoint
+effortByWo
+object[]
+[{ woId, csiWoNo, title, hoursWorked, assignedHours }] — breakdown by WO
+trend
+object[]
+[{ date, utilizationPct }] — last 30 calendar days
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+8. KPI & OI Tracker  /api/kpi/*
+KPI data is computed by a nightly Celery job (and on-demand via POST /api/kpi/rollup) from EFFORT_LOG, APPROVAL_RECORD and OI_TRACKER. The API exposes the pre-computed KPI_RECORD rows rather than computing on every read, keeping dashboard load times fast. The OI_TRACKER sub-group handles the Opportunity of Interest registered/won counts (PRD §14).
+GET  /api/kpi/scorecard
+Return the caller's personal KPI scorecard for a given period. HOD and Solution Manager additionally receive a team rollup. Used by KPI Dashboard (Wireframe Spec Screen 15).
+Roles: All roles
+Parameters
+Name
+In
+Type
+Required
+Description
+period
+Query
+string
+No
+Format YYYY-Q1 through YYYY-Q4 or YYYY for annual; default: current quarter
+Response 200 — KpiScorecardResponse
+Field
+Type
+Description
+period
+string
+The period these figures cover
+personalKpis
+KpiMetric[]
+Array of KPI_RECORD rows for the caller
+teamRollup
+TeamKpiRow[] | null
+Present only for HOD and Solution Manager; one row per direct report
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+💡 Notes: KpiMetric fields: { metricName, targetValue, achievedValue, achievementPct, status (OnTrack|AtRisk|Achieved|Missed) }. TeamKpiRow fields: { staffName, roleCode, metrics: KpiMetric[] }.
+POST  /api/kpi/rollup
+Trigger an on-demand KPI rollup for the current period. Normally run nightly by Celery; this endpoint allows the HOD to force a refresh before a dashboard review session. Returns a job ID; the frontend polls GET /api/kpi/rollup/:jobId for completion.
+Roles: HOD, Solution Manager
+Response 200 — RollupJob
+Field
+Type
+Description
+jobId
+UUID
+Celery task Id to poll
+status
+string
+Queued
+estimatedDurationSeconds
+integer
+Rough estimate based on staff count and period
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+429
+ROLLUP_ALREADY_RUNNING
+A rollup job for the current period is already queued or running; poll the existing jobId
+GET  /api/kpi/oi
+Return OI_TRACKER records — registered and won Opportunity of Interest counts per staff per period. Feeds the OI & Commission Tracker widget.
+Roles: HOD (all in scope); Solution Manager (stream); Team Lead (own); Team Member (own)
+Parameters
+Name
+In
+Type
+Required
+Description
+period
+Query
+string
+No
+YYYY for annual OI targets; default: current year
+staffId
+Query
+UUID
+No
+Scope-filtered — Team Lead can only request own pod
+Response 200 — OiTrackerEntry[]
+Field
+Type
+Description
+staffId
+UUID
+staffName
+string
+roleCode
+string
+period
+string
+registered
+integer
+Count of OI registered
+won
+integer
+Count of OI won
+registeredTarget
+integer
+Annual target from role config: HOD = 8, Team Lead = 3
+wonTarget
+integer
+Annual target from role config: HOD = 3, Team Lead = 1
+registeredPct / wonPct
+number
+Achievement percentage
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+PATCH  /api/kpi/oi/:staffId
+Manually increment or set OI registered/won counts for a staff member in the current period. Used by the OI & Commission Tracker inline edit. Writes to AUDIT_LOG.
+Roles: HOD, Solution Manager (for their stream)
+Parameters
+Name
+In
+Type
+Required
+Description
+staffId
+Path
+UUID
+Yes
+STAFF.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+period
+string
+Yes
+YYYY
+registered
+integer
+No
+≥ 0
+New total registered count (replaces current value)
+won
+integer
+No
+≥ 0 and ≤ registered
+New total won count
+Response 200 — OiTrackerEntry
+Field
+Type
+Description
+—
+—
+Updated entry as per GET response
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+WON_EXCEEDS_REGISTERED
+won cannot exceed registered
+9. Skills, Competency & Certification  /api/skills/*
+Manages the v1.1 Skills, Competency & Certification module (PRD §7.15, FR-50–56). Includes the Skills inventory (SKILL), competency assessment records (STAFF_SKILL), certification register (CERTIFICATION) and training roadmap (TRAINING_PLAN). All write operations produce AUDIT_LOG entries.
+9.1 Skills Inventory
+GET  /api/skills/inventory
+Return all configured skills, optionally filtered by technology domain. Used to populate skill-picker dropdowns and the competency heatmap column headings.
+Roles: All roles
+Parameters
+Name
+In
+Type
+Required
+Description
+domain
+Query
+string
+No
+Cloud | Cyber Security | Data Centre | Network | Enterprise Architecture | AI-HPC | BIM | Consultancy
+Response 200 — Skill[]
+Field
+Type
+Description
+id
+UUID
+SKILL.Id
+skillName
+string
+technologyDomain
+string
+One of the 8 configured domains
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+9.2 Competency Assessments
+GET  /api/skills/assessments
+Return STAFF_SKILL records — assessed competency per staff per skill. Used to build the By Staff radar chart and the By Domain heatmap.
+Roles: HOD, Solution Manager (all in scope); Team Lead (own pod); BIM TL (own team); staff (own)
+Parameters
+Name
+In
+Type
+Required
+Description
+staffId
+Query
+UUID
+No
+Scope-filtered
+skillId
+Query
+UUID
+No
+Filter by skill
+domain
+Query
+string
+No
+Filter by technology domain
+level
+Query
+string
+No
+Comma-separated: Beginner,Intermediate,Advanced,Expert
+Response 200 — StaffSkillRecord[]
+Field
+Type
+Description
+staffId
+UUID
+staffName
+string
+skillId
+UUID
+skillName
+string
+technologyDomain
+string
+competencyLevel
+string
+Beginner | Intermediate | Advanced | Expert
+lastAssessmentDate
+date
+assessedByName
+string
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/skills/assessments
+Record a new competency assessment for a staff member on a skill. Creates or updates the STAFF_SKILL row (upsert on StaffId + SkillId composite PK). AssessedBy is auto-populated from the caller's session.
+Roles: HOD, Solution Manager (any in scope); Team Lead / BIM TL (own pod/team)
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+staffId
+UUID
+Yes
+Must be within caller's scope
+skillId
+UUID
+Yes
+Must exist in SKILL table
+competencyLevel
+string
+Yes
+Exactly one of: Beginner Intermediate Advanced Expert
+lastAssessmentDate
+date
+Yes
+Cannot be a future date
+Response 200 — StaffSkillRecord
+Field
+Type
+Description
+—
+—
+Upserted record as per GET shape
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+INVALID_LEVEL
+competencyLevel not one of the four permitted values (FR-51)
+💡 Notes: AssessedBy is taken from the caller's session; it cannot be set in the request body.
+9.3 Certification Register
+GET  /api/skills/certifications
+Return CERTIFICATION records. Used by Certification Tracker screen (Wireframe Spec Screen 17) and Capability Readiness Dashboard.
+Roles: HOD, Solution Manager (all in scope); Team Lead (own pod); staff (own)
+Parameters
+Name
+In
+Type
+Required
+Description
+staffId
+Query
+UUID
+No
+Scope-filtered
+status
+Query
+string
+No
+Unverified | Verified | Expired
+expiringWithinDays
+Query
+integer
+No
+Return certifications expiring within N days from today
+vendor
+Query
+string
+No
+Filter by vendor name (partial match)
+limit / after
+Query
+—
+No
+Pagination
+Response 200 — CertificationRecord[]
+Field
+Type
+Description
+id
+UUID
+staffId
+UUID
+staffName
+string
+certificationName
+string
+vendor
+string | null
+certificationLevel
+string | null
+issueDate
+date
+expiryDate
+date | null
+daysUntilExpiry
+integer | null
+Computed; negative = already expired
+status
+string
+Unverified | Verified | Expired
+evidenceFileUrl
+string | null
+Pre-signed GET URL (1 h TTL) if EvidenceFile is set
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/skills/certifications
+Add a new certification record for a staff member.
+Roles: All roles (own record); HOD / SM / TL (within scope)
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+staffId
+UUID
+Yes
+Caller's own Id if Team Member/BIM Modeler; scope-filtered otherwise
+certificationName
+string
+Yes
+Max 150 characters
+vendor
+string
+No
+Max 100 characters
+certificationLevel
+string
+No
+Max 50 characters
+issueDate
+date
+Yes
+expiryDate
+date
+No
+Must be after issueDate if provided
+Response 200 — CertificationRecord
+Field
+Type
+Description
+—
+—
+New record; status = Unverified until EvidenceFile is attached
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+POST  /api/skills/certifications/:id/verify
+Upload evidence for a certification and move its status to Verified. Uses the same two-step presigned-URL flow as evidence upload.
+Roles: HOD, Solution Manager, Team Lead (own pod); staff (own record)
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+CERTIFICATION.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+filename
+string
+Yes
+mimeType
+string
+Yes
+application/pdf | image/jpeg | image/png
+fileSizeBytes
+integer
+Yes
+Max 10 MB for certification evidence
+Response 200 — VerifyResult
+Field
+Type
+Description
+certificationId
+UUID
+status
+string
+Verified
+presignedPutUrl
+string
+Upload evidence file here; then call PATCH /api/skills/certifications/:id/confirm-verify
+uploadIntentId
+UUID
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+9.4 Training Roadmap
+GET  /api/skills/training
+Return TRAINING_PLAN records for staff within scope.
+Roles: HOD, Solution Manager (all); Team Lead (own pod); staff (own)
+Parameters
+Name
+In
+Type
+Required
+Description
+staffId
+Query
+UUID
+No
+Scope-filtered
+status
+Query
+string
+No
+Planned | InProgress | Completed | Cancelled
+Response 200 — TrainingPlanEntry[]
+Field
+Type
+Description
+id
+UUID
+staffName
+string
+linkedSkill
+object | null
+{ id, skillName, domain } if SkillId is set
+linkedCertification
+object | null
+{ id, certificationName } if CertificationId is set
+plannedActivity
+string
+targetDate
+date | null
+status
+string
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/skills/training
+Add a training plan entry for a staff member. Either skillId or certificationId must be provided (not both, not neither).
+Roles: HOD, Solution Manager, Team Lead (own pod)
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+staffId
+UUID
+Yes
+Scope-filtered
+skillId
+UUID
+Conditional
+Exactly one of skillId / certificationId
+certificationId
+UUID
+Conditional
+Exactly one of skillId / certificationId
+plannedActivity
+string
+Yes
+Max 200 characters
+targetDate
+date
+No
+Future date
+Response 200 — TrainingPlanEntry
+Field
+Type
+Description
+—
+—
+Newly created entry; status = Planned
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+AMBIGUOUS_LINK
+Both skillId and certificationId provided — only one allowed
+400
+NO_LINK
+Neither skillId nor certificationId provided
+10. Reports  /api/reports/*
+The reports route group covers on-demand generation, scheduled subscriptions, job-status polling, and download-URL retrieval for all 11 report types defined in PRD §15. Report generation runs asynchronously via Celery; the API returns a job ID immediately and the frontend polls for completion.
+GET  /api/reports/catalogue
+Return the list of report types visible to the caller's role. Used to populate the Reports screen card grid (Wireframe Spec Screen 18).
+Roles: All roles (filtered by role)
+Response 200 — ReportCatalogueEntry[]
+Field
+Type
+Description
+reportCode
+string
+e.g. WO_TREND, CAPACITY_UTIL, CHAIRMAN_SUMMARY
+reportName
+string
+Display name
+description
+string
+One-line description
+availableFormats
+string[]
+['pdf','excel','pptx'] — role and report type determine which formats appear
+canSchedule
+boolean
+Whether monthly scheduling is available for this report type
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/reports/generate
+Request generation of a report. Returns a job ID for polling. Rate-limited to 10 requests/hour/user.
+Roles: All roles (limited to reports in their catalogue)
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+reportCode
+string
+Yes
+Must be in the caller's catalogue
+e.g. 'CHAIRMAN_SUMMARY'
+format
+string
+Yes
+pdf | excel | pptx — must be in the report's availableFormats
+periodFrom
+date
+No
+Start of the reporting period
+periodTo
+date
+No
+End of the reporting period
+scope
+object
+No
+Optional additional scope filters e.g. { deptCode: 'CSI', subTeam: 'A' }
+Response 200 — GenerationJob
+Field
+Type
+Description
+jobId
+UUID
+Celery task Id
+status
+string
+Queued
+estimatedSeconds
+integer
+Rough server-side estimate
+reportCode
+string
+format
+string
+requestedAt
+datetime
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+403
+REPORT_NOT_IN_CATALOGUE
+reportCode not visible to caller's role
+429
+RATE_LIMITED
+10 generation requests per hour per user exceeded
+GET  /api/reports/jobs/:jobId
+Poll the status of a report generation job. Frontend polls every 3 seconds until status = Completed or Failed.
+Roles: Job owner only
+Parameters
+Name
+In
+Type
+Required
+Description
+jobId
+Path
+UUID
+Yes
+Job Id returned by POST /api/reports/generate
+Response 200 — GenerationJob (extended)
+Field
+Type
+Description
+jobId
+UUID
+status
+string
+Queued | Running | Completed | Failed
+progress
+integer | null
+0–100 (populated during Running)
+downloadUrl
+string | null
+Pre-signed GET URL (24 h TTL) — populated when status = Completed
+fileSizeBytes
+integer | null
+Populated when status = Completed
+failureReason
+string | null
+Human-readable; populated when status = Failed
+completedAt
+datetime | null
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+403
+NOT_JOB_OWNER
+Only the user who requested the job can poll its status
+GET  /api/reports/history
+Return the caller's previously generated reports, with re-download links where the file is still within the 7-day TTL.
+Roles: All roles (own history only)
+Parameters
+Name
+In
+Type
+Required
+Description
+reportCode
+Query
+string
+No
+Filter by report code
+limit / after
+Query
+—
+No
+Pagination (default 20)
+Response 200 — ReportHistoryEntry[]
+Field
+Type
+Description
+jobId
+UUID
+reportCode
+string
+format
+string
+status
+string
+requestedAt
+datetime
+downloadUrl
+string | null
+Pre-signed URL; null if the file has expired (> 7 days)
+expiresAt
+datetime | null
+When the download URL and file expire
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+GET  /api/reports/schedules
+List monthly report schedule subscriptions configured by the caller (or all schedules for HOD).
+Roles: All roles (own); HOD (all)
+Response 200 — ReportSchedule[]
+Field
+Type
+Description
+scheduleId
+UUID
+reportCode
+string
+format
+string
+dayOfMonth
+integer
+1–28; day on which the job fires each month
+recipients
+string[]
+Email addresses
+active
+boolean
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+POST  /api/reports/schedules
+Create a monthly report schedule subscription.
+Roles: HOD, Solution Manager
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+reportCode
+string
+Yes
+Must be in the caller's catalogue and canSchedule = true
+format
+string
+Yes
+pdf | excel | pptx
+dayOfMonth
+integer
+Yes
+1–28
+recipients
+string[]
+Yes
+At least one email address; max 20
+Response 200 — ReportSchedule
+Field
+Type
+Description
+—
+—
+Newly created schedule
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+SCHEDULE_NOT_SUPPORTED
+canSchedule = false for this report code
+11. Admin & Master Data  /api/admin/*
+Restricted to staff with SystemConfigFlag = true (HOD by default; optionally delegated to one Solution Manager — PRD §6.1, FR-47–49). All write operations produce AUDIT_LOG entries. Every GET endpoint in this group returns the current live configuration values including their last-modified metadata, so the Admin & Master Data screen can show an audit history link per setting.
+GET  /api/admin/request-types
+Return all REQUEST_TYPE records with their current SLA targets.
+Roles: SystemConfigFlag = true
+Response 200 — RequestType[]
+Field
+Type
+Description
+id
+UUID
+typeCode
+integer
+1–12
+typeName
+string
+domain
+string
+slaAckDays / slaClassifyDays / slaRouteDays
+integer
+Current SLA targets
+updatedAt
+datetime
+Last modified
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+403
+SYSTEM_CONFIG_REQUIRED
+Caller does not have SystemConfigFlag = true
+PATCH  /api/admin/request-types/:id
+Update SLA targets for a request type. Writes to AUDIT_LOG.
+Roles: SystemConfigFlag = true
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+REQUEST_TYPE.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+slaAckDays
+integer
+No
+≥ 1
+slaClassifyDays
+integer
+No
+≥ 1
+slaRouteDays
+integer
+No
+≥ 1
+Response 200 — RequestType
+Field
+Type
+Description
+—
+—
+Updated record
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+403
+SYSTEM_CONFIG_REQUIRED
+GET  /api/admin/role-split
+Return ROLE_SPLIT records grouped by department. Shows current percentage allocations and the derived total per department.
+Roles: SystemConfigFlag = true
+Parameters
+Name
+In
+Type
+Required
+Description
+deptCode
+Query
+string
+No
+CSI | CMT
+Response 200 — RoleSplitGroup[]
+Field
+Type
+Description
+deptCode
+string
+totalPct
+number
+Sum of all percentages; must be 100 before Save is permitted
+rows
+RoleSplitRow[]
+[{ id, roleCode, roleName, percentage }]
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+403
+SYSTEM_CONFIG_REQUIRED
+PUT  /api/admin/role-split
+Replace all ROLE_SPLIT rows for a department in a single atomic transaction. Validated that the supplied rows sum to exactly 100% before the transaction is committed (FR-49).
+Roles: SystemConfigFlag = true
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+deptCode
+string
+Yes
+CSI | CMT
+rows
+array
+Yes
+Array of { roleId, percentage }; must cover all roles for the department
+Response 200 — RoleSplitGroup
+Field
+Type
+Description
+—
+—
+Updated group as per GET response
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+400
+TOTAL_NOT_100
+Supplied percentages do not sum to exactly 100 (FR-49)
+403
+SYSTEM_CONFIG_REQUIRED
+💡 Notes: This is a PUT (full replace), not a PATCH. All role rows for the department must be supplied; any omitted role is implicitly set to 0%, which will fail the 100% validation.
+GET  /api/admin/settings
+Return all SYSTEM_SETTING key-value pairs. Includes utilization thresholds, certification expiry window, Go/No-Go planning horizon default, and audit log retention years.
+Roles: SystemConfigFlag = true
+Response 200 — SystemSetting[]
+Field
+Type
+Description
+id
+UUID
+settingKey
+string
+e.g. CSI_UTILIZATION_THRESHOLD
+settingValue
+string
+Current value as a string; parse per the description
+description
+string
+Human-readable explanation of the setting
+updatedAt
+datetime
+updatedByName
+string
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+403
+SYSTEM_CONFIG_REQUIRED
+PATCH  /api/admin/settings/:key
+Update a single SYSTEM_SETTING value. Writes to AUDIT_LOG. The key is the SettingKey string (e.g. CSI_UTILIZATION_THRESHOLD), not the surrogate UUID Id.
+Roles: SystemConfigFlag = true
+Parameters
+Name
+In
+Type
+Required
+Description
+key
+Path
+string
+Yes
+SYSTEM_SETTING.SettingKey
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+settingValue
+string
+Yes
+Validated against the setting's type constraint (e.g. CSI_UTILIZATION_THRESHOLD must be a numeric string 50–100)
+Response 200 — SystemSetting
+Field
+Type
+Description
+—
+—
+Updated setting record
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+404
+SETTING_NOT_FOUND
+SettingKey does not exist
+400
+SETTING_VALUE_INVALID
+Value does not pass the setting's type or range constraint
+403
+SYSTEM_CONFIG_REQUIRED
+💡 Notes: The API validates settingValue against a per-key constraint table defined in the admin module — not as a raw string-store. Supplying a non-numeric string for a numeric setting returns 400.
+GET  /api/admin/staff
+Return all STAFF records in scope — used by Admin & Master Data for staff management and by the assignment picker endpoint.
+Roles: HOD (all); Solution Manager (own dept); SystemConfigFlag required for inactive staff
+Parameters
+Name
+In
+Type
+Required
+Description
+deptCode
+Query
+string
+No
+CSI | CMT
+status
+Query
+string
+No
+Active | Inactive | OnLeave (default: Active)
+q
+Query
+string
+No
+Search on name or staffCode
+Response 200 — StaffRecord[]
+Field
+Type
+Description
+id
+UUID
+staffCode
+string
+name
+string
+email
+string
+roleCode
+string
+roleName
+string
+deptCode
+string
+subTeam
+string | null
+productivityFactor
+number
+dailyUsableHours
+number
+status
+string
+systemConfigFlag
+boolean
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+403
+SYSTEM_CONFIG_REQUIRED
+Required for inactive staff; not required for Active staff list
+PATCH  /api/admin/staff/:id
+Update a staff member's role, department, sub-team, productivity factor, status or system config flag. Staff are never hard-deleted — deactivation uses status = Inactive. Writes to AUDIT_LOG.
+Roles: HOD with SystemConfigFlag = true
+Parameters
+Name
+In
+Type
+Required
+Description
+id
+Path
+UUID
+Yes
+STAFF.Id
+Request Body (application/json)
+Field
+Type
+Required
+Validation
+Description
+roleId
+UUID
+No
+Must resolve to a valid ROLE.Id
+deptId
+UUID
+No
+Must resolve to a valid DEPARTMENT.Id
+subTeam
+string
+No
+A | B | C | D | null
+productivityFactor
+number
+No
+0.1–1.0
+status
+string
+No
+Active | Inactive | OnLeave
+systemConfigFlag
+boolean
+No
+true only settable by HOD
+Response 200 — StaffRecord
+Field
+Type
+Description
+—
+—
+Updated record
+Error Responses
+Status
+Code
+When
+401
+UNAUTHENTICATED
+JWT missing, expired or invalid
+403
+FORBIDDEN
+Role not permitted for this route, or scope filter excludes the resource
+429
+RATE_LIMITED
+Per-IP or per-user rate limit exceeded
+500
+INTERNAL_ERROR
+Unexpected server-side failure — see Sentry/logs for trace
+404
+NOT_FOUND
+Record with provided Id does not exist or is outside the caller's scope
+400
+VALIDATION_ERROR
+Request body failed Zod schema validation — see errors[] array in response
+409
+CONFLICT
+Duplicate detected — see SAD §8 idempotency key behaviour
+403
+SYSTEM_CONFIG_REQUIRED
+💡 Notes: Setting systemConfigFlag = true on a non-HOD role is permitted for the HOD delegation pattern (PRD §6.1). The platform enforces this flag on Admin route access, not as a role-code check.
+12. Webhooks & Async Event Reference
+The platform does not expose outbound webhooks to external consumers in Phase 1–3. Internally, Celery jobs fire on schedule or on-demand; the frontend polls job-status endpoints (Section 10) for async operations. This section documents the internal async events that trigger side effects — notification dispatches, cache invalidations and audit entries — so the backend Developer has a complete picture of what happens beyond the immediate HTTP response.
+Trigger
+Async Side Effects
+Celery Task
+POST /api/wo (WO created)
+SLA acknowledgement timer set in Redis; notification to assigned staff (if assigned at creation)
+notify.wo_assigned
+POST /api/wo/:id/assign
+Notification to new assignee and to previous assignee (if reassignment); Redis utilization cache invalidated for both staff
+notify.wo_reassigned, cache.invalidate_utilization
+POST /api/wo/:id/complete
+Notification to the approver-tier staff member; SLA clock checked
+notify.approval_requested
+POST /api/wo/:id/approve (Approved)
+Notification to the assignee and creator; KPI partial rollup for the approved WO
+notify.wo_closed, kpi.partial_rollup
+POST /api/wo/:id/approve (Returned)
+Notification to the assignee with the return reason
+notify.wo_returned
+POST /api/effort
+Redis utilization cache invalidated for the logging staff member; Department Dashboard cache partially invalidated
+cache.invalidate_utilization
+GET /api/capacity/utilization (cache miss)
+FastAPI worker called to recompute; result stored in Redis TTL 5 min
+capacity.recompute
+POST /api/reports/generate
+Celery report-generation task queued; result stored in Object Storage on completion; notification to requester
+reports.generate_{reportCode}
+Nightly Celery beat — KPI rollup
+Full KPI_RECORD recalculation for all staff for current period
+kpi.nightly_rollup
+Nightly Celery beat — expiry scan
+CERTIFICATION rows scanned; notifications sent for certs expiring within CERT_EXPIRY_WINDOW_DAYS setting
+certs.expiry_scan
+Nightly Celery beat — audit integrity check
+AUDIT_LOG hash chain replayed; alert fired on any break
+audit.integrity_check
+Nightly Celery beat — Power BI push
+Aggregate dataset computed from read replica; pushed to Power BI REST dataset endpoint
+reports.pbi_push
