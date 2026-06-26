@@ -155,7 +155,7 @@ interface PendingStaff {
   createdAt: string;
 }
 
-interface LookupRole { id: string; roleCode?: string; roleName?: string }
+interface LookupRole { Id: string; RoleCode?: string; RoleName?: string }
 
 function PendingApprovalsPanel() {
   const { data, error, isLoading, mutate } = useSWR<PendingStaff[]>(
@@ -243,7 +243,7 @@ function PendingApprovalsPanel() {
                   >
                     <option value="">Assign role...</option>
                     {roles.map((role: LookupRole) => (
-                      <option key={role.id} value={role.id}>{role.roleName}</option>
+                      <option key={role.Id} value={role.Id}>{role.RoleName}</option>
                     ))}
                   </select>
                   <button
@@ -1064,7 +1064,7 @@ function StaffPanel() {
 
 // ─── Add Staff Form (slide-over) ───────────────────────────────────────────
 
-interface LookupOption { id: string; deptCode?: string; deptName?: string; roleCode?: string; roleName?: string }
+interface LookupOption { Id: string; DeptCode?: string; DeptName?: string; RoleCode?: string; RoleName?: string }
 
 function AddStaffForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { data: lookups } = useSWR<{ departments: LookupOption[]; roles: LookupOption[] }>("/api/lookups", apiFetcher);
@@ -1162,7 +1162,7 @@ function AddStaffForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 className="mt-1 input-field">
                 <option value="">Select department...</option>
                 {departments.map((d: LookupOption) => (
-                  <option key={d.id} value={d.id}>{d.deptCode} — {d.deptName}</option>
+                  <option key={d.Id} value={d.Id}>{d.DeptCode} — {d.DeptName}</option>
                 ))}
               </select>
             </label>
@@ -1174,7 +1174,7 @@ function AddStaffForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 className="mt-1 input-field">
                 <option value="">Select role...</option>
                 {roles.map((r: LookupOption) => (
-                  <option key={r.id} value={r.id}>{r.roleName}</option>
+                  <option key={r.Id} value={r.Id}>{r.RoleName}</option>
                 ))}
               </select>
             </label>
