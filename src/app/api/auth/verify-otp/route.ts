@@ -23,6 +23,26 @@ export async function POST(request: NextRequest) {
 
     const { email, code } = parsed.data;
 
+    // Demo account: bypass OTP validation with fixed code
+    const demoEmail = process.env.DEMO_ACCOUNT_EMAIL;
+    const demoCode = process.env.DEMO_ACCOUNT_CODE ?? "000000";
+    if (demoEmail && email.toLowerCase() === demoEmail.toLowerCase()) {
+      if (code !== demoCode) {
+        return unauthorized("Invalid demo code");
+      }
+      const staff = await findStaffByEmail(email);
+      if (!staff) {
+        return unauthorized("Demo account not found or inactive");
+      }
+      const { cookieValue, session } = await createSessionFromStaff(staff);
+      const response = NextResponse.json(
+        { success: true, data: session, meta: null },
+        { status: 200 }
+      );
+      response.cookies.set(SESSION_COOKIE_NAME, cookieValue, sessionCookieOptions());
+      return response;
+    }
+
     // Find the latest unused, non-expired OTP for this email
     const { rows: otpRows } = await query<{
       id: string;

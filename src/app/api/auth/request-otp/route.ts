@@ -38,6 +38,12 @@ export async function POST(request: NextRequest) {
       return badRequest("Your account is currently inactive. Please contact an administrator");
     }
 
+    // Demo account: skip OTP generation, return fixed hint
+    const demoEmail = process.env.DEMO_ACCOUNT_EMAIL;
+    if (demoEmail && email.toLowerCase() === demoEmail.toLowerCase()) {
+      return ok({ message: "Demo account — use code 000000" });
+    }
+
     // Rate-limit: max 3 OTPs in last 5 minutes
     const { rows: recentRows } = await query<{ count: string }>(
       `SELECT COUNT(*)::int AS "count"
