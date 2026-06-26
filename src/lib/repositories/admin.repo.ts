@@ -427,7 +427,7 @@ export async function createStaff(
     );
     const staffId = rows[0].id;
     await insertAuditEntry(
-      { entityName: "STAFF", entityId: staffId, action: "Create", newValue: JSON.stringify(input), performedBy: session.staffId },
+      { entityName: "STAFF", entityId: staffId, action: "Insert", newValue: JSON.stringify(input), performedBy: session.staffId },
       client
     );
     await client.query("COMMIT");

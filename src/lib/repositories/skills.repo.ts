@@ -116,7 +116,7 @@ export async function createSkill(
       {
         entityName: "SKILL",
         entityId: rows[0].id,
-        action: "Create",
+        action: "Insert",
         newValue: JSON.stringify(input),
         performedBy: session.staffId,
       },
@@ -224,7 +224,7 @@ export async function upsertAssessment(
         {
           entityName: "STAFF_SKILL",
           entityId: `${input.staffId}:${input.skillId}`,
-          action: "Create",
+          action: "Insert",
           newValue: JSON.stringify(input),
           performedBy: session.staffId,
         },
@@ -343,7 +343,7 @@ export async function createCertification(
       {
         entityName: "CERTIFICATION",
         entityId: certId,
-        action: "Create",
+        action: "Insert",
         newValue: JSON.stringify(input),
         performedBy: session.staffId,
       },
@@ -452,7 +452,7 @@ export async function createTrainingPlan(
       {
         entityName: "TRAINING_PLAN",
         entityId: planId,
-        action: "Create",
+        action: "Insert",
         newValue: JSON.stringify(input),
         performedBy: session.staffId,
       },
