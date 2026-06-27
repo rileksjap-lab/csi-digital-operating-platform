@@ -2,9 +2,10 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { PaginationMeta } from "@/lib/types/api";
+import { useAuthStore } from "@/lib/stores/auth.store";
 import WoStatusBadge from "@/components/wo/wo-status-badge";
 import WoPriorityBadge from "@/components/wo/wo-priority-badge";
 import WoSlaBadge from "@/components/wo/wo-sla-badge";
@@ -54,6 +55,29 @@ function InboxInner() {
   const router = useRouter();
   const activeTab = (searchParams.get("sourceType") as SourceTab) || "external";
   const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
+  const [polling, setPolling] = useState(false);
+  const [pollResult, setPollResult] = useState<string | null>(null);
+  const user = useAuthStore((s) => s.user);
+  const isHOD = user?.role === "HOD";
+
+  async function handleCheckEmail() {
+    setPolling(true);
+    setPollResult(null);
+    try {
+      const res = await fetch("/api/wo/poll-email", { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        setPollResult(`${json.data.created} new WO(s) imported`);
+        mutate((key: string) => typeof key === "string" && key.startsWith("/api/wo"), undefined, { revalidate: true });
+      } else {
+        setPollResult(json.error?.message ?? "Failed to check email");
+      }
+    } catch {
+      setPollResult("Network error");
+    } finally {
+      setPolling(false);
+    }
+  }
 
   const params = new URLSearchParams();
   params.set("sourceType", activeTab);
@@ -117,13 +141,39 @@ function InboxInner() {
           <h1 className="text-xl font-semibold text-gray-800">WO Inbox</h1>
           <p className="text-sm text-gray-500 mt-0.5">{tabInfo.description}</p>
         </div>
-        <Link
-          href="/wo"
-          className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          View All WOs
-        </Link>
+        <div className="flex items-center gap-2">
+          {isHOD && activeTab === "external" && (
+            <button
+              onClick={handleCheckEmail}
+              disabled={polling}
+              className="flex items-center gap-1.5 rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              <svg className={`h-4 w-4 ${polling ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {polling ? "Checking..." : "Check Email"}
+            </button>
+          )}
+          <Link
+            href="/wo"
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            View All WOs
+          </Link>
+        </div>
       </div>
+
+      {/* Poll result toast */}
+      {pollResult && (
+        <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+          <span>{pollResult}</span>
+          <button onClick={() => setPollResult(null)} className="text-blue-400 hover:text-blue-600 ml-3">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200">

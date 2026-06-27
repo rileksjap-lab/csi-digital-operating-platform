@@ -1,16 +1,19 @@
 import nodemailer from "nodemailer";
 
+const smtpUser = process.env.SMTP_USER ?? process.env.IMAP_USER;
+const smtpPass = process.env.SMTP_PASS ?? process.env.IMAP_PASS;
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST ?? "smtp.gmail.com",
+  host: process.env.SMTP_HOST ?? "smtp.office365.com",
   port: Number(process.env.SMTP_PORT ?? 587),
   secure: process.env.SMTP_SECURE === "true",
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: smtpUser,
+    pass: smtpPass,
   },
 });
 
-const FROM = process.env.SMTP_FROM ?? "CSI DOP <noreply@csidop.local>";
+const FROM = process.env.SMTP_FROM ?? `CSI DOP <${smtpUser ?? "noreply@csidop.local"}>`;
 
 export async function sendOtpEmail(email: string, code: string): Promise<void> {
   if (process.env.NODE_ENV === "development" && !process.env.SMTP_USER) {

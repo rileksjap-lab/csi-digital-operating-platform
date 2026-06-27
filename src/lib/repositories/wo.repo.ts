@@ -10,6 +10,13 @@ import {
   applyScopeFilter,
 } from "@/lib/db/repo-utils";
 import { insertAuditEntry } from "@/lib/db/audit";
+import {
+  notifyWoAssigned,
+  notifyWoReassigned,
+  notifyWoPendingApproval,
+  notifyWoApproved,
+  notifyWoReturned,
+} from "@/lib/email/notify";
 
 // ─── List types ─────────────────────────────────────────────────────────────
 
@@ -968,11 +975,28 @@ export async function assignWorkOrder(
 
     await client.query("COMMIT");
 
-    // Get staff name
-    const staffResult = await query(
-      `SELECT name AS "Name" FROM staff WHERE id = $1`,
-      [input.staffId]
-    );
+    // Get staff name + WO details for response and notification
+    const [staffResult, woDetail] = await Promise.all([
+      query(`SELECT name AS "Name" FROM staff WHERE id = $1`, [input.staffId]),
+      query(`SELECT csi_wo_no AS "csiWoNo", title AS "title", priorityinterdepart AS "priority", duedate AS "dueDate" FROM csi_wo WHERE id = $1`, [woId]),
+    ]);
+
+    const woInfo = woDetail.rows[0];
+    if (woInfo) {
+      if (isReassign) {
+        notifyWoReassigned(
+          input.staffId, wo.assignedto ?? null, session.staffId,
+          { id: woId, csiWoNo: woInfo.csiWoNo as string, title: woInfo.title as string },
+          input.reassignReason
+        );
+      } else {
+        notifyWoAssigned(
+          input.staffId, session.staffId,
+          { id: woId, csiWoNo: woInfo.csiWoNo as string, title: woInfo.title as string, priority: woInfo.priority as string, dueDate: woInfo.dueDate ? String(woInfo.dueDate) : undefined },
+          input.assignedHours
+        );
+      }
+    }
 
     return {
       assignmentId: result.rows[0].Id,
@@ -1065,6 +1089,20 @@ export async function completeWorkOrder(
     const tierCode = Number(wo.tiercode);
     const approverRole = tierCode === 1 ? "TeamLead" : tierCode === 2 ? "SolutionManager" : "HOD";
 
+    // Get WO details for notification
+    const woInfo = await query(
+      `SELECT csi_wo_no AS "csiWoNo", title AS "title", priorityinterdepart AS "priority" FROM csi_wo WHERE id = $1`,
+      [woId]
+    );
+    if (woInfo.rows[0]) {
+      notifyWoPendingApproval(
+        woId,
+        { csiWoNo: woInfo.rows[0].csiWoNo as string, title: woInfo.rows[0].title as string, priority: woInfo.rows[0].priority as string },
+        session.staffId,
+        approverRole
+      );
+    }
+
     return {
       result: {
         id: woId,
@@ -1096,7 +1134,7 @@ export async function approveWorkOrder(
     let paramIdx = 2;
     const sf = applyScopeFilter(scope, "w", paramIdx);
     const woResult = await client.query(
-      `SELECT w.id, w.status, w.tierid
+      `SELECT w.id, w.status, w.tierid, w.csi_wo_no AS csiwono, w.title, w.assignedto, w.createdby
        FROM csi_wo w
        LEFT JOIN staff sa ON sa.id = w.assignedto
        WHERE w.id = $1 ${sf.clause}`,
@@ -1142,6 +1180,14 @@ export async function approveWorkOrder(
     );
 
     await client.query("COMMIT");
+
+    // Fire-and-forget notifications
+    const woInfo = { csiWoNo: wo.csiwono, title: wo.title };
+    if (input.decision === "Approved") {
+      notifyWoApproved(woId, woInfo, session.staffId, wo.assignedto, wo.createdby);
+    } else if (input.decision === "Returned") {
+      notifyWoReturned(woId, woInfo, session.staffId, wo.assignedto, wo.createdby, input.reason);
+    }
 
     return {
       result: {
