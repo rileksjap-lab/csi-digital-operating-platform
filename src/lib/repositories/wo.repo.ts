@@ -49,6 +49,7 @@ export interface WoListFilters {
   dueDateFrom?: string;
   dueDateTo?: string;
   q?: string;
+  sourceType?: "external" | "internal";
   sortBy: string;
   sortDir: "asc" | "desc";
   limit: number;
@@ -128,6 +129,11 @@ export async function listWorkOrders(
     );
     params.push(`%${filters.q}%`);
     paramIdx++;
+  }
+  if (filters.sourceType === "external") {
+    wheres.push(`AND w.sourceofwo IS NOT NULL AND w.sourceofwo <> 'CSI HOD'`);
+  } else if (filters.sourceType === "internal") {
+    wheres.push(`AND (w.sourceofwo IS NULL OR w.sourceofwo = 'CSI HOD')`);
   }
 
   // Cursor
