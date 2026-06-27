@@ -42,9 +42,7 @@ export interface StaffUtilizationDetail extends StaffUtilization {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const DAILY_USABLE_HOURS = 6;
 const WORKING_DAYS_PER_MONTH = 22;
-const PERIOD_CAPACITY = DAILY_USABLE_HOURS * WORKING_DAYS_PER_MONTH; // 132h
 
 function toBand(pct: number): UtilizationBand {
   if (pct < 50) return "Free";
@@ -94,6 +92,7 @@ export async function getUtilization(
     `SELECT
       s.id AS "StaffId", s.name AS "Name", r.rolecode AS "RoleCode",
       s.subteam AS "SubTeam", d.deptcode AS "DeptCode",
+      (8.0 * s.productivityfactor)::float AS "DailyHours",
       COALESCE(assigned.total, 0) AS "AssignedHours",
       COALESCE(worked.total, 0) AS "WorkedHours",
       COALESCE(open_wo.cnt, 0) AS "OpenWoCount"
@@ -126,12 +125,14 @@ export async function getUtilization(
   );
 
   const staffRows: StaffUtilization[] = staffResult.rows.map((r) => {
+    const dailyHours = parseFloat(String(r.DailyHours));
+    const periodCap = dailyHours * WORKING_DAYS_PER_MONTH;
     const assigned = parseFloat(String(r.AssignedHours));
     const worked = parseFloat(String(r.WorkedHours));
-    const utilizationPct = PERIOD_CAPACITY > 0
-      ? Math.round((worked / PERIOD_CAPACITY) * 100)
+    const utilizationPct = periodCap > 0
+      ? Math.round((worked / periodCap) * 100)
       : 0;
-    const remaining = Math.max(0, PERIOD_CAPACITY - worked);
+    const remaining = Math.max(0, periodCap - worked);
     const band = toBand(utilizationPct);
 
     return {
@@ -140,7 +141,7 @@ export async function getUtilization(
       roleCode: r.RoleCode as string,
       subTeam: (r.SubTeam as string) ?? null,
       deptCode: r.DeptCode as string,
-      dailyUsableHours: DAILY_USABLE_HOURS,
+      dailyUsableHours: dailyHours,
       assignedHoursThisPeriod: assigned,
       workedHoursThisPeriod: worked,
       remainingCapacityHours: remaining,
@@ -159,7 +160,7 @@ export async function getUtilization(
 
   // Department summary
   const totalWorked = staffRows.reduce((sum, s) => sum + s.workedHoursThisPeriod, 0);
-  const totalCapacity = staffRows.length * PERIOD_CAPACITY;
+  const totalCapacity = staffRows.reduce((sum, s) => sum + s.dailyUsableHours * WORKING_DAYS_PER_MONTH, 0);
   const csiUtil = totalCapacity > 0 ? Math.round((totalWorked / totalCapacity) * 100) : 0;
 
   const summary: DepartmentSummary = {
@@ -187,7 +188,8 @@ export async function getStaffUtilizationDetail(
   // Verify staff exists and is in scope
   const staffRes = await query(
     `SELECT s.id AS "StaffId", s.name AS "Name", r.rolecode AS "RoleCode",
-            s.subteam AS "SubTeam", d.deptcode AS "DeptCode", s.status
+            s.subteam AS "SubTeam", d.deptcode AS "DeptCode", s.status,
+            (8.0 * s.productivityfactor)::float AS "DailyHours"
      FROM staff s
      JOIN role r ON r.id = s.roleid
      JOIN department d ON d.id = s.deptid
@@ -242,6 +244,8 @@ export async function getStaffUtilizationDetail(
   );
 
   // Build trend array with all 30 days
+  const staffDailyHours = parseFloat(String(staff.DailyHours));
+  const staffPeriodCap = staffDailyHours * WORKING_DAYS_PER_MONTH;
   const trendMap = new Map<string, number>();
   for (const r of trendRes.rows) {
     trendMap.set(String(r.LogDate).slice(0, 10), parseFloat(String(r.DayHours)));
@@ -254,7 +258,7 @@ export async function getStaffUtilizationDetail(
     const dayHours = trendMap.get(dateStr) ?? 0;
     trend.push({
       date: dateStr,
-      utilizationPct: Math.round((dayHours / DAILY_USABLE_HOURS) * 100),
+      utilizationPct: staffDailyHours > 0 ? Math.round((dayHours / staffDailyHours) * 100) : 0,
     });
   }
 
@@ -265,8 +269,8 @@ export async function getStaffUtilizationDetail(
   const totalAssigned = effortByWoRes.rows.reduce(
     (sum, r) => sum + parseFloat(String(r.AssignedHours)), 0
   );
-  const utilizationPct = PERIOD_CAPACITY > 0
-    ? Math.round((totalWorked / PERIOD_CAPACITY) * 100)
+  const utilizationPct = staffPeriodCap > 0
+    ? Math.round((totalWorked / staffPeriodCap) * 100)
     : 0;
 
   const openWoRes = await query(
@@ -280,10 +284,10 @@ export async function getStaffUtilizationDetail(
     roleCode: staff.RoleCode as string,
     subTeam: (staff.SubTeam as string) ?? null,
     deptCode: staff.DeptCode as string,
-    dailyUsableHours: DAILY_USABLE_HOURS,
+    dailyUsableHours: staffDailyHours,
     assignedHoursThisPeriod: totalAssigned,
     workedHoursThisPeriod: totalWorked,
-    remainingCapacityHours: Math.max(0, PERIOD_CAPACITY - totalWorked),
+    remainingCapacityHours: Math.max(0, staffPeriodCap - totalWorked),
     utilizationPct,
     band: toBand(utilizationPct),
     openWoCount: parseInt(String(openWoRes.rows[0].cnt), 10),

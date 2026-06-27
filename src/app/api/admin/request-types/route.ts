@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth/guards";
 import { ok, zodError, notFound, internalError } from "@/lib/response";
-import { requireSystemConfig, requestTypePatchSchema } from "@/lib/validations/admin.schema";
-import { listRequestTypes, patchRequestType } from "@/lib/repositories/admin.repo";
+import { requireSystemConfig, requestTypePatchSchema, requestTypeCreateSchema } from "@/lib/validations/admin.schema";
+import { listRequestTypes, patchRequestType, createRequestType } from "@/lib/repositories/admin.repo";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,6 +14,22 @@ export async function GET(request: NextRequest) {
     if (err instanceof Response) return err;
     console.error("[admin/request-types] GET error", err);
     return internalError(request.headers.get("x-request-id") ?? "unknown");
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await requireAuth(request);
+    requireSystemConfig(session);
+    const body = await request.json();
+    const parsed = requestTypeCreateSchema.safeParse(body);
+    if (!parsed.success) return zodError(parsed.error);
+    const created = await createRequestType(parsed.data, session);
+    return ok(created);
+  } catch (err) {
+    if (err instanceof Response) return err;
+    console.error("[admin/request-types] POST error", err);
+    return internalError("admin-request-types-post");
   }
 }
 

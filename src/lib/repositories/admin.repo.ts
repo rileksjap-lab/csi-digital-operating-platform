@@ -347,6 +347,8 @@ export async function listStaffAdmin(
 export async function patchStaff(
   staffId: string,
   input: {
+    name?: string;
+    email?: string;
     roleId?: string;
     deptId?: string;
     subTeam?: string | null;
@@ -359,6 +361,8 @@ export async function patchStaff(
   const sets: string[] = ["updatedat = now()"];
   const params: unknown[] = [];
 
+  if (input.name) { params.push(input.name); sets.push(`name = $${params.length}`); }
+  if (input.email) { params.push(input.email); sets.push(`email = $${params.length}`); }
   if (input.roleId) { params.push(input.roleId); sets.push(`roleid = $${params.length}`); }
   if (input.deptId) { params.push(input.deptId); sets.push(`deptid = $${params.length}`); }
   if (input.subTeam !== undefined) { params.push(input.subTeam); sets.push(`subteam = $${params.length}`); }
@@ -458,4 +462,289 @@ export async function listBaselineTiers(): Promise<BaselineTierRow[]> {
      FROM baseline_tier ORDER BY baselinecsihours`
   );
   return rows;
+}
+
+// ─── Roles CRUD ────────────────────────────────────────────────────────────
+
+export interface RoleRow {
+  id: string;
+  roleCode: string;
+  roleName: string;
+  capacityScope: string;
+  staffCount: number;
+}
+
+export async function listRoles(): Promise<RoleRow[]> {
+  const { rows } = await query<RoleRow>(
+    `SELECT r.id AS "id", r.rolecode AS "roleCode", r.rolename AS "roleName",
+            r.capacityscope AS "capacityScope",
+            COUNT(s.id)::int AS "staffCount"
+     FROM role r
+     LEFT JOIN staff s ON s.roleid = r.id AND s.status = 'Active'
+     GROUP BY r.id, r.rolecode, r.rolename, r.capacityscope
+     ORDER BY r.rolecode`
+  );
+  return rows;
+}
+
+export async function createRole(
+  input: { roleCode: string; roleName: string; capacityScope?: string },
+  session: AuthSession
+): Promise<RoleRow> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO role (rolecode, rolename, capacityscope) VALUES ($1, $2, $3) RETURNING id`,
+      [input.roleCode, input.roleName, input.capacityScope ?? "Self"]
+    );
+    const roleId = rows[0].id;
+    await insertAuditEntry({ entityName: "ROLE", entityId: roleId, action: "Insert", newValue: JSON.stringify(input), performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+    return { id: roleId, roleCode: input.roleCode, roleName: input.roleName, capacityScope: input.capacityScope ?? "Self", staffCount: 0 };
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+export async function patchRole(
+  id: string,
+  input: { roleName?: string; capacityScope?: string },
+  session: AuthSession
+): Promise<RoleRow | null> {
+  const sets: string[] = ["updatedat = now()"];
+  const params: unknown[] = [];
+  if (input.roleName) { params.push(input.roleName); sets.push(`rolename = $${params.length}`); }
+  if (input.capacityScope) { params.push(input.capacityScope); sets.push(`capacityscope = $${params.length}`); }
+  if (params.length === 0) return null;
+  params.push(id);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rowCount } = await client.query(`UPDATE role SET ${sets.join(", ")} WHERE id = $${params.length}`, params);
+    if (!rowCount) { await client.query("ROLLBACK"); return null; }
+    await insertAuditEntry({ entityName: "ROLE", entityId: id, action: "Update", newValue: JSON.stringify(input), performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+    const result = await listRoles();
+    return result.find((r) => r.id === id) ?? null;
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+export async function deleteRole(id: string, session: AuthSession): Promise<boolean> {
+  const check = await query<{ cnt: string }>(`SELECT COUNT(*) AS "cnt" FROM staff WHERE roleid = $1`, [id]);
+  if (parseInt(check.rows[0].cnt, 10) > 0) return false;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rowCount } = await client.query(`DELETE FROM role WHERE id = $1`, [id]);
+    if (!rowCount) { await client.query("ROLLBACK"); return false; }
+    await insertAuditEntry({ entityName: "ROLE", entityId: id, action: "Delete", performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+    return true;
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+// ─── Departments CRUD ──────────────────────────────────────────────────────
+
+export interface DepartmentRow {
+  id: string;
+  deptCode: string;
+  deptName: string;
+  staffCount: number;
+}
+
+export async function listDepartments(): Promise<DepartmentRow[]> {
+  const { rows } = await query<DepartmentRow>(
+    `SELECT d.id AS "id", d.deptcode AS "deptCode", d.deptname AS "deptName",
+            COUNT(s.id)::int AS "staffCount"
+     FROM department d
+     LEFT JOIN staff s ON s.deptid = d.id AND s.status = 'Active'
+     GROUP BY d.id, d.deptcode, d.deptname
+     ORDER BY d.deptcode`
+  );
+  return rows;
+}
+
+export async function createDepartment(
+  input: { deptCode: string; deptName: string },
+  session: AuthSession
+): Promise<DepartmentRow> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO department (deptcode, deptname) VALUES ($1, $2) RETURNING id`,
+      [input.deptCode, input.deptName]
+    );
+    const deptId = rows[0].id;
+    await insertAuditEntry({ entityName: "DEPARTMENT", entityId: deptId, action: "Insert", newValue: JSON.stringify(input), performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+    return { id: deptId, deptCode: input.deptCode, deptName: input.deptName, staffCount: 0 };
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+export async function patchDepartment(
+  id: string,
+  input: { deptName?: string },
+  session: AuthSession
+): Promise<DepartmentRow | null> {
+  if (!input.deptName) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rowCount } = await client.query(`UPDATE department SET deptname = $1, updatedat = now() WHERE id = $2`, [input.deptName, id]);
+    if (!rowCount) { await client.query("ROLLBACK"); return null; }
+    await insertAuditEntry({ entityName: "DEPARTMENT", entityId: id, action: "Update", newValue: JSON.stringify(input), performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+    const result = await listDepartments();
+    return result.find((d) => d.id === id) ?? null;
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+export async function deleteDepartment(id: string, session: AuthSession): Promise<boolean> {
+  const check = await query<{ cnt: string }>(`SELECT COUNT(*) AS "cnt" FROM staff WHERE deptid = $1`, [id]);
+  if (parseInt(check.rows[0].cnt, 10) > 0) return false;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rowCount } = await client.query(`DELETE FROM department WHERE id = $1`, [id]);
+    if (!rowCount) { await client.query("ROLLBACK"); return false; }
+    await insertAuditEntry({ entityName: "DEPARTMENT", entityId: id, action: "Delete", performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+    return true;
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+// ─── Role Permissions ──────────────────────────────────────────────────────
+
+export interface RolePermissionRow {
+  roleId: string;
+  roleCode: string;
+  roleName: string;
+  moduleCode: string;
+  accessLevel: string;
+}
+
+export async function listRolePermissions(): Promise<RolePermissionRow[]> {
+  const { rows } = await query<RolePermissionRow>(
+    `SELECT rp.roleid AS "roleId", r.rolecode AS "roleCode", r.rolename AS "roleName",
+            rp.modulecode AS "moduleCode", rp.accesslevel AS "accessLevel"
+     FROM role_permission rp
+     JOIN role r ON r.id = rp.roleid
+     ORDER BY r.rolecode, rp.modulecode`
+  );
+  return rows;
+}
+
+export async function putRolePermissions(
+  roleId: string,
+  permissions: { moduleCode: string; accessLevel: string }[],
+  session: AuthSession
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const p of permissions) {
+      await client.query(
+        `INSERT INTO role_permission (roleid, modulecode, accesslevel)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (roleid, modulecode)
+         DO UPDATE SET accesslevel = $3, updatedat = now()`,
+        [roleId, p.moduleCode, p.accessLevel]
+      );
+    }
+    await insertAuditEntry({ entityName: "ROLE_PERMISSION", entityId: roleId, action: "Update", newValue: JSON.stringify(permissions), performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+export async function getPermissionsForRole(roleId: string): Promise<Record<string, string>> {
+  const { rows } = await query<{ moduleCode: string; accessLevel: string }>(
+    `SELECT modulecode AS "moduleCode", accesslevel AS "accessLevel"
+     FROM role_permission WHERE roleid = $1`,
+    [roleId]
+  );
+  const map: Record<string, string> = {};
+  for (const r of rows) map[r.moduleCode] = r.accessLevel;
+  return map;
+}
+
+// ─── Request type create ───────────────────────────────────────────────────
+
+export async function createRequestType(
+  input: { typeName: string; domain: string; slaAckDays: number; slaClassifyDays: number; slaRouteDays: number },
+  session: AuthSession
+): Promise<RequestTypeRow> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const maxCode = await client.query<{ m: number }>(`SELECT COALESCE(MAX(typecode), 0) AS "m" FROM request_type`);
+    const nextCode = maxCode.rows[0].m + 1;
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO request_type (typecode, typename, domain, slaackdays, slaclassifydays, slaroutedays)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [nextCode, input.typeName, input.domain, input.slaAckDays, input.slaClassifyDays, input.slaRouteDays]
+    );
+    await insertAuditEntry({ entityName: "REQUEST_TYPE", entityId: rows[0].id, action: "Insert", newValue: JSON.stringify(input), performedBy: session.staffId }, client);
+    await client.query("COMMIT");
+    return { id: rows[0].id, typeCode: nextCode, typeName: input.typeName, domain: input.domain, slaAckDays: input.slaAckDays, slaClassifyDays: input.slaClassifyDays, slaRouteDays: input.slaRouteDays };
+  } catch (err) { await client.query("ROLLBACK"); throw err; }
+  finally { client.release(); }
+}
+
+// ─── Audit log viewer ──────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string;
+  entityName: string;
+  entityId: string;
+  action: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  reason: string | null;
+  performedByName: string;
+  performedAt: string;
+}
+
+export async function listAuditLog(
+  filters: { entityName?: string; action?: string; staffId?: string; from?: string; to?: string; limit?: number; offset?: number }
+): Promise<{ rows: AuditLogEntry[]; total: number }> {
+  const params: unknown[] = [];
+  const wheres: string[] = [];
+
+  if (filters.entityName) { params.push(filters.entityName); wheres.push(`a.entityname = $${params.length}`); }
+  if (filters.action) { params.push(filters.action); wheres.push(`a.action = $${params.length}`); }
+  if (filters.staffId) { params.push(filters.staffId); wheres.push(`a.performedby = $${params.length}`); }
+  if (filters.from) { params.push(filters.from); wheres.push(`a.performedat >= $${params.length}::timestamptz`); }
+  if (filters.to) { params.push(filters.to); wheres.push(`a.performedat <= $${params.length}::timestamptz`); }
+
+  const whereStr = wheres.length ? "WHERE " + wheres.join(" AND ") : "";
+  const limit = filters.limit ?? 50;
+  const offset = filters.offset ?? 0;
+
+  const countResult = await query<{ cnt: string }>(`SELECT COUNT(*) AS "cnt" FROM audit_log a ${whereStr}`, params);
+  const total = parseInt(countResult.rows[0].cnt, 10);
+
+  const dataParams = [...params, limit, offset];
+  const { rows } = await query<AuditLogEntry>(
+    `SELECT a.id AS "id", a.entityname AS "entityName", a.entityid AS "entityId",
+            a.action AS "action", a.fieldname AS "fieldName",
+            a.oldvalue AS "oldValue", a.newvalue AS "newValue",
+            a.reason AS "reason",
+            COALESCE(s.name, 'System') AS "performedByName",
+            a.performedat AS "performedAt"
+     FROM audit_log a
+     LEFT JOIN staff s ON s.id = a.performedby
+     ${whereStr}
+     ORDER BY a.performedat DESC
+     LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+    dataParams
+  );
+  return { rows, total };
 }

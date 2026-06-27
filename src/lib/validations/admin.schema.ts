@@ -1,13 +1,58 @@
 import { z } from "zod";
 import { forbidden } from "@/lib/response";
 
-// ─── Guard: SystemConfigFlag ────────────────────────────────────────────────
+// ─── Guard: Admin access (HOD, SM, or SystemConfigFlag) ────────────────────
 
-export function requireSystemConfig(session: { systemConfigFlag: boolean }) {
-  if (!session.systemConfigFlag) {
-    throw forbidden("Admin access requires System Configuration permission");
+export function requireSystemConfig(session: { systemConfigFlag: boolean; roleCode?: string }) {
+  const role = session.roleCode ?? "";
+  if (!session.systemConfigFlag && role !== "HOD" && role !== "SM") {
+    throw forbidden("Admin access requires HOD, Solution Manager, or System Configuration permission");
   }
 }
+
+// ─── Roles CRUD ────────────────────────────────────────────────────────────
+
+export const roleCreateSchema = z.object({
+  roleCode: z.string().min(1).max(20),
+  roleName: z.string().min(1).max(50),
+  capacityScope: z.enum(["Department", "Stream", "Pod", "Self"]).default("Self"),
+});
+
+export const rolePatchSchema = z.object({
+  roleName: z.string().min(1).max(50).optional(),
+  capacityScope: z.enum(["Department", "Stream", "Pod", "Self"]).optional(),
+});
+
+// ─── Departments CRUD ──────────────────────────────────────────────────────
+
+export const departmentCreateSchema = z.object({
+  deptCode: z.string().min(1).max(10),
+  deptName: z.string().min(1).max(100),
+});
+
+export const departmentPatchSchema = z.object({
+  deptName: z.string().min(1).max(100).optional(),
+});
+
+// ─── Role permissions ──────────────────────────────────────────────────────
+
+export const permissionPutSchema = z.object({
+  roleId: z.string().uuid(),
+  permissions: z.array(z.object({
+    moduleCode: z.string().min(1),
+    accessLevel: z.enum(["none", "view", "full"]),
+  })),
+});
+
+// ─── Request type create ───────────────────────────────────────────────────
+
+export const requestTypeCreateSchema = z.object({
+  typeName: z.string().min(1).max(80),
+  domain: z.string().min(1).max(50),
+  slaAckDays: z.coerce.number().int().min(1).default(1),
+  slaClassifyDays: z.coerce.number().int().min(1).default(2),
+  slaRouteDays: z.coerce.number().int().min(1).default(3),
+});
 
 // ─── Request type ───────────────────────────────────────────────────────────
 
@@ -58,6 +103,8 @@ export const settingPatchSchema = z.object({
 // ─── Staff management ───────────────────────────────────────────────────────
 
 export const staffPatchSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  email: z.string().email().optional(),
   roleId: z.string().uuid().optional(),
   deptId: z.string().uuid().optional(),
   subTeam: z.enum(["A", "B", "C", "D"]).nullable().optional(),

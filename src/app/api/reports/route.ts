@@ -98,7 +98,7 @@ async function generateReport(
       const { clause, params } = scopeWhere(scope, "s", 1);
       const res = await query(
         `SELECT s.name AS "staffName", r.rolecode AS "roleCode", d.deptcode AS "deptCode",
-                s.subteam AS "subTeam", s.dailyusablehours AS "dailyUsableHours",
+                s.subteam AS "subTeam", (8.0 * s.productivityfactor)::float AS "dailyUsableHours",
                 s.productivityfactor AS "productivityFactor",
                 COALESCE(asg.assigned_hours, 0) AS "assignedHours",
                 COALESCE(eff.worked_hours, 0) AS "workedHours",
@@ -118,7 +118,7 @@ async function generateReport(
          ) eff ON true
          LEFT JOIN csi_wo wo ON wo.assignedto = s.id AND wo.status IN ('Open','InProgress')
          WHERE s.status = 'Active' ${clause}
-         GROUP BY s.id, s.name, r.rolecode, d.deptcode, s.subteam, s.dailyusablehours, s.productivityfactor, asg.assigned_hours, eff.worked_hours
+         GROUP BY s.id, s.name, r.rolecode, d.deptcode, s.subteam, s.productivityfactor, asg.assigned_hours, eff.worked_hours
          ORDER BY s.name`,
         params
       );
@@ -292,8 +292,8 @@ async function generateReport(
       const res = await query(
         `WITH staff_capacity AS (
            SELECT s.id, s.name, r.rolecode, d.deptcode, s.subteam,
-                  s.dailyusablehours, s.productivityfactor,
-                  (s.dailyusablehours * s.productivityfactor * 22) AS monthly_capacity_hrs,
+                  (8.0 * s.productivityfactor) AS dailyusablehours, s.productivityfactor,
+                  (8.0 * s.productivityfactor * 22) AS monthly_capacity_hrs,
                   COALESCE(rs.percentage, 0) AS role_split_pct
            FROM staff s
            JOIN role r ON r.id = s.roleid
