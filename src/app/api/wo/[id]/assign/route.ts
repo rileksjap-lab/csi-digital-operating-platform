@@ -4,6 +4,7 @@ import { ok, notFound, badRequest, zodError, internalError } from "@/lib/respons
 import { assignWorkOrder, getWorkOrderById } from "@/lib/repositories/wo.repo";
 import { woAssignSchema } from "@/lib/validations/wo.schema";
 import { createNotification } from "@/lib/repositories/notification.repo";
+import { notifyWoAssigned } from "@/lib/email/notify";
 
 export async function POST(
   request: NextRequest,
@@ -31,6 +32,15 @@ export async function POST(
         category: "WorkOrder",
         linkUrl: `/wo/${id}`,
       }).catch((e) => console.error("[notification] create failed", e));
+
+      if (wo) {
+        notifyWoAssigned(
+          parsed.data.staffId,
+          session.staffId,
+          { id, csiWoNo: wo.csiWoNo, title: wo.title, priority: wo.priorityInterdepart, dueDate: wo.dueDate ?? undefined },
+          parsed.data.assignedHours
+        );
+      }
     }
 
     return ok(result);
