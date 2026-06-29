@@ -110,7 +110,6 @@ export async function createUploadIntent(
   session: AuthSession,
   scope: ScopeFilter
 ): Promise<{ result: UploadIntent | null; error?: string }> {
-  // Verify WO exists and is not Closed
   const params: unknown[] = [input.woId];
   let pi = 2;
   const wheres: string[] = [];
@@ -132,7 +131,6 @@ export async function createUploadIntent(
     params
   );
   if (woRes.rows.length === 0) return { result: null, error: "NOT_FOUND" };
-  if (woRes.rows[0].status === "Closed") return { result: null, error: "WO_CLOSED" };
 
   cleanExpiredIntents();
 
@@ -249,7 +247,6 @@ export async function saveEvidenceFile(
     params
   );
   if (woRes.rows.length === 0) return { result: null, error: "NOT_FOUND" };
-  if (woRes.rows[0].status === "Closed") return { result: null, error: "WO_CLOSED" };
 
   const fileId = randomUUID();
   const safeFilename = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");

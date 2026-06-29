@@ -14,6 +14,7 @@ interface WoRow {
   domain: string;
   requestTypeName: string;
   priority: string;
+  sourceOfWO: string | null;
   tierCode: number;
   assignedToName: string | null;
   dueDate: string | null;
@@ -24,6 +25,7 @@ interface WoRow {
   effortHoursTotal: number;
   evidenceCount: number;
   progressPercent: number;
+  createdAt: string;
 }
 
 interface Props {
@@ -34,16 +36,15 @@ interface Props {
 const COLUMNS = [
   { key: "csiWoNo", label: "WO No.", sortable: true },
   { key: "title", label: "Title", sortable: true },
+  { key: "sourceOfWO", label: "Source", sortable: false },
   { key: "domain", label: "Domain", sortable: false },
-  { key: "requestTypeName", label: "Type", sortable: false },
   { key: "priority", label: "Priority", sortable: true },
-  { key: "tierCode", label: "Tier", sortable: false },
   { key: "assignedToName", label: "Assignee", sortable: false },
   { key: "dueDate", label: "Due Date", sortable: true },
   { key: "sla", label: "SLA", sortable: false },
   { key: "status", label: "Status", sortable: true },
   { key: "progressPercent", label: "Progress", sortable: false },
-  { key: "effortHoursTotal", label: "Effort (h)", sortable: false },
+  { key: "createdAt", label: "Created", sortable: true },
 ];
 
 export default function WoDataTable({ rows, meta }: Props) {
@@ -126,13 +127,12 @@ export default function WoDataTable({ rows, meta }: Props) {
                     {row.title}
                   </Link>
                 </td>
+                <td className="px-4 py-3 text-gray-500 text-xs">
+                  {row.sourceOfWO ?? "—"}
+                </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{row.domain}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{row.requestTypeName}</td>
                 <td className="px-4 py-3">
                   <WoPriorityBadge priority={row.priority} />
-                </td>
-                <td className="px-4 py-3 text-center text-xs text-gray-500">
-                  {row.tierCode}
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-600">
                   {row.assignedToName ?? (
@@ -165,8 +165,8 @@ export default function WoDataTable({ rows, meta }: Props) {
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500 text-right tabular-nums">
-                  {row.effortHoursTotal.toFixed(1)}
+                <td className="px-4 py-3 text-xs text-gray-500 tabular-nums">
+                  {new Date(row.createdAt).toLocaleDateString("en-MY")}
                 </td>
               </tr>
             ))}

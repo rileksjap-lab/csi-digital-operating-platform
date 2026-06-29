@@ -56,7 +56,7 @@ export interface WoListFilters {
   dueDateFrom?: string;
   dueDateTo?: string;
   q?: string;
-  sourceType?: "external" | "internal";
+  sourceType?: string;
   sortBy: string;
   sortDir: "asc" | "desc";
   limit: number;
@@ -115,7 +115,9 @@ export async function listWorkOrders(
     params.push(filters.tenderId);
     paramIdx++;
   }
-  if (filters.assignedTo) {
+  if (filters.assignedTo === "unassigned") {
+    wheres.push(`AND w.assignedto IS NULL`);
+  } else if (filters.assignedTo) {
     wheres.push(`AND w.assignedto = $${paramIdx}`);
     params.push(filters.assignedTo);
     paramIdx++;
@@ -132,15 +134,15 @@ export async function listWorkOrders(
   }
   if (filters.q) {
     wheres.push(
-      `AND (w.title ILIKE $${paramIdx} OR w.csi_wo_no ILIKE $${paramIdx})`
+      `AND (w.title ILIKE $${paramIdx} OR w.csi_wo_no ILIKE $${paramIdx} OR w.remark ILIKE $${paramIdx})`
     );
     params.push(`%${filters.q}%`);
     paramIdx++;
   }
-  if (filters.sourceType === "external") {
-    wheres.push(`AND w.sourceofwo IS NOT NULL AND w.sourceofwo <> 'CSI HOD'`);
-  } else if (filters.sourceType === "internal") {
-    wheres.push(`AND (w.sourceofwo IS NULL OR w.sourceofwo = 'CSI HOD')`);
+  if (filters.sourceType) {
+    wheres.push(`AND w.sourceofwo = $${paramIdx}`);
+    params.push(filters.sourceType);
+    paramIdx++;
   }
 
   // Cursor

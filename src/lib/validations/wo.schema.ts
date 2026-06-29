@@ -6,11 +6,11 @@ export const woListQuerySchema = z.object({
   requestTypeId: z.string().uuid().optional(),
   tierId: z.string().uuid().optional(),
   tenderId: z.string().uuid().optional(),
-  assignedTo: z.string().uuid().optional(),
+  assignedTo: z.string().optional(),
   dueDateFrom: z.string().date().optional(),
   dueDateTo: z.string().date().optional(),
   q: z.string().max(200).optional(),
-  sourceType: z.enum(["external", "internal"]).optional(),
+  sourceType: z.string().max(50).optional(),
   sortBy: z
     .enum(["csiWoNo", "title", "priority", "dueDate", "status", "createdAt"])
     .default("createdAt"),

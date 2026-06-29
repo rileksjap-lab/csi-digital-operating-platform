@@ -181,7 +181,7 @@ export default function WoDetailPage() {
 
       {/* Action bar */}
       <div className="flex flex-wrap items-center gap-2">
-        {canAssign && wo.status !== "Closed" && (
+        {canAssign && (
           <Link
             href={`/wo/${wo.id}/assign`}
             className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -189,7 +189,7 @@ export default function WoDetailPage() {
             {wo.assignedTo ? "Reassign" : "Assign"}
           </Link>
         )}
-        {canPatch && wo.status !== "Closed" && (
+        {canPatch && (
           <button
             onClick={() => setShowPatch(true)}
             className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -363,7 +363,7 @@ export default function WoDetailPage() {
         <WoEvidencePanel
           woId={id}
           canUpload={!!user}
-          woClosed={wo.status === "Closed"}
+          woClosed={false}
           evidenceItems={wo.evidenceItems}
           onSuccess={() => mutate()}
         />
