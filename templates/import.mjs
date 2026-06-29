@@ -25,28 +25,76 @@ const DATABASE_URL =
   "postgresql://csidop_app:CHANGE_ME_VIA_SECRETS_MANAGER@localhost:5432/csidop";
 
 function parseCsv(text) {
-  const lines = text.replace(/\r\n/g, "\n").split("\n").filter((l) => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const content = text.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+  const records = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    if (ch === '"') {
+      if (inQuotes && content[i + 1] === '"') { current += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === "\n" && !inQuotes) {
+      if (current.trim()) records.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) records.push(current);
+  if (records.length < 2) return [];
+
+  const headers = splitCsvLine(records[0]);
+  const expectedCols = headers.length;
   const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(",").map((v) => v.trim());
+  for (let i = 1; i < records.length; i++) {
+    const vals = splitCsvLine(records[i]);
+    // Fix malformed CSV: if extra columns exist, merge overflow into Remark (col 14)
+    if (vals.length > expectedCols && expectedCols === 21) {
+      const overflow = vals.length - expectedCols;
+      const remarkParts = vals.splice(14, 1 + overflow);
+      vals.splice(14, 0, remarkParts.join(", "));
+    }
     const row = {};
-    headers.forEach((h, j) => {
-      row[h] = vals[j] === "" ? null : vals[j];
-    });
+    headers.forEach((h, j) => { row[h] = (vals[j] ?? "") === "" ? null : vals[j]; });
     const hasData = Object.values(row).some((v) => v !== null);
     if (hasData) rows.push(row);
   }
   return rows;
 }
 
+function splitCsvLine(line) {
+  const vals = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === "," && !inQuotes) {
+      vals.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  vals.push(current.trim());
+  return vals;
+}
+
 function parseDate(val) {
   if (!val) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-  const m = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-  return val;
+  const m = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
+    let dd = parseInt(m[1]), mm = parseInt(m[2]);
+    // If first part > 12 it must be day; if second > 12 swap
+    if (mm > 12 && dd <= 12) { [dd, mm] = [mm, dd]; }
+    return `${yr}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  }
+  return null;
 }
 
 function readTemplate(filename) {
@@ -65,6 +113,10 @@ async function main() {
   console.log(`\n=== CSI DOP Data Import ${DRY_RUN ? "(DRY RUN)" : ""} ===\n`);
 
   try {
+    // Pre-migration: extend title column if needed
+    try { await client.query("ALTER TABLE csi_wo ALTER COLUMN title TYPE VARCHAR(500)"); console.log("  [OK] Extended title column to 500 chars"); }
+    catch { console.log("  [INFO] Title column already extended or insufficient privileges — continuing"); }
+
     await client.query("BEGIN");
 
     // ── 01: Staff ──────────────────────────────────────────────────────
@@ -194,11 +246,10 @@ async function main() {
         );
         const creatorId = creatorRes.rows[0]?.id ?? assigneeId;
 
-        // Create external WO record (only when ExtWoNo is provided)
+        // Create external WO record (only when ExtWoNo looks like a valid WO number)
         let extWoId = null;
-        if (r.ExtWoNo) {
-          if (!sourceDeptId) { console.log(`  [WARN] SourceDeptCode required for external WO ${r.ExtWoNo}, skipping`); continue; }
-          if (!r.ReceivedDate) { console.log(`  [WARN] ReceivedDate required for external WO ${r.ExtWoNo}, skipping`); continue; }
+        const extWoNo = r.ExtWoNo && /^\d{3}-/.test(r.ExtWoNo.trim()) ? r.ExtWoNo.trim() : null;
+        if (extWoNo && sourceDeptId && r.ReceivedDate) {
           const extRes = await client.query(
             `INSERT INTO external_wo (extwo_no, projectcode, sourcedeptid, enduser, receiveddate)
              VALUES ($1, $2, $3, $4, $5)
@@ -208,7 +259,7 @@ async function main() {
                enduser = EXCLUDED.enduser,
                receiveddate = EXCLUDED.receiveddate
              RETURNING id`,
-            [r.ExtWoNo, r.ProjectCode || null, sourceDeptId,
+            [extWoNo, r.ProjectCode || null, sourceDeptId,
              r.EndUser || null, parseDate(r.ReceivedDate)]
           );
           extWoId = extRes.rows[0].id;
@@ -221,8 +272,9 @@ async function main() {
         const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "");
         const csiWoNo = `300-${dateStr}-${String(woSeqRes.rows[0].next_seq).padStart(3, "0")}`;
 
-        // Determine initial status
-        const status = r.Status ?? "Open";
+        // Determine initial status (only accept valid statuses)
+        const validStatuses = ["Open", "Acknowledged", "InProgress", "PendingApproval", "Approved", "Closed", "Returned", "Cancelled"];
+        const status = validStatuses.includes(r.Status) ? r.Status : "Open";
         const effectiveAssignee = (status === "InProgress" && assigneeId) ? assigneeId : null;
 
         const indicativeVal = r.IndicativeValue ? parseFloat(r.IndicativeValue) : null;
@@ -239,8 +291,8 @@ async function main() {
            RETURNING id`,
           [csiWoNo, extWoId, rtRes.rows[0].id, tierRes.rows[0].id,
            r.PriorityInterdepart ?? "Normal", r.PriorityInternal || null,
-           r.SLAWorkingDays ? parseInt(r.SLAWorkingDays) : null,
-           r.Title, indicativeVal, complexityVal,
+           r.SLAWorkingDays && parseInt(r.SLAWorkingDays) > 0 ? parseInt(r.SLAWorkingDays) : null,
+           (r.Title || "").substring(0, 200), indicativeVal, complexityVal,
            parseDate(r.DueDate), status,
            effectiveAssignee, creatorId, monitoringStaffId,
            r.SourceOfWO, r.TenderOrProjectCode || null, r.Remark || null,

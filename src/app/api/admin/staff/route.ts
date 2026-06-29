@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth/guards";
-import { ok, zodError, notFound, internalError } from "@/lib/response";
+import { ok, zodError, notFound, badRequest, internalError } from "@/lib/response";
 import { requireSystemConfig, staffListQuerySchema, staffPatchSchema, staffCreateSchema } from "@/lib/validations/admin.schema";
 import { listStaffAdmin, patchStaff, createStaff } from "@/lib/repositories/admin.repo";
 
@@ -35,6 +35,12 @@ export async function POST(request: NextRequest) {
     return ok(created);
   } catch (err) {
     if (err instanceof Response) return err;
+    const pgErr = err as { code?: string; constraint?: string };
+    if (pgErr.code === "23505") {
+      if (pgErr.constraint?.includes("staffcode")) return badRequest("Staff code already exists");
+      if (pgErr.constraint?.includes("email")) return badRequest("Email already exists");
+      return badRequest("Duplicate entry");
+    }
     console.error("[admin/staff] POST error", err);
     return internalError(request.headers.get("x-request-id") ?? "unknown");
   }
