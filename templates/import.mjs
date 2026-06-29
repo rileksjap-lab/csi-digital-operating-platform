@@ -207,7 +207,7 @@ async function main() {
     // ── 04: Work Orders ────────────────────────────────────────────────
     if (!FILE_FILTER || FILE_FILTER.includes("04")) {
       console.log("[4/8] Importing Work Orders...");
-      const rows = readTemplate("04_WORK_ORDERS.csv");
+      const rows = readTemplate("04_WORK_ORDERS_edited3.csv");
       for (const r of rows) {
         // Lookup request type
         const rtRes = await client.query("SELECT id FROM request_type WHERE typename = $1", [r.RequestTypeName]);
@@ -292,7 +292,7 @@ async function main() {
           [csiWoNo, extWoId, rtRes.rows[0].id, tierRes.rows[0].id,
            r.PriorityInterdepart ?? "Normal", r.PriorityInternal || null,
            r.SLAWorkingDays && parseInt(r.SLAWorkingDays) > 0 ? parseInt(r.SLAWorkingDays) : null,
-           (r.Title || "").substring(0, 200), indicativeVal, complexityVal,
+           (r.Title || "").substring(0, 500), indicativeVal, complexityVal,
            parseDate(r.DueDate), status,
            effectiveAssignee, creatorId, monitoringStaffId,
            r.SourceOfWO, r.TenderOrProjectCode || null, r.Remark || null,
