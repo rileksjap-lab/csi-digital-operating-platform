@@ -225,12 +225,12 @@ async function main() {
           else console.log(`  [WARN] Monitoring staff ${r.MonitoringEmail} not found`);
         }
 
-        // Lookup assignee (optional)
+        // Lookup assignee (optional — import without assignee if not found)
         let assigneeId = null;
         if (r.AssigneeEmail) {
           const assignRes = await client.query("SELECT id FROM staff WHERE email = $1", [r.AssigneeEmail]);
           if (assignRes.rows.length > 0) assigneeId = assignRes.rows[0].id;
-          else { console.log(`  [WARN] Assignee ${r.AssigneeEmail} not found, skipping`); continue; }
+          else console.log(`  [WARN] Assignee ${r.AssigneeEmail} not found, importing without assignee`);
         }
 
         // Lookup source department (optional, for external WOs)
