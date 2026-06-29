@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireAuth } from "@/lib/auth/guards";
 import { created, badRequest, forbidden, zodError, internalError } from "@/lib/response";
 import { confirmUpload } from "@/lib/repositories/evidence.repo";
 import { evidenceConfirmSchema } from "@/lib/validations/wo.schema";
@@ -7,7 +7,6 @@ import { evidenceConfirmSchema } from "@/lib/validations/wo.schema";
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth(request);
-    requireRole(session, "TeamMember", "TeamLead", "BIMModeler");
 
     const body = await request.json();
     const parsed = evidenceConfirmSchema.safeParse(body);

@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireAuth, requireRole, buildScopeFilter } from "@/lib/auth/guards";
+import { requireAuth, buildScopeFilter } from "@/lib/auth/guards";
 import { ok, notFound, badRequest, zodError, internalError } from "@/lib/response";
 import { createUploadIntent } from "@/lib/repositories/evidence.repo";
 import { evidenceUploadUrlSchema } from "@/lib/validations/wo.schema";
@@ -7,7 +7,6 @@ import { evidenceUploadUrlSchema } from "@/lib/validations/wo.schema";
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth(request);
-    requireRole(session, "TeamMember", "TeamLead", "BIMModeler");
 
     const body = await request.json();
     const parsed = evidenceUploadUrlSchema.safeParse(body);

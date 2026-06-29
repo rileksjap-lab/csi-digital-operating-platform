@@ -26,9 +26,6 @@ export async function POST(
     if (error === "INVALID_STATUS_TRANSITION") {
       return badRequest("WO must be in Open or InProgress status to complete");
     }
-    if (error === "NO_EVIDENCE") {
-      return badRequest("WO must have at least one evidence attachment before completion");
-    }
     if (!result) return notFound("Work order not found");
     return ok(result);
   } catch (err) {

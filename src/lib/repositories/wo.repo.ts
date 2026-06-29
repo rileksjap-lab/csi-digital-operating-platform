@@ -1055,16 +1055,6 @@ export async function completeWorkOrder(
       return { result: null, error: "INVALID_STATUS_TRANSITION" };
     }
 
-    // Check evidence exists
-    const evResult = await client.query(
-      `SELECT COUNT(*) AS cnt FROM evidence_deliverable WHERE csi_wo_id = $1 AND removedat IS NULL`,
-      [woId]
-    );
-    if (parseInt(evResult.rows[0].cnt, 10) === 0) {
-      await client.query("ROLLBACK");
-      return { result: null, error: "NO_EVIDENCE" };
-    }
-
     await client.query(
       `UPDATE csi_wo SET status = 'PendingApproval', updatedat = now() WHERE id = $1`,
       [woId]

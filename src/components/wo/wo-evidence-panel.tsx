@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { apiPost } from "@/lib/api/fetcher";
+import { useRef, useState } from "react";
 
 interface EvidenceItem {
   id: string;
@@ -29,6 +28,25 @@ const EVIDENCE_TYPES = [
   "Other",
 ];
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileIcon(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["pdf"].includes(ext)) return "PDF";
+  if (["doc", "docx"].includes(ext)) return "DOC";
+  if (["xls", "xlsx"].includes(ext)) return "XLS";
+  if (["ppt", "pptx"].includes(ext)) return "PPT";
+  if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "IMG";
+  if (["zip", "rar"].includes(ext)) return "ZIP";
+  return "FILE";
+}
+
 export default function WoEvidencePanel({
   woId,
   canUpload,
@@ -37,42 +55,66 @@ export default function WoEvidencePanel({
   onSuccess,
 }: WoEvidencePanelProps) {
   const [showForm, setShowForm] = useState(false);
-  const [filename, setFilename] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [evidenceType, setEvidenceType] = useState(EVIDENCE_TYPES[0]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileSelect(file: File) {
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`File too large (${formatFileSize(file.size)}). Maximum is 20 MB.`);
+      return;
+    }
+    setError(null);
+    setSelectedFile(file);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  }
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedFile) return;
     setError(null);
     setSubmitting(true);
 
     try {
-      // Step 1: Get upload intent
-      const intent = await apiPost<{
-        uploadIntentId: string;
-        presignedUrl: string;
-        fileRef: string;
-      }>("/api/evidence/upload-url", {
-        woId,
-        filename: filename.trim(),
-        mimeType: "application/pdf",
-        fileSizeBytes: 1024,
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("woId", woId);
+      formData.append("evidenceType", evidenceType);
+
+      const res = await fetch("/api/evidence/upload", {
+        method: "POST",
+        body: formData,
       });
 
-      // Step 2: In production, the binary would be PUT to intent.presignedUrl here.
-      // For dev, we skip the actual binary upload.
+      if (res.status === 401) {
+        window.location.href = "/api/auth/login";
+        return;
+      }
 
-      // Step 3: Confirm
-      await apiPost("/api/evidence/confirm", {
-        uploadIntentId: intent.uploadIntentId,
-        evidenceType,
-      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error?.message ?? "Upload failed");
+      }
 
-      setFilename("");
+      setSelectedFile(null);
       setEvidenceType(EVIDENCE_TYPES[0]);
       setShowForm(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -103,60 +145,123 @@ export default function WoEvidencePanel({
 
   return (
     <div>
-      {/* Upload button / form */}
       {canUpload && !woClosed && (
         <div className="border-b border-gray-200 px-4 py-3">
           {!showForm ? (
             <button
               onClick={() => setShowForm(true)}
-              className="rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
+              className="inline-flex items-center gap-1.5 rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
             >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
               Upload Evidence
             </button>
           ) : (
-            <form onSubmit={handleUpload} className="flex flex-wrap items-end gap-3">
-              <div className="flex-1 min-w-[180px]">
-                <label className="block text-xs font-medium text-gray-600">
-                  Filename <span className="text-red-500">*</span>
-                </label>
+            <form onSubmit={handleUpload} className="space-y-3">
+              {/* Drop zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
+                  dragOver
+                    ? "border-primary-400 bg-primary-50"
+                    : selectedFile
+                    ? "border-green-300 bg-green-50"
+                    : "border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100"
+                }`}
+              >
                 <input
-                  type="text"
-                  required
-                  value={filename}
-                  onChange={(e) => setFilename(e.target.value)}
-                  maxLength={200}
-                  className="mt-1 block w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm"
-                  placeholder="report.pdf"
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleInputChange}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv,.zip,.rar"
                 />
+                {selectedFile ? (
+                  <div className="flex items-center gap-3">
+                    <span className="rounded bg-primary-100 px-2 py-1 text-xs font-bold text-primary-700">
+                      {fileIcon(selectedFile.name)}
+                    </span>
+                    <div className="text-sm">
+                      <p className="font-medium text-gray-800">{selectedFile.name}</p>
+                      <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="ml-2 text-gray-400 hover:text-red-500"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="mb-2 h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium text-primary-600">Click to browse</span> or drag and drop
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      PDF, DOC, XLS, PPT, Images, ZIP — max 20 MB
+                    </p>
+                  </>
+                )}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600">
-                  Type
-                </label>
-                <select
-                  value={evidenceType}
-                  onChange={(e) => setEvidenceType(e.target.value)}
-                  className="mt-1 block rounded border border-gray-300 bg-white px-2 py-1.5 text-sm"
+
+              {/* Type + buttons */}
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600">Evidence Type</label>
+                  <select
+                    value={evidenceType}
+                    onChange={(e) => setEvidenceType(e.target.value)}
+                    className="mt-1 block rounded border border-gray-300 bg-white px-2 py-1.5 text-sm"
+                  >
+                    {EVIDENCE_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting || !selectedFile}
+                  className="inline-flex items-center gap-1.5 rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {EVIDENCE_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                  {submitting ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                        <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75" />
+                      </svg>
+                      Uploading...
+                    </>
+                  ) : (
+                    "Upload"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setSelectedFile(null);
+                    setError(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
               </div>
-              <button
-                type="submit"
-                disabled={submitting || !filename.trim()}
-                className="rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-              >
-                {submitting ? "Uploading..." : "Upload"}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowForm(false); setError(null); }}
-                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
             </form>
           )}
           {error && (
@@ -182,29 +287,54 @@ export default function WoEvidencePanel({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {evidenceItems.map((ev) => (
-              <tr key={ev.id}>
-                <td className="px-4 py-2">{ev.evidenceType}</td>
-                <td className="px-4 py-2 font-mono text-xs text-gray-500 truncate max-w-[200px]">
-                  {ev.fileRef.split("/").pop() ?? ev.fileRef}
-                </td>
-                <td className="px-4 py-2 text-gray-500">{ev.uploadedByName}</td>
-                <td className="px-4 py-2 text-gray-500">
-                  {new Date(ev.uploadedDate).toLocaleDateString("en-MY")}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  {!woClosed && (
-                    <button
-                      onClick={() => handleDelete(ev.id)}
-                      disabled={deleting === ev.id}
-                      className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+            {evidenceItems.map((ev) => {
+              const filename = ev.fileRef.split("/").pop() ?? ev.fileRef;
+              const displayName = filename.includes("-")
+                ? filename.substring(filename.indexOf("-") + 1)
+                : filename;
+              return (
+                <tr key={ev.id}>
+                  <td className="px-4 py-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">
+                        {fileIcon(displayName)}
+                      </span>
+                      {ev.evidenceType}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 max-w-[200px]">
+                    <a
+                      href={`/api/evidence/${ev.id}/download`}
+                      className="truncate block text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+                      title={displayName}
                     >
-                      {deleting === ev.id ? "Removing..." : "Remove"}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                      {displayName}
+                    </a>
+                  </td>
+                  <td className="px-4 py-2 text-gray-500">{ev.uploadedByName}</td>
+                  <td className="px-4 py-2 text-gray-500">
+                    {new Date(ev.uploadedDate).toLocaleDateString("en-MY")}
+                  </td>
+                  <td className="px-4 py-2 text-right whitespace-nowrap">
+                    <a
+                      href={`/api/evidence/${ev.id}/download`}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium mr-3"
+                    >
+                      Download
+                    </a>
+                    {!woClosed && (
+                      <button
+                        onClick={() => handleDelete(ev.id)}
+                        disabled={deleting === ev.id}
+                        className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+                      >
+                        {deleting === ev.id ? "Removing..." : "Remove"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

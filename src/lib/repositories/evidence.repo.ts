@@ -3,6 +3,8 @@ import type { ScopeFilter } from "@/lib/auth/guards";
 import type { AuthSession } from "@/lib/types/api";
 import { insertAuditEntry } from "@/lib/db/audit";
 import { randomUUID } from "crypto";
+import { mkdir, writeFile } from "fs/promises";
+import path from "path";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -217,6 +219,130 @@ export async function confirmUpload(
   } finally {
     client.release();
   }
+}
+
+// ─── Direct file upload (single-step) ──────────────────────────────────────
+
+export async function saveEvidenceFile(
+  input: { woId: string; evidenceType: string; file: File },
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<{ result: EvidenceItem | null; error?: string }> {
+  const params: unknown[] = [input.woId];
+  let pi = 2;
+  const wheres: string[] = [];
+
+  if (scope.scope === "Self") {
+    wheres.push(`AND (w.assignedto = $${pi} OR w.createdby = $${pi})`);
+    params.push(scope.staffId);
+    pi++;
+  } else if (scope.scope === "Pod") {
+    wheres.push(`AND (w.assignedto IN (
+      SELECT s.id FROM staff s WHERE s.deptid = $${pi} AND s.subteam = $${pi + 1}
+    ) OR w.createdby = $${pi + 2})`);
+    params.push(scope.departmentId, scope.subTeam, scope.staffId);
+    pi += 3;
+  }
+
+  const woRes = await query(
+    `SELECT w.id, w.status FROM csi_wo w WHERE w.id = $1 ${wheres.join(" ")}`,
+    params
+  );
+  if (woRes.rows.length === 0) return { result: null, error: "NOT_FOUND" };
+  if (woRes.rows[0].status === "Closed") return { result: null, error: "WO_CLOSED" };
+
+  const fileId = randomUUID();
+  const safeFilename = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const fileRef = path.join("uploads", "evidence", input.woId, `${fileId}-${safeFilename}`);
+  const fullPath = path.join(process.cwd(), fileRef);
+
+  await mkdir(path.dirname(fullPath), { recursive: true });
+  const arrayBuffer = await input.file.arrayBuffer();
+  await writeFile(fullPath, Buffer.from(arrayBuffer));
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query<{ Id: string; UploadedDate: string }>(
+      `INSERT INTO evidence_deliverable (csi_wo_id, fileref, evidencetype, uploadedby)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id AS "Id", uploadeddate AS "UploadedDate"`,
+      [input.woId, fileRef, input.evidenceType, session.staffId]
+    );
+    const row = result.rows[0];
+
+    await insertAuditEntry(
+      {
+        entityName: "EVIDENCE_DELIVERABLE",
+        entityId: row.Id,
+        action: "Insert",
+        newValue: JSON.stringify({
+          fileRef,
+          evidenceType: input.evidenceType,
+          filename: input.file.name,
+          size: input.file.size,
+        }),
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+
+    return {
+      result: {
+        id: row.Id,
+        woId: input.woId,
+        fileRef,
+        downloadUrl: `/api/evidence/${row.Id}/download`,
+        evidenceType: input.evidenceType,
+        uploadedByName: session.displayName,
+        uploadedDate: String(row.UploadedDate),
+        removedAt: null,
+      },
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── Get evidence for download ─────────────────────────────────────────────
+
+export async function getEvidenceForDownload(
+  evidenceId: string,
+  scope: ScopeFilter
+): Promise<{ fileRef: string } | null> {
+  const params: unknown[] = [evidenceId];
+  let pi = 2;
+  const wheres: string[] = [];
+
+  if (scope.scope === "Self") {
+    wheres.push(`AND (w.assignedto = $${pi} OR w.createdby = $${pi})`);
+    params.push(scope.staffId);
+    pi++;
+  } else if (scope.scope === "Pod") {
+    wheres.push(`AND (w.assignedto IN (
+      SELECT s.id FROM staff s WHERE s.deptid = $${pi} AND s.subteam = $${pi + 1}
+    ) OR w.createdby = $${pi + 2})`);
+    params.push(scope.departmentId, scope.subTeam, scope.staffId);
+    pi += 3;
+  }
+
+  const result = await query(
+    `SELECT ed.fileref AS "FileRef"
+     FROM evidence_deliverable ed
+     JOIN csi_wo w ON w.id = ed.csi_wo_id
+     WHERE ed.id = $1 AND ed.removedat IS NULL
+     ${wheres.join(" ")}`,
+    params
+  );
+
+  if (result.rows.length === 0) return null;
+  return { fileRef: result.rows[0].FileRef as string };
 }
 
 // ─── Soft-delete ────────────────────────────────────────────────────────────
