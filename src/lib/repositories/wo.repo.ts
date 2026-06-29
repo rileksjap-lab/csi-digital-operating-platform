@@ -785,8 +785,18 @@ export async function createWorkOrder(
 
 export interface WoPatchInput {
   priority?: string;
-  dueDate?: string;
+  priorityInternal?: string | null;
+  dueDate?: string | null;
   tierId?: string;
+  requestTypeId?: string;
+  title?: string;
+  sourceOfWO?: string | null;
+  requesterName?: string | null;
+  remark?: string | null;
+  slaWorkingDays?: number | null;
+  status?: string;
+  tenderOrProjectCode?: string | null;
+  createdAt?: string;
   amendReason?: string;
 }
 
@@ -804,7 +814,9 @@ export async function patchWorkOrder(
     let paramIdx = 2;
     const sf = applyScopeFilter(scope, "w", paramIdx);
     const existing = await client.query(
-      `SELECT w.id, w.priorityinterdepart, w.duedate, w.tierid, w.status
+      `SELECT w.id, w.priorityinterdepart, w.priorityinternal, w.duedate,
+              w.tierid, w.requesttypeid, w.title, w.sourceofwo, w.requestername,
+              w.remark, w.slaworkingdays, w.status, w.tenderorprojectcode
        FROM csi_wo w
        LEFT JOIN staff sa ON sa.id = w.assignedto
        WHERE w.id = $1 ${sf.clause}`,
@@ -820,22 +832,30 @@ export async function patchWorkOrder(
     const params: unknown[] = [];
     let pi = 1;
 
-    if (input.priority !== undefined && input.priority !== old.priorityinterdepart) {
-      sets.push(`priorityinterdepart = $${pi}`);
-      params.push(input.priority);
-      await auditField(client, id, "PriorityInterdepart", old.priorityinterdepart, input.priority, input.amendReason, session.staffId);
+    const patch = (col: string, field: string, oldVal: unknown, newVal: unknown) => {
+      if (newVal === undefined) return;
+      if (String(newVal ?? "") === String(oldVal ?? "")) return;
+      sets.push(`${col} = $${pi}`);
+      params.push(newVal);
+      auditField(client, id, field, oldVal != null ? String(oldVal) : null, String(newVal ?? ""), input.amendReason, session.staffId);
       pi++;
-    }
-    if (input.dueDate !== undefined && String(input.dueDate) !== String(old.duedate ?? "")) {
-      sets.push(`duedate = $${pi}`);
-      params.push(input.dueDate);
-      await auditField(client, id, "DueDate", old.duedate ? String(old.duedate) : null, input.dueDate, input.amendReason!, session.staffId);
-      pi++;
-    }
-    if (input.tierId !== undefined && input.tierId !== old.tierid) {
-      sets.push(`tierid = $${pi}`);
-      params.push(input.tierId);
-      await auditField(client, id, "TierId", old.tierid, input.tierId, input.amendReason!, session.staffId);
+    };
+
+    patch("priorityinterdepart", "PriorityInterdepart", old.priorityinterdepart, input.priority);
+    patch("priorityinternal", "PriorityInternal", old.priorityinternal, input.priorityInternal);
+    patch("duedate", "DueDate", old.duedate, input.dueDate);
+    patch("tierid", "TierId", old.tierid, input.tierId);
+    patch("requesttypeid", "RequestTypeId", old.requesttypeid, input.requestTypeId);
+    patch("title", "Title", old.title, input.title);
+    patch("sourceofwo", "SourceOfWO", old.sourceofwo, input.sourceOfWO);
+    patch("requestername", "RequesterName", old.requestername, input.requesterName);
+    patch("remark", "Remark", old.remark, input.remark);
+    patch("slaworkingdays", "SLAWorkingDays", old.slaworkingdays, input.slaWorkingDays);
+    patch("status", "Status", old.status, input.status);
+    patch("tenderorprojectcode", "TenderOrProjectCode", old.tenderorprojectcode, input.tenderOrProjectCode);
+    if (input.createdAt !== undefined) {
+      sets.push(`createdat = $${pi}`);
+      params.push(input.createdAt);
       pi++;
     }
 

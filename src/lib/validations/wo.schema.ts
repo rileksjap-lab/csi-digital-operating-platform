@@ -81,22 +81,22 @@ export type WoTaskPatchInput = z.infer<typeof woTaskPatchSchema>;
 
 // ─── PATCH /api/wo/:id — update editable fields (FR-09) ─────────────────────
 
-export const woPatchSchema = z
-  .object({
-    priority: z.enum(["Low", "Normal", "High", "Urgent", "Critical"]).optional(),
-    dueDate: z.string().date().optional(),
-    tierId: z.string().uuid().optional(),
-    amendReason: z.string().min(1).max(500).optional(),
-  })
-  .refine(
-    (d) => {
-      if (d.dueDate !== undefined || d.tierId !== undefined) {
-        return !!d.amendReason;
-      }
-      return true;
-    },
-    { message: "amendReason is required when changing dueDate or tierId", path: ["amendReason"] }
-  );
+export const woPatchSchema = z.object({
+  priority: z.enum(["Low", "Normal", "High", "Urgent", "Critical"]).optional(),
+  priorityInternal: z.enum(["Low", "Normal", "High", "Urgent", "Critical", "N/A"]).nullable().optional(),
+  dueDate: z.string().date().nullable().optional(),
+  tierId: z.string().uuid().optional(),
+  requestTypeId: z.string().uuid().optional(),
+  title: z.string().min(1).max(500).optional(),
+  sourceOfWO: z.string().max(100).nullable().optional(),
+  requesterName: z.string().max(200).nullable().optional(),
+  remark: z.string().max(2000).nullable().optional(),
+  slaWorkingDays: z.number().int().nullable().optional(),
+  status: z.enum(["Open", "Acknowledged", "InProgress", "PendingApproval", "Approved", "Closed", "Returned", "Cancelled"]).optional(),
+  tenderOrProjectCode: z.string().max(100).nullable().optional(),
+  createdAt: z.string().datetime().optional(),
+  amendReason: z.string().max(500).optional(),
+});
 
 export type WoPatchInput = z.infer<typeof woPatchSchema>;
 

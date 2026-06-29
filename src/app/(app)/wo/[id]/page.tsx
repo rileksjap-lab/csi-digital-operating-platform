@@ -230,8 +230,7 @@ export default function WoDetailPage() {
       {showPatch && (
         <WoPatchDialog
           woId={id}
-          currentPriority={wo.priorityInterdepart}
-          currentDueDate={wo.dueDate}
+          wo={wo}
           onClose={() => setShowPatch(false)}
           onSuccess={() => {
             setShowPatch(false);

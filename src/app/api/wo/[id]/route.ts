@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { requireAuth, requireRole, buildScopeFilter } from "@/lib/auth/guards";
 import { ok, notFound, badRequest, zodError, internalError } from "@/lib/response";
-import { getWorkOrderById, patchWorkOrder } from "@/lib/repositories/wo.repo";
+import { getWorkOrderById, patchWorkOrder, type WoPatchInput } from "@/lib/repositories/wo.repo";
 import { woPatchSchema } from "@/lib/validations/wo.schema";
 
 export async function GET(
@@ -37,7 +37,7 @@ export async function PATCH(
     if (!parsed.success) return zodError(parsed.error);
 
     const scope = buildScopeFilter(session);
-    const updated = await patchWorkOrder(id, parsed.data, session, scope);
+    const updated = await patchWorkOrder(id, parsed.data as WoPatchInput, session, scope);
     if (!updated) return notFound("Work order not found");
     return ok(updated);
   } catch (err) {
