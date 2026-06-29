@@ -346,6 +346,17 @@ export interface WoDetail {
   effortLog: EffortItem[];
   evidenceItems: EvidenceItem[];
   approvalTrail: ApprovalItem[];
+  activityLog: ActivityItem[];
+}
+
+interface ActivityItem {
+  action: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  reason: string | null;
+  performedAt: string;
+  performedByName: string;
 }
 
 interface AssignmentItem {
@@ -424,7 +435,7 @@ export async function getWorkOrderById(
   if (mainResult.rows.length === 0) return null;
   const r = mainResult.rows[0];
 
-  const [assignments, efforts, evidence, approvals, tasks] = await Promise.all([
+  const [assignments, efforts, evidence, approvals, tasks, auditLogs] = await Promise.all([
     query(
       `SELECT a.assignedhours AS "AssignedHours", a.assigneddate AS "AssignedDate",
               a.iscurrent AS "IsCurrent", a.reassignreason AS "ReassignReason",
@@ -474,6 +485,18 @@ export async function getWorkOrderById(
        LEFT JOIN staff s ON s.id = wt.assignedto
        WHERE wt.csi_wo_id = $1
        ORDER BY wt.taskno`,
+      [id]
+    ),
+    query(
+      `SELECT al.action AS "Action", al.fieldname AS "FieldName",
+              al.oldvalue AS "OldValue", al.newvalue AS "NewValue",
+              al.reason AS "Reason", al.performedat AS "PerformedAt",
+              s.name AS "PerformedByName"
+       FROM audit_log al
+       JOIN staff s ON s.id = al.performedby
+       WHERE al.entityname = 'CSI_WO' AND al.entityid = $1
+       ORDER BY al.performedat DESC
+       LIMIT 50`,
       [id]
     ),
   ]);
@@ -582,6 +605,15 @@ export async function getWorkOrderById(
       decision: ap.Decision as string,
       reason: (ap.Reason as string) ?? null,
       decisionDate: String(ap.DecisionDate),
+    })),
+    activityLog: auditLogs.rows.map((al) => ({
+      action: al.Action as string,
+      fieldName: (al.FieldName as string) ?? null,
+      oldValue: (al.OldValue as string) ?? null,
+      newValue: (al.NewValue as string) ?? null,
+      reason: (al.Reason as string) ?? null,
+      performedAt: String(al.PerformedAt),
+      performedByName: al.PerformedByName as string,
     })),
   };
 }

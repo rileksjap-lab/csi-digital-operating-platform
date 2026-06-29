@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth(request);
-    requireRole(session, "TeamMember", "TeamLead", "BIMTeamLead", "BIMModeler");
+    requireRole(session, "HOD", "SolutionManager", "TeamLead", "BIMTeamLead", "TeamMember", "BIMModeler");
 
     const body = await request.json();
     const parsed = effortCreateSchema.safeParse(body);
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const { result, error } = await createEffortEntry(parsed.data, session, scope);
 
     if (error === "NOT_FOUND") return notFound("Work order not found");
-    if (error === "WO_CLOSED") return badRequest("Cannot log effort on a closed work order");
+    // WO_CLOSED check removed — allow effort logging on closed WOs for backdated imports
     if (error === "NOT_ASSIGNEE") return badRequest("You must be the current assignee to log effort");
     if (error === "FUTURE_DATE") return badRequest("Log date cannot be in the future");
     if (error === "STAFF_NOT_FOUND") return badRequest("Selected staff member not found");

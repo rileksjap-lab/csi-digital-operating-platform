@@ -86,6 +86,15 @@ interface WoDetail {
     reason: string | null;
     decisionDate: string;
   }[];
+  activityLog: {
+    action: string;
+    fieldName: string | null;
+    oldValue: string | null;
+    newValue: string | null;
+    reason: string | null;
+    performedAt: string;
+    performedByName: string;
+  }[];
 }
 
 type Role = "HOD" | "SolutionManager" | "TeamLead" | "BIMTeamLead" | "TeamMember" | "BIMModeler";
@@ -352,6 +361,7 @@ export default function WoDetailPage() {
         <WoEffortForm
           woId={id}
           isAssignee={user?.staffId === wo.assignedTo?.id}
+          isLead={!!(user && ASSIGN_ROLES.includes(user.role as Role))}
           woClosed={wo.status === "Closed"}
           effortLog={wo.effortLog}
           onSuccess={() => mutate()}
@@ -412,6 +422,54 @@ export default function WoDetailPage() {
               ))}
             </tbody>
           </table>
+        )}
+      </Section>
+
+      {/* Activity Log */}
+      <Section title="Activity Log" count={wo.activityLog.length}>
+        {wo.activityLog.length === 0 ? (
+          <EmptyState text="No activity recorded" />
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {wo.activityLog.map((al, i) => (
+              <div key={i} className="px-4 py-2.5 flex items-start gap-3">
+                <div className="mt-0.5 h-2 w-2 rounded-full bg-primary-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-gray-800">
+                    <span className="font-medium">{al.performedByName}</span>
+                    {" "}
+                    {al.action === "Insert" && !al.fieldName && "created this work order"}
+                    {al.action === "Update" && al.fieldName && (
+                      <>
+                        changed <span className="font-medium">{al.fieldName}</span>
+                        {al.oldValue && (
+                          <> from <span className="text-gray-500 line-through">{al.oldValue.length > 60 ? al.oldValue.slice(0, 60) + "..." : al.oldValue}</span></>
+                        )}
+                        {al.newValue && (
+                          <> to <span className="text-primary-700">{al.newValue.length > 60 ? al.newValue.slice(0, 60) + "..." : al.newValue}</span></>
+                        )}
+                      </>
+                    )}
+                    {al.action === "Insert" && al.fieldName && (
+                      <>
+                        added <span className="font-medium">{al.fieldName}</span>
+                        {al.newValue && <> — <span className="text-primary-700">{al.newValue.length > 60 ? al.newValue.slice(0, 60) + "..." : al.newValue}</span></>}
+                      </>
+                    )}
+                  </div>
+                  {al.reason && (
+                    <div className="text-xs text-gray-500 mt-0.5">Reason: {al.reason}</div>
+                  )}
+                </div>
+                <div className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+                  {new Date(al.performedAt).toLocaleString("en-MY", {
+                    day: "2-digit", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </Section>
     </div>

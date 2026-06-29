@@ -13,9 +13,9 @@ interface SkillRow {
 }
 
 interface StaffOption {
-  id: string;
-  name: string;
-  staffCode: string;
+  Id: string;
+  Name: string;
+  StaffCode: string;
 }
 
 interface StaffSkillRow {
@@ -308,7 +308,7 @@ function AssessmentForm({ onClose, onSuccess }: { onClose: () => void; onSuccess
           >
             <option value="">Select staff...</option>
             {(staffList ?? []).map((s) => (
-              <option key={s.id} value={s.id}>{s.name} ({s.staffCode})</option>
+              <option key={s.Id} value={s.Id}>{s.Name} ({s.StaffCode})</option>
             ))}
           </select>
         </Field>
@@ -368,6 +368,7 @@ function CertificationsTab() {
   const [statusFilter, setStatusFilter] = useState("");
   const [expiryFilter, setExpiryFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
 
   const params = new URLSearchParams();
   if (statusFilter) params.set("status", statusFilter);
@@ -490,9 +491,51 @@ function CertificationsTab() {
                     <Badge className={CERT_STATUS_COLORS[c.status] ?? ""}>{c.status}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs font-medium text-primary-600 cursor-pointer hover:text-primary-800">
-                      {c.status === "Expired" ? "Renew" : c.status === "Unverified" ? "Verify" : "View"}
-                    </span>
+                    {c.status === "Unverified" && (
+                      <button
+                        disabled={updating === c.id}
+                        onClick={async () => {
+                          setUpdating(c.id);
+                          try {
+                            const res = await fetch(`/api/skills/certifications/${c.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ status: "Verified" }),
+                            });
+                            if (res.ok) mutate(url);
+                          } finally {
+                            setUpdating(null);
+                          }
+                        }}
+                        className="text-xs font-medium text-primary-600 hover:text-primary-800 disabled:opacity-50"
+                      >
+                        {updating === c.id ? "..." : "Verify"}
+                      </button>
+                    )}
+                    {c.status === "Expired" && (
+                      <button
+                        disabled={updating === c.id}
+                        onClick={async () => {
+                          setUpdating(c.id);
+                          try {
+                            const res = await fetch(`/api/skills/certifications/${c.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ status: "Verified" }),
+                            });
+                            if (res.ok) mutate(url);
+                          } finally {
+                            setUpdating(null);
+                          }
+                        }}
+                        className="text-xs font-medium text-green-600 hover:text-green-800 disabled:opacity-50"
+                      >
+                        {updating === c.id ? "..." : "Renew"}
+                      </button>
+                    )}
+                    {c.status === "Verified" && (
+                      <span className="text-xs text-gray-400">Verified</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -838,7 +881,7 @@ function TrainingForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
           >
             <option value="">Select staff...</option>
             {(staffList ?? []).map((s) => (
-              <option key={s.id} value={s.id}>{s.name} ({s.staffCode})</option>
+              <option key={s.Id} value={s.Id}>{s.Name} ({s.StaffCode})</option>
             ))}
           </select>
         </Field>

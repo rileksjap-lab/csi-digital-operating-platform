@@ -382,6 +382,68 @@ export async function createCertification(
   }
 }
 
+export async function updateCertificationStatus(
+  id: string,
+  status: "Verified" | "Unverified" | "Expired",
+  session: AuthSession
+): Promise<CertificationRow | null> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const prev = await client.query<{ status: string }>(
+      `SELECT status FROM certification WHERE id = $1`,
+      [id]
+    );
+    if (prev.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    await client.query(`UPDATE certification SET status = $1 WHERE id = $2`, [status, id]);
+    await insertAuditEntry(
+      {
+        entityName: "CERTIFICATION",
+        entityId: id,
+        action: "Update",
+        fieldName: "Status",
+        oldValue: prev.rows[0].status,
+        newValue: status,
+        performedBy: session.staffId,
+      },
+      client
+    );
+    await client.query("COMMIT");
+
+    const result = await query<CertificationRow>(
+      `SELECT c.id AS "id",
+              c.staffid AS "staffId",
+              s.name AS "staffName",
+              s.staffcode AS "staffCode",
+              d.deptcode AS "deptCode",
+              c.certificationname AS "certificationName",
+              c.vendor AS "vendor",
+              c.certificationlevel AS "certificationLevel",
+              c.issuedate::text AS "issueDate",
+              c.expirydate::text AS "expiryDate",
+              CASE WHEN c.expirydate IS NOT NULL
+                   THEN (c.expirydate - CURRENT_DATE)
+                   ELSE NULL END AS "daysUntilExpiry",
+              c.status AS "status",
+              c.evidencefile AS "evidenceFile"
+       FROM certification c
+       JOIN staff s ON s.id = c.staffid
+       JOIN department d ON d.id = s.deptid
+       WHERE c.id = $1`,
+      [id]
+    );
+    return result.rows[0] ?? null;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // ─── Training plans ─────────────────────────────────────────────────────────
 
 export async function listTrainingPlans(

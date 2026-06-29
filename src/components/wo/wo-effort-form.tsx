@@ -22,6 +22,7 @@ interface EffortEntry {
 interface WoEffortFormProps {
   woId: string;
   isAssignee: boolean;
+  isLead: boolean;
   woClosed: boolean;
   effortLog: EffortEntry[];
   onSuccess: () => void;
@@ -30,6 +31,7 @@ interface WoEffortFormProps {
 export default function WoEffortForm({
   woId,
   isAssignee,
+  isLead,
   woClosed,
   effortLog,
   onSuccess,
@@ -47,8 +49,9 @@ export default function WoEffortForm({
   const [editNotes, setEditNotes] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  const canLog = isAssignee || isLead;
   const { data: staffList } = useSWR<StaffOption[]>(
-    isAssignee && !woClosed ? "/api/staff" : null,
+    canLog ? "/api/staff" : null,
     apiFetcher
   );
 
@@ -99,14 +102,14 @@ export default function WoEffortForm({
     }
   }
 
-  const canEditEntry = (entry: EffortEntry) => {
-    return isAssignee && !woClosed && entry.logDate.slice(0, 10) === today;
+  const canEditEntry = (_entry: EffortEntry) => {
+    return canLog;
   };
 
   return (
     <div>
       {/* Log effort form — only for current assignee on non-closed WOs */}
-      {isAssignee && !woClosed && (
+      {canLog && (
         <div className="border-b border-gray-200 px-4 py-3">
           <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
             <div>

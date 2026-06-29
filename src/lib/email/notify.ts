@@ -128,7 +128,7 @@ export function notifyWoReassigned(
             <strong>${assignerName}</strong> has reassigned this work order to you.
           </p>
           ${woFields(wo)}
-          ${reason ? field("Reason", reason) : ""}
+          ${reason ? `<table style="border-collapse:collapse;margin:12px 0;">${field("Reason", reason)}</table>` : ""}
           ${actionButton("View Work Order", wo.id)}
         `)
       );
@@ -146,7 +146,7 @@ export function notifyWoReassigned(
               <strong>${wo.csiWoNo}</strong> has been reassigned from you to <strong>${newName}</strong>.
             </p>
             ${woFields(wo)}
-            ${reason ? field("Reason", reason) : ""}
+            ${reason ? `<table style="border-collapse:collapse;margin:12px 0;">${field("Reason", reason)}</table>` : ""}
           `)
         );
       }

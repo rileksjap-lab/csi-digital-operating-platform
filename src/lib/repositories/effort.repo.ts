@@ -181,13 +181,9 @@ export async function createEffortEntry(
     }
     const wo = woRes.rows[0];
 
-    if (wo.status === "Closed") {
-      await client.query("ROLLBACK");
-      return { result: null, error: "WO_CLOSED" };
-    }
-
-    // Caller must be the current assignee (they can log on behalf of others)
-    if (wo.assignedto !== session.staffId) {
+    const LEAD_ROLES = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
+    const isLead = LEAD_ROLES.includes(session.role);
+    if (!isLead && wo.assignedto !== session.staffId) {
       await client.query("ROLLBACK");
       return { result: null, error: "NOT_ASSIGNEE" };
     }
@@ -301,12 +297,6 @@ export async function patchEffortEntry(
     if (entry.StaffId !== session.staffId) {
       await client.query("ROLLBACK");
       return { result: null, error: "NOT_OWN_ENTRY" };
-    }
-
-    // WO must not be Closed
-    if (entry.WoStatus === "Closed") {
-      await client.query("ROLLBACK");
-      return { result: null, error: "WO_CLOSED" };
     }
 
     // Same-day edits only
