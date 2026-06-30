@@ -13,6 +13,7 @@ import WoEffortForm from "@/components/wo/wo-effort-form";
 import WoEvidencePanel from "@/components/wo/wo-evidence-panel";
 import WoSlaBadge from "@/components/wo/wo-sla-badge";
 import WoTaskChecklist from "@/components/wo/wo-task-checklist";
+import WoDiscussion from "@/components/wo/wo-discussion";
 
 interface WoTaskItem {
   id: string;
@@ -425,6 +426,11 @@ export default function WoDetailPage() {
         )}
       </Section>
 
+      {/* Discussion */}
+      <Section title="Discussion">
+        <WoDiscussion woId={wo.id} currentStaffId={user?.staffId ?? ""} />
+      </Section>
+
       {/* Activity Log */}
       <Section title="Activity Log" count={wo.activityLog.length}>
         {wo.activityLog.length === 0 ? (
@@ -545,15 +551,15 @@ function Section({
   children,
 }: {
   title: string;
-  count: number;
+  count?: number;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
       <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
         <h2 className="text-sm font-medium text-gray-700">
-          {title}{" "}
-          <span className="ml-1 text-gray-400">({count})</span>
+          {title}
+          {count != null && <span className="ml-1 text-gray-400">({count})</span>}
         </h2>
       </div>
       {children}

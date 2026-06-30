@@ -3,7 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { apiFetcher } from "@/lib/api/fetcher";
+import { apiFetcher, apiPost } from "@/lib/api/fetcher";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import "@/components/charts/chart-setup";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
@@ -213,6 +213,60 @@ function timeAgo(d: string): string {
 const CHART_GRID = { color: "#F3F4F6" };
 const CHART_NO_GRID = { display: false };
 
+// ─── Digest Button ──────────────────────────────────────────────────────────
+
+function DigestButton() {
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function send(period: "daily" | "weekly") {
+    setSending(true);
+    setResult(null);
+    try {
+      const res = (await apiPost("/api/digest", { period })) as { sent: number };
+      setResult({ ok: true, msg: `Sent ${res.sent} ${period} digest email(s)` });
+    } catch {
+      setResult({ ok: false, msg: "Failed to send digest" });
+    } finally {
+      setSending(false);
+      setTimeout(() => setResult(null), 4000);
+    }
+  }
+
+  return (
+    <div className="relative group">
+      <button
+        disabled={sending}
+        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        {sending ? "Sending..." : "Send Digest"}
+      </button>
+      <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-lg py-1 w-36">
+          <button onClick={() => send("daily")} disabled={sending}
+            className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700">
+            Daily Summary
+          </button>
+          <button onClick={() => send("weekly")} disabled={sending}
+            className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700">
+            Weekly Summary
+          </button>
+        </div>
+      </div>
+      {result && (
+        <div className={`absolute right-0 top-full mt-1 z-50 rounded-lg px-3 py-1.5 text-xs font-medium shadow-lg whitespace-nowrap ${
+          result.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+        }`}>
+          {result.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Tab Icons (SVG) ────────────────────────────────────────────────────────
 
 function IconClipboard({ className }: { className?: string }) {
@@ -273,11 +327,16 @@ export default function DashboardPage() {
             Welcome back, {user?.name ?? "User"}
           </p>
         </div>
-        <p className="text-xs text-gray-400">
-          {new Date().toLocaleDateString("en-MY", {
-            weekday: "long", day: "numeric", month: "long", year: "numeric",
-          })}
-        </p>
+        <div className="flex items-center gap-3">
+          {(user?.roleCode === "HOD" || user?.roleCode === "SM") && (
+            <DigestButton />
+          )}
+          <p className="text-xs text-gray-400">
+            {new Date().toLocaleDateString("en-MY", {
+              weekday: "long", day: "numeric", month: "long", year: "numeric",
+            })}
+          </p>
+        </div>
       </div>
 
       {/* Tab bar */}

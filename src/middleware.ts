@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set("x-request-id", requestId);
 
   const isAuthRoute =
-    pathname.startsWith("/api/auth/") || pathname === "/api/health";
+    pathname.startsWith("/api/auth/") || pathname === "/api/health" || pathname === "/api/digest";
 
   if (pathname.startsWith("/api/") && !isAuthRoute) {
     const sessionCookie = request.cookies.get("csidop_session");
