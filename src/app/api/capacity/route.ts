@@ -6,7 +6,7 @@ import { getUtilization } from "@/lib/repositories/capacity.repo";
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth(request);
-    requireRole(session, "HOD", "SolutionManager");
+    requireRole(session, "HOD", "SolutionManager", "TeamLead", "BIMTeamLead");
 
     const scope = buildScopeFilter(session);
     const deptCode = request.nextUrl.searchParams.get("deptCode") ?? undefined;

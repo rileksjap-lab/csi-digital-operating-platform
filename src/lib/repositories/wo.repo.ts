@@ -140,9 +140,15 @@ export async function listWorkOrders(
     paramIdx++;
   }
   if (filters.sourceType) {
-    wheres.push(`AND w.sourceofwo = $${paramIdx}`);
-    params.push(filters.sourceType);
-    paramIdx++;
+    if (filters.sourceType === "internal") {
+      wheres.push(`AND w.extwo_id IS NULL`);
+    } else if (filters.sourceType === "external") {
+      wheres.push(`AND w.extwo_id IS NOT NULL`);
+    } else {
+      wheres.push(`AND w.sourceofwo = $${paramIdx}`);
+      params.push(filters.sourceType);
+      paramIdx++;
+    }
   }
 
   // Cursor
