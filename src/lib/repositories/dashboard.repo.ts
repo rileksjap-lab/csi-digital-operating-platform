@@ -211,7 +211,7 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
     // WO monthly trend (last 6 months)
     query<{ month: string; opened: string; closed: string }>(
       `SELECT to_char(m.d, 'Mon') AS month,
-              COUNT(w.id) FILTER (WHERE w.createdat >= m.d AND w.createdat < m.d + INTERVAL '1 month')::int AS opened,
+              COUNT(w.id) FILTER (WHERE w.duedate >= m.d AND w.duedate < m.d + INTERVAL '1 month')::int AS opened,
               COUNT(w.id) FILTER (WHERE w.status = 'Closed' AND w.updatedat >= m.d AND w.updatedat < m.d + INTERVAL '1 month')::int AS closed
        FROM generate_series(
          date_trunc('month', CURRENT_DATE) - INTERVAL '5 months',

@@ -45,7 +45,7 @@ async function getDigestStats(period: "daily" | "weekly"): Promise<DigestStats> 
       ),
       query<{ count: string }>(
         `SELECT count(*)::int AS count FROM csi_wo
-         WHERE createdat >= now() - $1::interval`,
+         WHERE duedate >= now() - $1::interval`,
         [interval]
       ),
       query<{ count: string }>(

@@ -71,7 +71,7 @@ async function generateReport(
       const { clause, params } = woScopeWhere(scope, 3);
       const res = await query(
         `SELECT
-           TO_CHAR(w.createdat, 'YYYY-MM') AS month,
+           TO_CHAR(w.duedate, 'YYYY-MM') AS month,
            COUNT(*)::int AS total,
            COUNT(*) FILTER (WHERE w.status = 'Closed')::int AS closed,
            COUNT(*) FILTER (WHERE w.status = 'Open')::int AS open,
@@ -83,7 +83,7 @@ async function generateReport(
              / NULLIF(COUNT(*) FILTER (WHERE w.status = 'Closed'), 0)
            , 1), 0) AS "slaCompliancePct"
          FROM csi_wo w
-         WHERE w.createdat >= $1::date AND w.createdat <= $2::date ${clause}
+         WHERE w.duedate >= $1::date AND w.duedate <= $2::date ${clause}
          GROUP BY 1 ORDER BY 1`,
         [periodFrom, periodTo, ...params]
       );

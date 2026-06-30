@@ -386,7 +386,7 @@ export default function DashboardPage() {
                 <Bar data={{
                   labels: d.woMonthlyTrend.map(t => t.month),
                   datasets: [
-                    { label: "Opened", data: d.woMonthlyTrend.map(t => t.opened), backgroundColor: "#dbeafe", borderColor: BLUE, borderWidth: 1, borderRadius: 3 },
+                    { label: "Due", data: d.woMonthlyTrend.map(t => t.opened), backgroundColor: "#dbeafe", borderColor: BLUE, borderWidth: 1, borderRadius: 3 },
                     { label: "Closed", data: d.woMonthlyTrend.map(t => t.closed), backgroundColor: GREEN, borderRadius: 3 },
                   ],
                 }} options={{
