@@ -7,6 +7,7 @@ import { apiFetcher, apiPost } from "@/lib/api/fetcher";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import "@/components/charts/chart-setup";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
+import AnnouncementBoard from "@/components/announcement-board";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -338,6 +339,9 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* Announcement Board */}
+      <AnnouncementBoard canPost={user?.roleCode === "HOD" || user?.roleCode === "SM"} />
 
       {/* Tab bar */}
       <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 w-fit shadow-sm">
