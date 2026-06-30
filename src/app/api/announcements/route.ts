@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       : "normal";
     const pinned = body.pinned === true;
     const expiresAt = typeof body.expiresAt === "string" ? body.expiresAt : null;
+    const eventDate = typeof body.eventDate === "string" ? body.eventDate : null;
 
     if (!title || title.length > 200) return badRequest("Title required (max 200 chars)");
     if (!text || text.length > 5000) return badRequest("Body required (max 5000 chars)");
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
       priority,
       pinned,
       expiresAt,
+      eventDate,
       createdBy: session.staffId,
     });
     return ok(result);

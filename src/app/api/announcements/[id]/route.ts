@@ -22,6 +22,7 @@ export async function PATCH(
       priority: body.priority,
       pinned: body.pinned,
       expiresAt: body.expiresAt,
+      eventDate: body.eventDate,
     });
     return ok({ updated: true });
   } catch (err) {

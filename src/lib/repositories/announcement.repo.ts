@@ -11,6 +11,7 @@ export interface AnnouncementRow {
   staffRoleCode: string;
   createdAt: string;
   expiresAt: string | null;
+  eventDate: string | null;
 }
 
 export async function listAnnouncements(opts?: {
@@ -26,7 +27,8 @@ export async function listAnnouncements(opts?: {
             s.name AS "staffName",
             r.rolecode AS "staffRoleCode",
             a.createdat AS "createdAt",
-            a.expiresat AS "expiresAt"
+            a.expiresat AS "expiresAt",
+            a.eventdate AS "eventDate"
      FROM announcement a
      JOIN staff s ON s.id = a.createdby
      JOIN role r ON r.id = s.roleid
@@ -46,20 +48,21 @@ export async function createAnnouncement(input: {
   priority: string;
   pinned: boolean;
   expiresAt: string | null;
+  eventDate: string | null;
   createdBy: string;
 }): Promise<{ id: string }> {
   const result = await query<{ id: string }>(
-    `INSERT INTO announcement (title, body, priority, pinned, expiresat, createdby)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO announcement (title, body, priority, pinned, expiresat, eventdate, createdby)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id`,
-    [input.title, input.body, input.priority, input.pinned, input.expiresAt, input.createdBy]
+    [input.title, input.body, input.priority, input.pinned, input.expiresAt, input.eventDate, input.createdBy]
   );
   return result.rows[0];
 }
 
 export async function updateAnnouncement(
   id: string,
-  input: { title?: string; body?: string; priority?: string; pinned?: boolean; expiresAt?: string | null }
+  input: { title?: string; body?: string; priority?: string; pinned?: boolean; expiresAt?: string | null; eventDate?: string | null }
 ): Promise<void> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -70,6 +73,7 @@ export async function updateAnnouncement(
   if (input.priority !== undefined) { sets.push(`priority = $${idx++}`); params.push(input.priority); }
   if (input.pinned !== undefined) { sets.push(`pinned = $${idx++}`); params.push(input.pinned); }
   if (input.expiresAt !== undefined) { sets.push(`expiresat = $${idx++}`); params.push(input.expiresAt); }
+  if (input.eventDate !== undefined) { sets.push(`eventdate = $${idx++}`); params.push(input.eventDate); }
 
   if (sets.length === 0) return;
   params.push(id);

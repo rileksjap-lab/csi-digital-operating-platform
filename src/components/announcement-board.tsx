@@ -15,6 +15,7 @@ interface Announcement {
   staffRoleCode: string;
   createdAt: string;
   expiresAt: string | null;
+  eventDate: string | null;
 }
 
 interface Props {
@@ -23,7 +24,7 @@ interface Props {
 
 export default function AnnouncementBoard({ canPost }: Props) {
   const { data: items, mutate } = useSWR<Announcement[]>(
-    "/api/announcements?limit=5",
+    "/api/announcements?limit=10",
     apiFetcher,
     { refreshInterval: 60000 }
   );
@@ -55,8 +56,9 @@ export default function AnnouncementBoard({ canPost }: Props) {
       </div>
 
       {showForm && canPost && (
-        <CreateForm
+        <AnnouncementForm
           onDone={() => { setShowForm(false); mutate(); }}
+          onCancel={() => setShowForm(false)}
         />
       )}
 
@@ -66,7 +68,7 @@ export default function AnnouncementBoard({ canPost }: Props) {
         <>
           <div className="space-y-2">
             {displayed.map((a) => (
-              <AnnouncementCard key={a.id} item={a} canPost={canPost} onDelete={() => mutate()} />
+              <AnnouncementCard key={a.id} item={a} canPost={canPost} onMutate={() => mutate()} />
             ))}
           </div>
           {items.length > 3 && (
@@ -83,9 +85,11 @@ export default function AnnouncementBoard({ canPost }: Props) {
   );
 }
 
-function AnnouncementCard({ item, canPost, onDelete }: {
-  item: Announcement; canPost: boolean; onDelete: () => void;
+function AnnouncementCard({ item, canPost, onMutate }: {
+  item: Announcement; canPost: boolean; onMutate: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+
   const borderColor =
     item.priority === "urgent" ? "border-l-red-500" :
     item.priority === "important" ? "border-l-amber-400" :
@@ -96,20 +100,28 @@ function AnnouncementCard({ item, canPost, onDelete }: {
     item.priority === "important" ? "bg-amber-50" :
     "bg-white";
 
-  const timeAgo = formatTimeAgo(item.createdAt);
-
   async function handleDelete() {
     try {
       await fetch(`/api/announcements/${item.id}`, { method: "DELETE" });
-      onDelete();
+      onMutate();
     } catch { /* ignore */ }
+  }
+
+  if (editing) {
+    return (
+      <AnnouncementForm
+        initial={item}
+        onDone={() => { setEditing(false); onMutate(); }}
+        onCancel={() => setEditing(false)}
+      />
+    );
   }
 
   return (
     <div className={`rounded-lg border border-l-4 ${borderColor} ${bgColor} p-3`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-gray-900 truncate">{item.title}</h3>
             {item.pinned && (
               <span className="text-[10px] font-medium bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
@@ -127,31 +139,60 @@ function AnnouncementCard({ item, canPost, onDelete }: {
             )}
           </div>
           <p className="mt-1 text-xs text-gray-600 line-clamp-2 whitespace-pre-wrap">{item.body}</p>
-          <p className="mt-1.5 text-[11px] text-gray-400">
-            {item.staffName} ({item.staffRoleCode}) &middot; {timeAgo}
-          </p>
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+            {item.eventDate && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {formatEventDate(item.eventDate)}
+              </span>
+            )}
+            <span className="text-[11px] text-gray-400">
+              {item.staffName} ({item.staffRoleCode}) &middot; {formatTimeAgo(item.createdAt)}
+            </span>
+          </div>
         </div>
         {canPost && (
-          <button
-            onClick={handleDelete}
-            className="text-gray-300 hover:text-red-500 shrink-0 p-0.5"
-            title="Remove"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setEditing(true)}
+              className="text-gray-300 hover:text-primary-500 p-0.5"
+              title="Edit"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              onClick={handleDelete}
+              className="text-gray-300 hover:text-red-500 p-0.5"
+              title="Remove"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function CreateForm({ onDone }: { onDone: () => void }) {
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [priority, setPriority] = useState("normal");
-  const [pinned, setPinned] = useState(false);
+function AnnouncementForm({ initial, onDone, onCancel }: {
+  initial?: Announcement;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const isEdit = !!initial;
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [body, setBody] = useState(initial?.body ?? "");
+  const [priority, setPriority] = useState(initial?.priority ?? "normal");
+  const [pinned, setPinned] = useState(initial?.pinned ?? false);
+  const [eventDate, setEventDate] = useState(
+    initial?.eventDate ? toLocalDatetime(initial.eventDate) : ""
+  );
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -159,12 +200,23 @@ function CreateForm({ onDone }: { onDone: () => void }) {
     if (!title.trim() || !body.trim()) return;
     setSubmitting(true);
     try {
-      await apiPost("/api/announcements", {
+      const payload = {
         title: title.trim(),
         body: body.trim(),
         priority,
         pinned,
-      });
+        eventDate: eventDate || null,
+      };
+
+      if (isEdit) {
+        await fetch(`/api/announcements/${initial.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await apiPost("/api/announcements", payload);
+      }
       onDone();
     } catch { /* ignore */ } finally {
       setSubmitting(false);
@@ -199,6 +251,17 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           <option value="important">Important</option>
           <option value="urgent">Urgent</option>
         </select>
+        <div className="flex items-center gap-1.5">
+          <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <input
+            type="datetime-local"
+            value={eventDate}
+            onChange={(e) => setEventDate(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
+          />
+        </div>
         <label className="flex items-center gap-1.5 text-xs text-gray-600">
           <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)}
             className="rounded border-gray-300" />
@@ -206,15 +269,35 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         </label>
         <div className="flex-1" />
         <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs text-gray-500 hover:text-gray-700"
+        >
+          Cancel
+        </button>
+        <button
           type="submit"
           disabled={submitting || !title.trim() || !body.trim()}
           className="rounded bg-primary-600 px-3 py-1 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
         >
-          {submitting ? "Posting..." : "Post"}
+          {submitting ? "Saving..." : isEdit ? "Save" : "Post"}
         </button>
       </div>
     </form>
   );
+}
+
+function toLocalDatetime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatEventDate(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" });
+  const time = d.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit", hour12: true });
+  return `${date}, ${time}`;
 }
 
 function formatTimeAgo(dateStr: string): string {
