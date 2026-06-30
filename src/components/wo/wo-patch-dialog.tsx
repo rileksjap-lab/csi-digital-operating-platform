@@ -30,8 +30,8 @@ const PRIORITIES_INTERNAL = ["Low", "Normal", "High", "Urgent", "Critical", "N/A
 const STATUSES = ["Open", "Acknowledged", "InProgress", "PendingApproval", "Approved", "Closed", "Returned", "Cancelled"] as const;
 
 interface Lookups {
-  requestTypes: { id: string; typeName: string; domain: string }[];
-  tiers: { id: string; tierCode: number; tierName: string }[];
+  requestTypes: { Id: string; TypeName: string; Domain: string }[];
+  tiers: { Id: string; TierCode: number; TierName: string }[];
 }
 
 export default function WoPatchDialog({ woId, wo, onClose, onSuccess }: WoPatchDialogProps) {
@@ -157,7 +157,7 @@ export default function WoPatchDialog({ woId, wo, onClose, onSuccess }: WoPatchD
               className="mt-1 block w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm"
             >
               {(lookups?.requestTypes ?? []).map((rt) => (
-                <option key={rt.id} value={rt.id}>{rt.typeName} ({rt.domain})</option>
+                <option key={rt.Id} value={rt.Id}>{rt.TypeName} ({rt.Domain})</option>
               ))}
             </select>
           </div>
@@ -169,7 +169,7 @@ export default function WoPatchDialog({ woId, wo, onClose, onSuccess }: WoPatchD
               className="mt-1 block w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm"
             >
               {(lookups?.tiers ?? []).map((t) => (
-                <option key={t.id} value={t.id}>Tier {t.tierCode} — {t.tierName}</option>
+                <option key={t.Id} value={t.Id}>Tier {t.TierCode} — {t.TierName}</option>
               ))}
             </select>
           </div>
