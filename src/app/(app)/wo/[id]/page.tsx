@@ -76,6 +76,7 @@ interface WoDetail {
     id: string;
     fileRef: string;
     evidenceType: string;
+    caption: string | null;
     uploadedByName: string;
     uploadedDate: string;
   }[];
@@ -376,6 +377,7 @@ export default function WoDetailPage() {
           isAssignee={user?.staffId === wo.assignedTo?.id}
           isLead={!!(user && ASSIGN_ROLES.includes(user.role as Role))}
           woClosed={wo.status === "Closed"}
+          userRole={user?.role ?? ""}
           effortLog={wo.effortLog}
           onSuccess={() => mutate()}
         />

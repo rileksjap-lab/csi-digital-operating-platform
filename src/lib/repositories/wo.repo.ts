@@ -468,7 +468,7 @@ export async function getWorkOrderById(
     ),
     query(
       `SELECT ed.id AS "Id", ed.fileref AS "FileRef", ed.evidencetype AS "EvidenceType",
-              ed.uploadeddate AS "UploadedDate", s.name AS "UploadedByName"
+              ed.caption AS "Caption", ed.uploadeddate AS "UploadedDate", s.name AS "UploadedByName"
        FROM evidence_deliverable ed
        JOIN staff s ON s.id = ed.uploadedby
        WHERE ed.csi_wo_id = $1 AND ed.removedat IS NULL
@@ -605,6 +605,7 @@ export async function getWorkOrderById(
       id: ev.Id as string,
       fileRef: ev.FileRef as string,
       evidenceType: ev.EvidenceType as string,
+      caption: (ev.Caption as string) ?? null,
       uploadedByName: ev.UploadedByName as string,
       uploadedDate: String(ev.UploadedDate),
     })),

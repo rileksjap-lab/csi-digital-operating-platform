@@ -3,6 +3,10 @@ import { requireAuth, buildScopeFilter } from "@/lib/auth/guards";
 import { created, badRequest, notFound, internalError } from "@/lib/response";
 import { saveEvidenceFile } from "@/lib/repositories/evidence.repo";
 
+export const runtime = "nodejs";
+
+export const maxDuration = 60;
+
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 const ALLOWED_TYPES = new Set([
@@ -27,10 +31,18 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth(request);
 
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (parseErr) {
+      console.error("[evidence/upload] formData parse error", parseErr);
+      return badRequest("Failed to parse upload. File may be too large or request was malformed.");
+    }
+
     const file = formData.get("file") as File | null;
     const woId = formData.get("woId") as string | null;
     const evidenceType = formData.get("evidenceType") as string | null;
+    const caption = (formData.get("caption") as string | null)?.trim() || null;
 
     if (!file || !woId || !evidenceType) {
       return badRequest("file, woId, and evidenceType are required");
@@ -50,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     const scope = buildScopeFilter(session);
     const { result, error } = await saveEvidenceFile(
-      { woId, evidenceType, file },
+      { woId, evidenceType, caption, file },
       session,
       scope
     );

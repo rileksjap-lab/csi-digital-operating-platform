@@ -14,6 +14,7 @@ export interface EvidenceItem {
   fileRef: string;
   downloadUrl: string;
   evidenceType: string;
+  caption: string | null;
   uploadedByName: string;
   uploadedDate: string;
   removedAt: string | null;
@@ -80,7 +81,8 @@ export async function listEvidence(
 
   const result = await query(
     `SELECT ed.id AS "Id", ed.csi_wo_id AS "WoId", ed.fileref AS "FileRef",
-            ed.evidencetype AS "EvidenceType", s.name AS "UploadedByName",
+            ed.evidencetype AS "EvidenceType", ed.caption AS "Caption",
+            s.name AS "UploadedByName",
             ed.uploadeddate AS "UploadedDate", ed.removedat AS "RemovedAt"
      FROM evidence_deliverable ed
      JOIN csi_wo w ON w.id = ed.csi_wo_id
@@ -97,6 +99,7 @@ export async function listEvidence(
     fileRef: r.FileRef as string,
     downloadUrl: `/api/evidence/${r.Id}/download`,
     evidenceType: r.EvidenceType as string,
+    caption: (r.Caption as string) ?? null,
     uploadedByName: r.UploadedByName as string,
     uploadedDate: String(r.UploadedDate),
     removedAt: r.RemovedAt ? String(r.RemovedAt) : null,
@@ -206,6 +209,7 @@ export async function confirmUpload(
         fileRef: intent.fileRef,
         downloadUrl: `/api/evidence/${row.Id}/download`,
         evidenceType,
+        caption: null,
         uploadedByName: session.displayName,
         uploadedDate: String(row.UploadedDate),
         removedAt: null,
@@ -222,7 +226,7 @@ export async function confirmUpload(
 // ─── Direct file upload (single-step) ──────────────────────────────────────
 
 export async function saveEvidenceFile(
-  input: { woId: string; evidenceType: string; file: File },
+  input: { woId: string; evidenceType: string; caption: string | null; file: File },
   session: AuthSession,
   scope: ScopeFilter
 ): Promise<{ result: EvidenceItem | null; error?: string }> {
@@ -247,6 +251,7 @@ export async function saveEvidenceFile(
     params
   );
   if (woRes.rows.length === 0) return { result: null, error: "NOT_FOUND" };
+  if (woRes.rows[0].status === "Closed") return { result: null, error: "WO_CLOSED" };
 
   const fileId = randomUUID();
   const safeFilename = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -262,10 +267,10 @@ export async function saveEvidenceFile(
     await client.query("BEGIN");
 
     const result = await client.query<{ Id: string; UploadedDate: string }>(
-      `INSERT INTO evidence_deliverable (csi_wo_id, fileref, evidencetype, uploadedby)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO evidence_deliverable (csi_wo_id, fileref, evidencetype, caption, uploadedby)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id AS "Id", uploadeddate AS "UploadedDate"`,
-      [input.woId, fileRef, input.evidenceType, session.staffId]
+      [input.woId, fileRef, input.evidenceType, input.caption || null, session.staffId]
     );
     const row = result.rows[0];
 
@@ -277,6 +282,7 @@ export async function saveEvidenceFile(
         newValue: JSON.stringify({
           fileRef,
           evidenceType: input.evidenceType,
+          caption: input.caption,
           filename: input.file.name,
           size: input.file.size,
         }),
@@ -294,6 +300,7 @@ export async function saveEvidenceFile(
         fileRef,
         downloadUrl: `/api/evidence/${row.Id}/download`,
         evidenceType: input.evidenceType,
+        caption: input.caption ?? null,
         uploadedByName: session.displayName,
         uploadedDate: String(row.UploadedDate),
         removedAt: null,
@@ -399,7 +406,7 @@ export async function softDeleteEvidence(
       {
         entityName: "EVIDENCE_DELIVERABLE",
         entityId: evidenceId,
-        action: "SoftDelete",
+        action: "Delete",
         performedBy: session.staffId,
       },
       client

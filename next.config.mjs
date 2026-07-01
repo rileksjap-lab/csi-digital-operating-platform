@@ -3,6 +3,12 @@ const nextConfig = {
   // Strict mode for catching React bugs early
   reactStrictMode: true,
 
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "25mb",
+    },
+  },
+
   // Server-side env vars validated at startup — prevent silent misconfiguration
   serverRuntimeConfig: {
     databaseUrl: process.env.DATABASE_URL,

@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/redis";
 import { unauthorized, forbidden } from "@/lib/response";
+import { verifySessionJwt } from "@/lib/auth/jwt";
 import type { AuthSession, Role, CapacityScope } from "@/lib/types/api";
 
 export interface ScopeFilter {
@@ -11,8 +12,15 @@ export interface ScopeFilter {
 }
 
 export async function requireAuth(request: NextRequest): Promise<AuthSession> {
-  const sessionId = request.headers.get("x-session-id");
-  if (!sessionId) throw unauthorized();
+  let sessionId = request.headers.get("x-session-id");
+
+  if (!sessionId) {
+    const cookie = request.cookies.get("csidop_session")?.value;
+    if (!cookie) throw unauthorized();
+    const payload = await verifySessionJwt(cookie);
+    if (!payload?.sid) throw unauthorized();
+    sessionId = payload.sid;
+  }
 
   const session = await getSession(sessionId);
   if (!session) throw unauthorized("Session expired or revoked");

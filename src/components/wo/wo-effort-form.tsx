@@ -24,6 +24,7 @@ interface WoEffortFormProps {
   isAssignee: boolean;
   isLead: boolean;
   woClosed: boolean;
+  userRole: string;
   effortLog: EffortEntry[];
   onSuccess: () => void;
 }
@@ -33,6 +34,7 @@ export default function WoEffortForm({
   isAssignee,
   isLead,
   woClosed,
+  userRole,
   effortLog,
   onSuccess,
 }: WoEffortFormProps) {
@@ -102,8 +104,13 @@ export default function WoEffortForm({
     }
   }
 
-  const canEditEntry = (_entry: EffortEntry) => {
-    return canLog;
+  const isManagerRole = userRole === "HOD" || userRole === "SolutionManager";
+
+  const canEditEntry = (entry: EffortEntry) => {
+    if (!canLog) return false;
+    if (isManagerRole) return true;
+    const entryDate = entry.logDate.slice(0, 10);
+    return entryDate === today;
   };
 
   return (

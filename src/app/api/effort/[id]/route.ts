@@ -10,7 +10,7 @@ export async function PATCH(
 ) {
   try {
     const session = await requireAuth(request);
-    requireRole(session, "TeamMember", "TeamLead", "BIMTeamLead", "BIMModeler");
+    requireRole(session, "HOD", "SolutionManager", "TeamLead", "BIMTeamLead", "TeamMember", "BIMModeler");
 
     const { id } = await params;
     const body = await request.json();

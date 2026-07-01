@@ -293,18 +293,23 @@ export async function patchEffortEntry(
     }
     const entry = entryRes.rows[0];
 
-    // Must be the staff who created the entry
-    if (entry.StaffId !== session.staffId) {
+    const isLeadRole = ["HOD", "SolutionManager"].includes(session.role);
+
+    // Must be the staff who created the entry (unless HOD/SM)
+    if (!isLeadRole && entry.StaffId !== session.staffId) {
       await client.query("ROLLBACK");
       return { result: null, error: "NOT_OWN_ENTRY" };
     }
 
-    // Same-day edits only
-    const today = new Date().toISOString().slice(0, 10);
     const logDateStr = String(entry.LogDate).slice(0, 10);
-    if (logDateStr !== today) {
-      await client.query("ROLLBACK");
-      return { result: null, error: "NOT_SAME_DAY" };
+
+    // Same-day edits only (unless HOD/SM)
+    if (!isLeadRole) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (logDateStr !== today) {
+        await client.query("ROLLBACK");
+        return { result: null, error: "NOT_SAME_DAY" };
+      }
     }
 
     const sets: string[] = [];

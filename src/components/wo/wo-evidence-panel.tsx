@@ -6,6 +6,7 @@ interface EvidenceItem {
   id: string;
   fileRef: string;
   evidenceType: string;
+  caption: string | null;
   uploadedByName: string;
   uploadedDate: string;
 }
@@ -57,6 +58,7 @@ export default function WoEvidencePanel({
   const [showForm, setShowForm] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [evidenceType, setEvidenceType] = useState(EVIDENCE_TYPES[0]);
+  const [caption, setCaption] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export default function WoEvidencePanel({
       formData.append("file", selectedFile);
       formData.append("woId", woId);
       formData.append("evidenceType", evidenceType);
+      if (caption.trim()) formData.append("caption", caption.trim());
 
       const res = await fetch("/api/evidence/upload", {
         method: "POST",
@@ -107,12 +110,21 @@ export default function WoEvidencePanel({
       }
 
       if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.error?.message ?? "Upload failed");
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const json = await res.json();
+          throw new Error(json.error?.message ?? "Upload failed");
+        }
+        throw new Error(
+          res.status === 413
+            ? "File too large for the server to process"
+            : `Upload failed (${res.status})`
+        );
       }
 
       setSelectedFile(null);
       setEvidenceType(EVIDENCE_TYPES[0]);
+      setCaption("");
       setShowForm(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
       onSuccess();
@@ -218,6 +230,19 @@ export default function WoEvidencePanel({
                 )}
               </div>
 
+              {/* Caption */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Caption / Description</label>
+                <input
+                  type="text"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Brief description of this evidence"
+                  maxLength={500}
+                  className="mt-1 block w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm placeholder:text-gray-400"
+                />
+              </div>
+
               {/* Type + buttons */}
               <div className="flex flex-wrap items-end gap-3">
                 <div>
@@ -254,6 +279,7 @@ export default function WoEvidencePanel({
                   onClick={() => {
                     setShowForm(false);
                     setSelectedFile(null);
+                    setCaption("");
                     setError(null);
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
@@ -281,6 +307,7 @@ export default function WoEvidencePanel({
             <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase">
               <th className="px-4 py-2 text-left">Type</th>
               <th className="px-4 py-2 text-left">File</th>
+              <th className="px-4 py-2 text-left">Caption</th>
               <th className="px-4 py-2 text-left">Uploaded By</th>
               <th className="px-4 py-2 text-left">Date</th>
               <th className="px-4 py-2 text-right">Actions</th>
@@ -310,6 +337,9 @@ export default function WoEvidencePanel({
                     >
                       {displayName}
                     </a>
+                  </td>
+                  <td className="px-4 py-2 text-gray-500 max-w-[200px] truncate" title={ev.caption ?? ""}>
+                    {ev.caption || <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-2 text-gray-500">{ev.uploadedByName}</td>
                   <td className="px-4 py-2 text-gray-500">
