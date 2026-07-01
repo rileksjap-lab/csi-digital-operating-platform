@@ -97,6 +97,7 @@ export interface DashboardData {
   skillDomains: string[];
   skillHeatmap: SkillHeatRow[];
   auditLogCount: number;
+  woByRequestType: { month: string; requestType: string; count: number }[];
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -143,6 +144,7 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
     slaRes,
     certDetailRes,
     auditCountRes,
+    woByReqTypeRes,
   ] = await Promise.all([
     // Core KPIs
     query<{ status: string; count: string }>(
@@ -294,6 +296,23 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
       `SELECT COUNT(*)::int AS count FROM audit_log
        WHERE performedat >= date_trunc('month', CURRENT_DATE)`
     ),
+    // WO by request type per month (last 6 months)
+    query<{ month: string; requestType: string; count: string }>(
+      `SELECT to_char(m.d, 'Mon') AS month,
+              COALESCE(rt.typename, 'Unset') AS "requestType",
+              COUNT(w.id)::int AS count
+       FROM generate_series(
+         date_trunc('month', CURRENT_DATE) - INTERVAL '5 months',
+         date_trunc('month', CURRENT_DATE),
+         '1 month'
+       ) AS m(d)
+       LEFT JOIN csi_wo w ON w.duedate >= m.d AND w.duedate < m.d + INTERVAL '1 month' ${woScope}
+       LEFT JOIN request_type rt ON rt.id = w.requesttypeid
+       GROUP BY m.d, rt.typename
+       HAVING COUNT(w.id) > 0
+       ORDER BY m.d, count DESC`,
+      scopeParams
+    ),
   ]);
 
   // Process WO counts
@@ -417,5 +436,10 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
     skillDomains,
     skillHeatmap,
     auditLogCount: parseInt(auditCountRes.rows[0]?.count ?? "0", 10),
+    woByRequestType: woByReqTypeRes.rows.map(r => ({
+      month: r.month,
+      requestType: r.requestType,
+      count: parseInt(String(r.count), 10),
+    })),
   };
 }

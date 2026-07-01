@@ -75,6 +75,7 @@ interface DashboardData {
   skillDomains: string[];
   skillHeatmap: { staff: string; scores: Record<string, number> }[];
   auditLogCount: number;
+  woByRequestType: { month: string; requestType: string; count: number }[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -417,6 +418,45 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* WO by Request Type */}
+          {d.woByRequestType.length > 0 && (() => {
+            const months = [...new Set(d.woByRequestType.map(r => r.month))];
+            const types = [...new Set(d.woByRequestType.map(r => r.requestType))];
+            const TYPE_COLORS = [
+              "#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6",
+              "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
+              "#14b8a6", "#e11d48", "#a855f7",
+            ];
+            return (
+              <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-900 text-sm mb-4">Monthly WO by Request Type</h3>
+                <div className="h-[260px]">
+                  <Bar data={{
+                    labels: months,
+                    datasets: types.map((t, i) => ({
+                      label: t,
+                      data: months.map(m => {
+                        const found = d.woByRequestType.find(r => r.month === m && r.requestType === t);
+                        return found?.count ?? 0;
+                      }),
+                      backgroundColor: TYPE_COLORS[i % TYPE_COLORS.length],
+                      borderRadius: 2,
+                    })),
+                  }} options={{
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                      legend: { display: true, position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } },
+                    },
+                    scales: {
+                      x: { stacked: true, grid: CHART_NO_GRID },
+                      y: { stacked: true, grid: CHART_GRID, beginAtZero: true },
+                    },
+                  }} />
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Recent WOs + WO by Status */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
