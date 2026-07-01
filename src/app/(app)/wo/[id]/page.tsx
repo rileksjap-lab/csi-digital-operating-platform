@@ -286,6 +286,10 @@ export default function WoDetailPage() {
           label="Task Score"
           value={wo.taskScore != null ? String(wo.taskScore) : "—"}
         />
+        <div className="col-span-2 md:col-span-4">
+          <p className="text-xs font-medium text-gray-500 mb-1">Remark</p>
+          <p className="text-sm text-gray-800 whitespace-pre-wrap">{wo.remark || "—"}</p>
+        </div>
       </div>
 
       {/* Task Checklist — only for Tender / RFP work orders */}
