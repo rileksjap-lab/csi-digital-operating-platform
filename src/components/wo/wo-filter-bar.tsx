@@ -90,9 +90,9 @@ export default function WoFilterBar() {
         params.delete(key);
       }
       params.delete("after");
-      router.replace(`?${params.toString()}`);
+      window.location.href = `/wo?${params.toString()}`;
     },
-    [searchParams, router]
+    [searchParams]
   );
 
   const updateParams = useCallback(
@@ -103,7 +103,7 @@ export default function WoFilterBar() {
         else params.delete(key);
       }
       params.delete("after");
-      router.replace(`?${params.toString()}`);
+      window.location.href = `/wo?${params.toString()}`;
     },
     [searchParams, router]
   );
@@ -208,7 +208,7 @@ export default function WoFilterBar() {
 
         {hasFilters && (
           <button
-            onClick={() => { router.replace("/wo"); setSearchInput(""); }}
+            onClick={() => { window.location.href = "/wo"; }}
             className="text-xs text-red-500 hover:text-red-700 font-medium"
           >
             Clear all

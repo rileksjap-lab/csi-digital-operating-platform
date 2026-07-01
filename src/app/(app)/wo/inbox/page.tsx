@@ -103,7 +103,7 @@ function InboxInner() {
   function switchTab(tab: SourceTab) {
     const p = new URLSearchParams();
     p.set("sourceType", tab);
-    router.replace(`/wo/inbox?${p.toString()}`);
+    window.location.href = `/wo/inbox?${p.toString()}`;
   }
 
   function updateParam(key: string, value: string) {
@@ -112,7 +112,7 @@ function InboxInner() {
     else p.delete(key);
     p.delete("after");
     if (!p.has("sourceType")) p.set("sourceType", activeTab);
-    router.replace(`/wo/inbox?${p.toString()}`);
+    window.location.href = `/wo/inbox?${p.toString()}`;
   }
 
   function handleNextPage() {
@@ -120,7 +120,7 @@ function InboxInner() {
     const p = new URLSearchParams(searchParams.toString());
     p.set("after", data.meta.nextCursor);
     if (!p.has("sourceType")) p.set("sourceType", activeTab);
-    router.replace(`/wo/inbox?${p.toString()}`);
+    window.location.href = `/wo/inbox?${p.toString()}`;
   }
 
   const activeStatuses = (searchParams.get("status") ?? "").split(",").filter(Boolean);
