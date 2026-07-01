@@ -218,13 +218,7 @@ export default function WoDetailPage() {
         )}
         {canApprove && (
           <>
-            <button
-              onClick={() => handleApprove("Approved")}
-              disabled={actionLoading}
-              className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-            >
-              Approve
-            </button>
+            <ApproveButton onApprove={(reason) => handleApprove("Approved", reason)} disabled={actionLoading} />
             <ReturnButton onReturn={(reason) => handleApprove("Returned", reason)} disabled={actionLoading} />
           </>
         )}
@@ -478,6 +472,58 @@ export default function WoDetailPage() {
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+function ApproveButton({
+  onApprove,
+  disabled,
+}: {
+  onApprove: (reason?: string) => void;
+  disabled: boolean;
+}) {
+  const [showReason, setShowReason] = useState(false);
+  const [reason, setReason] = useState("");
+
+  if (!showReason) {
+    return (
+      <button
+        onClick={() => setShowReason(true)}
+        disabled={disabled}
+        className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+      >
+        Approve
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Reason (optional)"
+        className="rounded border border-gray-300 px-2 py-1 text-sm"
+      />
+      <button
+        onClick={() => {
+          onApprove(reason.trim() || undefined);
+          setShowReason(false);
+          setReason("");
+        }}
+        disabled={disabled}
+        className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+      >
+        Confirm
+      </button>
+      <button
+        onClick={() => { setShowReason(false); setReason(""); }}
+        className="text-xs text-gray-500 hover:text-gray-700"
+      >
+        Cancel
+      </button>
     </div>
   );
 }
