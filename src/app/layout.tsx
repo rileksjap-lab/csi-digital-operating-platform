@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "CSI Digital Operating Platform",
   description:
     "Internal operating platform for the Consultant, Solution & Innovation department — 10 Creative Solutions Sdn Bhd",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
