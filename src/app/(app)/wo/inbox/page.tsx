@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useCallback } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type { PaginationMeta } from "@/lib/types/api";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import WoStatusBadge from "@/components/wo/wo-status-badge";
@@ -52,9 +52,14 @@ interface WoListResponse {
 
 function InboxInner() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const activeTab = (searchParams.get("sourceType") as SourceTab) || "external";
+
+  const [activeTab, setActiveTab] = useState<SourceTab>(
+    (searchParams.get("sourceType") as SourceTab) || "external"
+  );
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
+  const [cursor, setCursor] = useState<string | null>(searchParams.get("after"));
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
@@ -79,15 +84,17 @@ function InboxInner() {
     }
   }
 
-  const params = new URLSearchParams();
-  params.set("sourceType", activeTab);
-  params.set("sortBy", searchParams.get("sortBy") ?? "createdAt");
-  params.set("sortDir", searchParams.get("sortDir") ?? "desc");
-  if (searchParams.get("status")) params.set("status", searchParams.get("status")!);
-  if (searchParams.get("q")) params.set("q", searchParams.get("q")!);
-  if (searchParams.get("after")) params.set("after", searchParams.get("after")!);
-
-  const apiUrl = `/api/wo?${params.toString()}`;
+  // Build API URL from state (not URL params)
+  const apiUrl = (() => {
+    const p = new URLSearchParams();
+    p.set("sourceType", activeTab);
+    p.set("sortBy", "createdAt");
+    p.set("sortDir", "desc");
+    if (statusFilter) p.set("status", statusFilter);
+    if (query) p.set("q", query);
+    if (cursor) p.set("after", cursor);
+    return `/api/wo?${p.toString()}`;
+  })();
 
   const { data, error, isLoading } = useSWR<WoListResponse>(apiUrl, async (url: string) => {
     const res = await fetch(url);
@@ -101,34 +108,38 @@ function InboxInner() {
   });
 
   function switchTab(tab: SourceTab) {
-    const p = new URLSearchParams();
-    p.set("sourceType", tab);
-    window.location.href = `/wo/inbox?${p.toString()}`;
+    setActiveTab(tab);
+    setStatusFilter("");
+    setQuery("");
+    setSearchInput("");
+    setCursor(null);
   }
 
-  function updateParam(key: string, value: string) {
-    const p = new URLSearchParams(searchParams.toString());
-    if (value) p.set(key, value);
-    else p.delete(key);
-    p.delete("after");
-    if (!p.has("sourceType")) p.set("sourceType", activeTab);
-    window.location.href = `/wo/inbox?${p.toString()}`;
-  }
+  const updateStatusFilter = useCallback((newStatus: string) => {
+    setStatusFilter(newStatus);
+    setCursor(null);
+  }, []);
+
+  const updateQuery = useCallback((newQuery: string) => {
+    setQuery(newQuery);
+    setCursor(null);
+  }, []);
 
   function handleNextPage() {
     if (!data?.meta?.nextCursor) return;
-    const p = new URLSearchParams(searchParams.toString());
-    p.set("after", data.meta.nextCursor);
-    if (!p.has("sourceType")) p.set("sourceType", activeTab);
-    window.location.href = `/wo/inbox?${p.toString()}`;
+    setCursor(data.meta.nextCursor);
   }
 
-  const activeStatuses = (searchParams.get("status") ?? "").split(",").filter(Boolean);
+  function handleFirstPage() {
+    setCursor(null);
+  }
+
+  const activeStatuses = statusFilter.split(",").filter(Boolean);
   function toggleStatus(status: string) {
     const current = new Set(activeStatuses);
     if (current.has(status)) current.delete(status);
     else current.add(status);
-    updateParam("status", Array.from(current).join(","));
+    updateStatusFilter(Array.from(current).join(","));
   }
 
   const tabInfo = TABS.find((t) => t.key === activeTab)!;
@@ -235,7 +246,7 @@ function InboxInner() {
             setSearchInput(e.target.value);
             clearTimeout((window as unknown as Record<string, ReturnType<typeof setTimeout>>).__inboxSearch);
             (window as unknown as Record<string, ReturnType<typeof setTimeout>>).__inboxSearch = setTimeout(
-              () => updateParam("q", e.target.value),
+              () => updateQuery(e.target.value),
               300
             );
           }}
@@ -339,11 +350,21 @@ function InboxInner() {
           {data.meta && (
             <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-xs text-gray-500">
               <span>Showing {data.rows.length} of {data.meta.total} work orders</span>
-              {data.meta.hasNextPage && (
-                <button onClick={handleNextPage} className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
-                  Next page
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {cursor && (
+                  <button
+                    onClick={handleFirstPage}
+                    className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    &larr; First page
+                  </button>
+                )}
+                {data.meta.hasNextPage && (
+                  <button onClick={handleNextPage} className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
+                    Next page &rarr;
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

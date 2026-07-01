@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/api/fetcher";
 
@@ -50,10 +49,28 @@ interface StaffOption {
   Name: string;
 }
 
-export default function WoFilterBar() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
+interface Filters {
+  status: string;
+  domain: string;
+  q: string;
+  assignedTo: string;
+  sourceType: string;
+  dueDateFrom: string;
+  dueDateTo: string;
+  sortBy: string;
+  sortDir: string;
+  limit: string;
+}
+
+interface Props {
+  filters: Filters;
+  onUpdateFilter: (key: keyof Filters, value: string) => void;
+  onUpdateFilters: (updates: Partial<Filters>) => void;
+  onClearAll: () => void;
+}
+
+export default function WoFilterBar({ filters, onUpdateFilter, onUpdateFilters, onClearAll }: Props) {
+  const [searchInput, setSearchInput] = useState(filters.q);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const { data: staffList } = useSWR<StaffOption[]>(
@@ -61,71 +78,44 @@ export default function WoFilterBar() {
     apiFetcher
   );
 
-  const activeStatuses = (searchParams.get("status") ?? "").split(",").filter(Boolean);
-  const activeDomain = searchParams.get("domain") ?? "";
-  const activeAssignee = searchParams.get("assignedTo") ?? "";
-  const activeSource = searchParams.get("sourceType") ?? "";
-  const activeDateFrom = searchParams.get("dueDateFrom") ?? "";
-  const activeDateTo = searchParams.get("dueDateTo") ?? "";
-  const currentSort = searchParams.get("sortBy") ?? "createdAt";
-  const currentDir = searchParams.get("sortDir") ?? "desc";
-  const currentLimit = searchParams.get("limit") ?? "25";
-  const sortValue = `${currentSort}:${currentDir}`;
+  const activeStatuses = filters.status.split(",").filter(Boolean);
+  const sortValue = `${filters.sortBy}:${filters.sortDir}`;
 
-  const hasFilters = activeStatuses.length > 0 || activeDomain || activeAssignee
-    || activeSource || activeDateFrom || activeDateTo || searchInput;
+  const hasFilters = activeStatuses.length > 0 || filters.domain || filters.assignedTo
+    || filters.sourceType || filters.dueDateFrom || filters.dueDateTo || filters.q;
 
   useEffect(() => {
-    if (activeAssignee || activeSource || activeDateFrom || activeDateTo) {
+    if (filters.assignedTo || filters.sourceType || filters.dueDateFrom || filters.dueDateTo) {
       setShowAdvanced(true);
     }
-  }, [activeAssignee, activeSource, activeDateFrom, activeDateTo]);
+  }, [filters.assignedTo, filters.sourceType, filters.dueDateFrom, filters.dueDateTo]);
 
-  const updateParam = useCallback(
-    (key: string, value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== filters.q) {
+        onUpdateFilter("q", searchInput);
       }
-      params.delete("after");
-      window.location.href = `/wo?${params.toString()}`;
-    },
-    [searchParams]
-  );
-
-  const updateParams = useCallback(
-    (updates: Record<string, string>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, value] of Object.entries(updates)) {
-        if (value) params.set(key, value);
-        else params.delete(key);
-      }
-      params.delete("after");
-      window.location.href = `/wo?${params.toString()}`;
-    },
-    [searchParams, router]
-  );
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, filters.q, onUpdateFilter]);
 
   function toggleStatus(status: string) {
     const current = new Set(activeStatuses);
     if (current.has(status)) current.delete(status);
     else current.add(status);
-    updateParam("status", Array.from(current).join(","));
+    onUpdateFilter("status", Array.from(current).join(","));
   }
 
   function handleSortChange(val: string) {
     const [sortBy, sortDir] = val.split(":");
-    updateParams({ sortBy, sortDir });
+    onUpdateFilters({ sortBy, sortDir });
   }
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      updateParam("q", searchInput);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchInput, updateParam]);
+  function handleClearAll() {
+    setSearchInput("");
+    onClearAll();
+  }
 
   return (
     <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
@@ -165,8 +155,8 @@ export default function WoFilterBar() {
         </div>
 
         <select
-          value={activeDomain}
-          onChange={(e) => updateParam("domain", e.target.value)}
+          value={filters.domain}
+          onChange={(e) => onUpdateFilter("domain", e.target.value)}
           className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700"
         >
           <option value="">All Domains</option>
@@ -186,8 +176,8 @@ export default function WoFilterBar() {
         </select>
 
         <select
-          value={currentLimit}
-          onChange={(e) => updateParam("limit", e.target.value)}
+          value={filters.limit}
+          onChange={(e) => onUpdateFilter("limit", e.target.value)}
           className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700"
         >
           {PAGE_SIZES.map((n) => (
@@ -208,7 +198,7 @@ export default function WoFilterBar() {
 
         {hasFilters && (
           <button
-            onClick={() => { window.location.href = "/wo"; }}
+            onClick={handleClearAll}
             className="text-xs text-red-500 hover:text-red-700 font-medium"
           >
             Clear all
@@ -220,8 +210,8 @@ export default function WoFilterBar() {
       {showAdvanced && (
         <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
           <select
-            value={activeSource}
-            onChange={(e) => updateParam("sourceType", e.target.value)}
+            value={filters.sourceType}
+            onChange={(e) => onUpdateFilter("sourceType", e.target.value)}
             className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700"
           >
             <option value="">All Sources</option>
@@ -231,8 +221,8 @@ export default function WoFilterBar() {
           </select>
 
           <select
-            value={activeAssignee}
-            onChange={(e) => updateParam("assignedTo", e.target.value)}
+            value={filters.assignedTo}
+            onChange={(e) => onUpdateFilter("assignedTo", e.target.value)}
             className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700"
           >
             <option value="">All Assignees</option>
@@ -246,16 +236,16 @@ export default function WoFilterBar() {
             <span className="text-xs text-gray-500">Due:</span>
             <input
               type="date"
-              value={activeDateFrom}
-              onChange={(e) => updateParam("dueDateFrom", e.target.value)}
+              value={filters.dueDateFrom}
+              onChange={(e) => onUpdateFilter("dueDateFrom", e.target.value)}
               className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
               placeholder="From"
             />
             <span className="text-xs text-gray-400">to</span>
             <input
               type="date"
-              value={activeDateTo}
-              onChange={(e) => updateParam("dueDateTo", e.target.value)}
+              value={filters.dueDateTo}
+              onChange={(e) => onUpdateFilter("dueDateTo", e.target.value)}
               className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
               placeholder="To"
             />

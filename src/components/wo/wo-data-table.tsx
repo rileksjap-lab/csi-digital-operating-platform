@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import WoStatusBadge from "@/components/wo/wo-status-badge";
 import WoPriorityBadge from "@/components/wo/wo-priority-badge";
 import WoSlaBadge from "@/components/wo/wo-sla-badge";
@@ -31,6 +30,12 @@ interface WoRow {
 interface Props {
   rows: WoRow[];
   meta: PaginationMeta | null;
+  cursor: string | null;
+  sortBy: string;
+  sortDir: string;
+  onSort: (key: string) => void;
+  onNextPage: () => void;
+  onFirstPage: () => void;
 }
 
 const COLUMNS = [
@@ -47,39 +52,7 @@ const COLUMNS = [
   { key: "createdAt", label: "Created", sortable: true },
 ];
 
-export default function WoDataTable({ rows, meta }: Props) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const currentSort = searchParams.get("sortBy") ?? "createdAt";
-  const currentDir = searchParams.get("sortDir") ?? "desc";
-
-  function handleSort(key: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (currentSort === key) {
-      params.set("sortDir", currentDir === "asc" ? "desc" : "asc");
-    } else {
-      params.set("sortBy", key);
-      params.set("sortDir", "asc");
-    }
-    params.delete("after");
-    router.push(`/wo?${params.toString()}`);
-  }
-
-  const hasCursor = searchParams.has("after");
-
-  function handleNextPage() {
-    if (!meta?.nextCursor) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("after", meta.nextCursor);
-    window.location.href = `/wo?${params.toString()}`;
-  }
-
-  function handleFirstPage() {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("after");
-    window.location.href = `/wo?${params.toString()}`;
-  }
-
+export default function WoDataTable({ rows, meta, cursor, sortBy, sortDir, onSort, onNextPage, onFirstPage }: Props) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
       <div className="overflow-x-auto">
@@ -92,13 +65,13 @@ export default function WoDataTable({ rows, meta }: Props) {
                   className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     col.sortable ? "cursor-pointer select-none hover:text-gray-700" : ""
                   }`}
-                  onClick={col.sortable ? () => handleSort(col.key) : undefined}
+                  onClick={col.sortable ? () => onSort(col.key) : undefined}
                 >
                   <span className="flex items-center gap-1">
                     {col.label}
-                    {col.sortable && currentSort === col.key && (
+                    {col.sortable && sortBy === col.key && (
                       <span className="text-primary-600">
-                        {currentDir === "asc" ? "↑" : "↓"}
+                        {sortDir === "asc" ? "↑" : "↓"}
                       </span>
                     )}
                   </span>
@@ -189,20 +162,20 @@ export default function WoDataTable({ rows, meta }: Props) {
             Showing {rows.length} of {meta.total} work orders
           </span>
           <div className="flex items-center gap-2">
-            {hasCursor && (
+            {cursor && (
               <button
-                onClick={handleFirstPage}
+                onClick={onFirstPage}
                 className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
               >
-                ← First page
+                &larr; First page
               </button>
             )}
             {meta.hasNextPage && (
               <button
-                onClick={handleNextPage}
+                onClick={onNextPage}
                 className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 transition-colors"
               >
-                Next page →
+                Next page &rarr;
               </button>
             )}
           </div>
