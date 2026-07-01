@@ -165,6 +165,19 @@ export default function WoDetailPage() {
     }
   }
 
+  async function handleCancel(reason: string) {
+    setActionError(null);
+    setActionLoading(true);
+    try {
+      await apiPost(`/api/wo/${id}/cancel`, { reason });
+      mutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -221,6 +234,9 @@ export default function WoDetailPage() {
             <ApproveButton onApprove={(reason) => handleApprove("Approved", reason)} disabled={actionLoading} />
             <ReturnButton onReturn={(reason) => handleApprove("Returned", reason)} disabled={actionLoading} />
           </>
+        )}
+        {canAssign && wo.status !== "Closed" && wo.status !== "Cancelled" && (
+          <CancelButton onCancel={handleCancel} disabled={actionLoading} />
         )}
       </div>
 
@@ -581,6 +597,60 @@ function ReturnButton({
         className="text-sm text-gray-500 hover:text-gray-700"
       >
         Cancel
+      </button>
+    </div>
+  );
+}
+
+function CancelButton({
+  onCancel,
+  disabled,
+}: {
+  onCancel: (reason: string) => void;
+  disabled: boolean;
+}) {
+  const [showReason, setShowReason] = useState(false);
+  const [reason, setReason] = useState("");
+
+  if (!showReason) {
+    return (
+      <button
+        onClick={() => setShowReason(true)}
+        disabled={disabled}
+        className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+      >
+        Cancel WO
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Cancellation reason (required)"
+        className="rounded border border-gray-300 px-2 py-1 text-sm"
+      />
+      <button
+        onClick={() => {
+          if (reason.trim()) {
+            onCancel(reason.trim());
+            setShowReason(false);
+            setReason("");
+          }
+        }}
+        disabled={disabled || !reason.trim()}
+        className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        Confirm Cancel
+      </button>
+      <button
+        onClick={() => { setShowReason(false); setReason(""); }}
+        className="text-sm text-gray-500 hover:text-gray-700"
+      >
+        Dismiss
       </button>
     </div>
   );

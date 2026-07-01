@@ -1376,6 +1376,62 @@ export async function updateWoTask(
   };
 }
 
+export async function cancelWorkOrder(
+  woId: string,
+  reason: string,
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<{ result: WoStatusUpdate | null; error?: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    let paramIdx = 2;
+    const sf = applyScopeFilter(scope, "w", paramIdx);
+    const woResult = await client.query(
+      `SELECT w.id, w.status FROM csi_wo w WHERE w.id = $1 ${sf.clause}`,
+      [woId, ...sf.params]
+    );
+    if (woResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { result: null };
+    }
+    const wo = woResult.rows[0];
+
+    if (wo.status === "Closed" || wo.status === "Cancelled") {
+      await client.query("ROLLBACK");
+      return { result: null, error: "INVALID_STATUS_TRANSITION" };
+    }
+
+    await client.query(
+      `UPDATE csi_wo SET status = 'Cancelled', updatedat = now() WHERE id = $1`,
+      [woId]
+    );
+
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: woId,
+        action: "Update",
+        fieldName: "Status",
+        oldValue: wo.status,
+        newValue: "Cancelled",
+        reason,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+    return { result: { id: woId, status: "Cancelled" } };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function deleteWoTask(taskId: string): Promise<boolean> {
   const result = await query(`DELETE FROM wo_task WHERE id = $1`, [taskId]);
   return (result.rowCount ?? 0) > 0;
