@@ -736,36 +736,19 @@ export async function createWorkOrder(
     );
     const wo = woResult.rows[0];
 
-    // 4. Auto-populate tender baseline tasks if request type is Tender/RFP
-    const rtResult = await client.query<{ TypeName: string }>(
-      `SELECT typename AS "TypeName" FROM request_type WHERE id = $1`,
+    // 4. Auto-populate tasks from task_template for this request type
+    const templates = await client.query<{ taskname: string; scope: string }>(
+      `SELECT taskname, scope FROM task_template
+       WHERE requesttypeid = $1 ORDER BY sortorder`,
       [input.requestTypeId]
     );
-    const typeName = rtResult.rows[0]?.TypeName ?? "";
-    if (typeName === "Tender / RFP") {
-      const baselineTasks = [
-        "Initial Review & Requirement Understanding",
-        "Solution Recommendation / Proposal Strategy",
-        "Product / Solution Definition",
-        "Culcu Fill-up for CMT Partner Request",
-        "Implementation Schedule / Gantt Chart",
-        "Project Team & Organisation Chart",
-        "Experience Profile / Track Record / Brochure",
-        "Risk Assessment",
-        "Partner / Vendor Quotation & Technical Confirmation",
-        "Bill of Materials",
-        "Compliance Matrix",
-        "Solution Architecture Diagram",
-        "Technical Proposal Write-up",
-        "Final Review & Submission",
-      ];
-      for (let i = 0; i < baselineTasks.length; i++) {
-        await client.query(
-          `INSERT INTO wo_task (csi_wo_id, taskno, description, scope)
-           VALUES ($1, $2, $3, 'Internal')`,
-          [wo.Id, i + 1, baselineTasks[i]]
-        );
-      }
+    for (let i = 0; i < templates.rows.length; i++) {
+      const t = templates.rows[i];
+      await client.query(
+        `INSERT INTO wo_task (csi_wo_id, taskno, description, scope)
+         VALUES ($1, $2, $3, $4)`,
+        [wo.Id, i + 1, t.taskname, t.scope]
+      );
     }
 
     // 5. Audit log

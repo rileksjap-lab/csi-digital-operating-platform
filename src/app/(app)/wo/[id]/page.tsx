@@ -308,24 +308,22 @@ export default function WoDetailPage() {
         </div>
       </div>
 
-      {/* Task Checklist — only for Tender / RFP work orders */}
-      {wo.requestType.typeName === "Tender / RFP" && (
-        <Section title="Task Checklist" count={wo.tasks.length}>
-          <WoTaskChecklist
-            woId={id}
-            tasks={wo.tasks}
-            canEdit={
-              wo.status !== "Closed" &&
-              !!(user && (ASSIGN_ROLES.includes(user.role as Role) || user.staffId === wo.assignedTo?.id))
-            }
-            canAddTask={
-              wo.status !== "Closed" &&
-              !!(user && (ASSIGN_ROLES.includes(user.role as Role) || user.staffId === wo.assignedTo?.id))
-            }
-            onSuccess={() => mutate()}
-          />
-        </Section>
-      )}
+      {/* Task Checklist */}
+      <Section title="Task Checklist" count={wo.tasks.length}>
+        <WoTaskChecklist
+          woId={id}
+          tasks={wo.tasks}
+          canEdit={
+            wo.status !== "Closed" && wo.status !== "Cancelled" &&
+            !!(user && (ASSIGN_ROLES.includes(user.role as Role) || user.staffId === wo.assignedTo?.id))
+          }
+          canAddTask={
+            wo.status !== "Closed" && wo.status !== "Cancelled" &&
+            !!(user && (ASSIGN_ROLES.includes(user.role as Role) || user.staffId === wo.assignedTo?.id))
+          }
+          onSuccess={() => mutate()}
+        />
+      </Section>
 
       {/* Assignment History */}
       <Section title="Assignment History" count={wo.assignmentHistory.length}>

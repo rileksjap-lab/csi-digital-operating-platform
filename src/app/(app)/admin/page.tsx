@@ -59,7 +59,7 @@ interface PendingStaff {
 
 type Section =
   | "pending-approvals" | "staff" | "roles" | "departments" | "permissions"
-  | "request-types" | "complexity-tiers" | "baseline-tiers" | "multiplier-factors"
+  | "request-types" | "task-templates" | "complexity-tiers" | "baseline-tiers" | "multiplier-factors"
   | "role-split" | "settings" | "audit-log";
 
 const SECTIONS: { key: Section; label: string; icon: string }[] = [
@@ -69,6 +69,7 @@ const SECTIONS: { key: Section; label: string; icon: string }[] = [
   { key: "departments", label: "Departments", icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" },
   { key: "permissions", label: "Role Permissions", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
   { key: "request-types", label: "Request Types & SLA", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+  { key: "task-templates", label: "Task Templates", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
   { key: "complexity-tiers", label: "Complexity Tiers", icon: "M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" },
   { key: "baseline-tiers", label: "Baseline Tiers", icon: "M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16" },
   { key: "multiplier-factors", label: "Multiplier Factors", icon: "M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" },
@@ -163,6 +164,7 @@ export default function AdminPage() {
           {section === "departments" && <DepartmentsPanel />}
           {section === "permissions" && <PermissionsPanel />}
           {section === "request-types" && <RequestTypesPanel />}
+          {section === "task-templates" && <TaskTemplatesPanel />}
           {section === "complexity-tiers" && <ComplexityTiersPanel />}
           {section === "baseline-tiers" && <BaselineTiersPanel />}
           {section === "multiplier-factors" && <MultiplierFactorsPanel />}
@@ -1112,6 +1114,172 @@ function AuditLogPanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Task Templates Panel ─────────────────────────────────────────────────
+
+interface TaskTemplate {
+  id: string; requestTypeId: string; requestTypeName: string;
+  taskName: string; scope: string; sortOrder: number;
+}
+
+function TaskTemplatesPanel() {
+  const { data: requestTypes } = useSWR<RequestType[]>("/api/admin/request-types", apiFetcher);
+  const [selectedRt, setSelectedRt] = useState<string>("");
+  const apiUrl = selectedRt
+    ? `/api/admin/task-templates?requestTypeId=${selectedRt}`
+    : "/api/admin/task-templates";
+  const { data: templates, error, isLoading, mutate } = useSWR<TaskTemplate[]>(apiUrl, apiFetcher);
+  const [newTask, setNewTask] = useState("");
+  const [newScope, setNewScope] = useState("Internal");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function handleAdd() {
+    if (!selectedRt || !newTask.trim()) return;
+    setSaving(true);
+    try {
+      await fetch("/api/admin/task-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestTypeId: selectedRt, taskName: newTask.trim(), scope: newScope }),
+      });
+      setNewTask("");
+      mutate();
+    } catch { /* ignore */ } finally { setSaving(false); }
+  }
+
+  async function handleDelete(id: string) {
+    await fetch("/api/admin/task-templates", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    mutate();
+  }
+
+  async function handleUpdate(id: string) {
+    if (!editName.trim()) return;
+    setSaving(true);
+    try {
+      await fetch("/api/admin/task-templates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, taskName: editName.trim() }),
+      });
+      setEditingId(null);
+      mutate();
+    } catch { /* ignore */ } finally { setSaving(false); }
+  }
+
+  const grouped = (templates ?? []).reduce<Record<string, TaskTemplate[]>>((acc, t) => {
+    const key = t.requestTypeName;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      <SectionHeader
+        title="Task Templates"
+        description="Default checklist tasks auto-added when a new WO is created for each request type"
+      />
+      <div className="p-4 space-y-4">
+        {/* Request type filter */}
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-gray-600">Request Type:</label>
+          <select
+            value={selectedRt}
+            onChange={(e) => setSelectedRt(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1.5 text-sm flex-1 max-w-xs"
+          >
+            <option value="">All Request Types</option>
+            {(requestTypes ?? []).map((rt) => (
+              <option key={rt.id} value={rt.id}>{rt.typeName} ({rt.domain})</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Add new template */}
+        {selectedRt && (
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <input
+              type="text"
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              placeholder="New task name..."
+              className="flex-1 rounded border border-gray-300 px-2.5 py-1.5 text-sm"
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            />
+            <select
+              value={newScope}
+              onChange={(e) => setNewScope(e.target.value)}
+              className="rounded border border-gray-300 px-2 py-1.5 text-xs"
+            >
+              <option value="Internal">Internal</option>
+              <option value="External">External</option>
+            </select>
+            <button
+              onClick={handleAdd}
+              disabled={saving || !newTask.trim()}
+              className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              + Add
+            </button>
+          </div>
+        )}
+
+        {isLoading && <Spinner />}
+        {error && <ErrorBox message="Failed to load task templates" />}
+
+        {/* Template list */}
+        {!isLoading && Object.keys(grouped).length === 0 && (
+          <div className="text-center py-8 text-sm text-gray-400">
+            {selectedRt ? "No templates for this request type. Add one above." : "No task templates configured yet. Select a request type to start."}
+          </div>
+        )}
+
+        {Object.entries(grouped).map(([typeName, tasks]) => (
+          <div key={typeName} className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700">{typeName}</h3>
+              <p className="text-xs text-gray-400">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {tasks.map((t, idx) => (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50">
+                  <span className="text-xs text-gray-400 w-6 text-right">{idx + 1}.</span>
+                  {editingId === t.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+                        onKeyDown={(e) => e.key === "Enter" && handleUpdate(t.id)}
+                        autoFocus
+                      />
+                      <button onClick={() => handleUpdate(t.id)} disabled={saving} className="text-xs text-primary-600 hover:text-primary-700 font-medium">Save</button>
+                      <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm text-gray-700">{t.taskName}</span>
+                      <Badge className="bg-gray-100 text-gray-600">{t.scope}</Badge>
+                      <button onClick={() => { setEditingId(t.id); setEditName(t.taskName); }} className="text-xs text-gray-400 hover:text-primary-600">Edit</button>
+                      <button onClick={() => handleDelete(t.id)} className="text-xs text-gray-400 hover:text-red-600">Delete</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
