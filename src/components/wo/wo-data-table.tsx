@@ -71,13 +71,13 @@ export default function WoDataTable({ rows, meta }: Props) {
     if (!meta?.nextCursor) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("after", meta.nextCursor);
-    router.push(`/wo?${params.toString()}`);
+    window.location.href = `/wo?${params.toString()}`;
   }
 
   function handleFirstPage() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("after");
-    router.push(`/wo?${params.toString()}`);
+    window.location.href = `/wo?${params.toString()}`;
   }
 
   return (
