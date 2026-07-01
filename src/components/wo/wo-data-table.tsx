@@ -62,14 +62,22 @@ export default function WoDataTable({ rows, meta }: Props) {
       params.set("sortDir", "asc");
     }
     params.delete("after");
-    router.replace(`?${params.toString()}`);
+    router.push(`/wo?${params.toString()}`);
   }
+
+  const hasCursor = searchParams.has("after");
 
   function handleNextPage() {
     if (!meta?.nextCursor) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("after", meta.nextCursor);
-    router.replace(`?${params.toString()}`);
+    router.push(`/wo?${params.toString()}`);
+  }
+
+  function handleFirstPage() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("after");
+    router.push(`/wo?${params.toString()}`);
   }
 
   return (
@@ -180,14 +188,24 @@ export default function WoDataTable({ rows, meta }: Props) {
           <span>
             Showing {rows.length} of {meta.total} work orders
           </span>
-          {meta.hasNextPage && (
-            <button
-              onClick={handleNextPage}
-              className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 transition-colors"
-            >
-              Next page
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {hasCursor && (
+              <button
+                onClick={handleFirstPage}
+                className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                ← First page
+              </button>
+            )}
+            {meta.hasNextPage && (
+              <button
+                onClick={handleNextPage}
+                className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 transition-colors"
+              >
+                Next page →
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
