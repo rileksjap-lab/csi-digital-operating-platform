@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
 import { useSearchParams } from "next/navigation";
@@ -84,15 +84,30 @@ function InboxInner() {
     }
   }
 
-  // Build API URL from state (not URL params)
-  const apiUrl = (() => {
+  // Build query params from state
+  const buildParams = useCallback(() => {
     const p = new URLSearchParams();
     p.set("sourceType", activeTab);
-    p.set("sortBy", "createdAt");
-    p.set("sortDir", "desc");
     if (statusFilter) p.set("status", statusFilter);
     if (query) p.set("q", query);
     if (cursor) p.set("after", cursor);
+    return p;
+  }, [activeTab, statusFilter, query, cursor]);
+
+  // Sync URL bar so refresh preserves state
+  useEffect(() => {
+    const p = buildParams();
+    const qs = p.toString();
+    const newUrl = qs ? `/wo/inbox?${qs}` : "/wo/inbox";
+    if (newUrl !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, [buildParams]);
+
+  const apiUrl = (() => {
+    const p = buildParams();
+    p.set("sortBy", "createdAt");
+    p.set("sortDir", "desc");
     return `/api/wo?${p.toString()}`;
   })();
 

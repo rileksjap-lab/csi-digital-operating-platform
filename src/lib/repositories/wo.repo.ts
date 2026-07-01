@@ -151,7 +151,7 @@ export async function listWorkOrders(
     }
   }
 
-  // Cursor
+  // Cursor — kept separate so the count query excludes it
   const sortCol = SORT_MAP[filters.sortBy] ?? "w.createdat";
   const cursor = filters.after ? decodeCursor(filters.after) : null;
   const cursorWhere = buildCursorWhere(
@@ -160,15 +160,25 @@ export async function listWorkOrders(
     filters.sortDir,
     paramIdx
   );
-  if (cursorWhere.clause) {
-    wheres.push(cursorWhere.clause);
+
+  // filterWhereStr: no cursor (for count — total across all pages)
+  const filterWhereStr = wheres.join("\n      ");
+  // dataWhereStr: includes cursor (for current page)
+  const dataWhereStr = cursorWhere.clause
+    ? [...wheres, cursorWhere.clause].join("\n      ")
+    : filterWhereStr;
+
+  const dir = filters.sortDir;
+  const limitPlus1 = filters.limit + 1;
+
+  // Count params: only filter params (no cursor, no limit)
+  const countParams = [...params];
+
+  // Add cursor params for the data query
+  if (cursorWhere.params.length) {
     params.push(...cursorWhere.params);
     paramIdx += cursorWhere.params.length;
   }
-
-  const whereStr = wheres.join("\n      ");
-  const dir = filters.sortDir;
-  const limitPlus1 = filters.limit + 1;
 
   const dataQuery = `
     SELECT
@@ -190,7 +200,7 @@ export async function listWorkOrders(
     LEFT JOIN staff sa ON sa.id = w.assignedto
     LEFT JOIN tender t ON t.id = w.tenderid
     WHERE 1=1
-      ${whereStr}
+      ${dataWhereStr}
     ORDER BY ${sortCol} ${dir}, w.id ${dir}
     LIMIT $${paramIdx}`;
 
@@ -205,13 +215,7 @@ export async function listWorkOrders(
     LEFT JOIN staff sa ON sa.id = w.assignedto
     LEFT JOIN tender t ON t.id = w.tenderid
     WHERE 1=1
-      ${whereStr}`;
-
-  // Count query uses the same params minus the limit and cursor params
-  const countParams = params.slice(
-    0,
-    params.length - 1 - cursorWhere.params.length
-  );
+      ${filterWhereStr}`;
 
   const [dataResult, countResult] = await Promise.all([
     query(dataQuery, params),

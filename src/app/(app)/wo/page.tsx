@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
@@ -49,7 +49,8 @@ function WoListInner() {
   });
   const [cursor, setCursor] = useState<string | null>(searchParams.get("after"));
 
-  const apiUrl = (() => {
+  // Build query params from state
+  const buildParams = useCallback(() => {
     const p = new URLSearchParams();
     if (filters.status) p.set("status", filters.status);
     if (filters.domain) p.set("domain", filters.domain);
@@ -62,8 +63,20 @@ function WoListInner() {
     p.set("sortDir", filters.sortDir);
     p.set("limit", filters.limit);
     if (cursor) p.set("after", cursor);
-    return `/api/wo?${p.toString()}`;
-  })();
+    return p;
+  }, [filters, cursor]);
+
+  // Sync URL bar so refresh preserves state
+  useEffect(() => {
+    const p = buildParams();
+    const qs = p.toString();
+    const newUrl = qs ? `/wo?${qs}` : "/wo";
+    if (newUrl !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, [buildParams]);
+
+  const apiUrl = `/api/wo?${buildParams().toString()}`;
 
   const { data, error, isLoading } = useSWR(apiUrl, async (url: string) => {
     const res = await fetch(url);
