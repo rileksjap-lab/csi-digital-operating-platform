@@ -254,6 +254,40 @@ function sortColKey(sortBy: string): string {
   return map[sortBy] ?? "CreatedAt";
 }
 
+function addWorkingDays(start: Date, days: number): Date {
+  const result = new Date(start);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return result;
+}
+
+function countWorkingDays(from: Date, to: Date): number {
+  const startDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const endDate = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  if (startDate >= endDate) {
+    let count = 0;
+    const cursor = new Date(endDate);
+    while (cursor < startDate) {
+      const dow = cursor.getDay();
+      if (dow !== 0 && dow !== 6) count--;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return count;
+  }
+  let count = 0;
+  const cursor = new Date(startDate);
+  while (cursor < endDate) {
+    cursor.setDate(cursor.getDate() + 1);
+    const dow = cursor.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
+
 function computeSla(
   createdAt: unknown,
   slaTotalDays: unknown,
@@ -264,12 +298,13 @@ function computeSla(
   if (!total || isNaN(total)) return { slaDaysRemaining: null, slaStatus: null };
 
   const created = new Date(String(createdAt));
-  const deadline = new Date(created);
-  deadline.setDate(deadline.getDate() + total);
+  const deadline = addWorkingDays(created, total);
 
   const now = new Date();
-  const diffMs = deadline.getTime() - now.getTime();
-  const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+
+  const daysRemaining = countWorkingDays(today, deadlineDate);
 
   let slaStatus: SlaStatus;
   if (daysRemaining < 0) slaStatus = "Breached";
@@ -281,7 +316,8 @@ function computeSla(
 
 function mapWoListItem(row: Record<string, unknown>): WoListItem {
   const status = row.Status as string;
-  const { slaDaysRemaining, slaStatus } = computeSla(row.CreatedAt, row.SlaTotalDays, status);
+  const slaDays = row.SLAWorkingDays ?? row.SlaTotalDays;
+  const { slaDaysRemaining, slaStatus } = computeSla(row.CreatedAt, slaDays, status);
 
   return {
     id: row.Id as string,
@@ -563,7 +599,7 @@ export async function getWorkOrderById(
     taskScore: r.TaskScore != null ? parseFloat(String(r.TaskScore)) : null,
     slaWorkingDays: r.SLAWorkingDays != null ? Number(r.SLAWorkingDays) : null,
     dueDate: r.DueDate ? String(r.DueDate) : null,
-    ...computeSla(r.CreatedAt, r.SlaTotalDays, r.Status as string),
+    ...computeSla(r.CreatedAt, r.SLAWorkingDays ?? r.SlaTotalDays, r.Status as string),
     status: r.Status as string,
     remark: (r.Remark as string) ?? null,
     monitoringStaff: r.MonitorId
