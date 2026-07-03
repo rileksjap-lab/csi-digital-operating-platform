@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/api/fetcher";
 
@@ -139,7 +140,12 @@ export default function ProfilePage() {
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs text-gray-400">Total Effort Logged</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">{profile.effortSummary.totalHours.toFixed(1)}h</p>
-          <p className="text-xs text-gray-400">{profile.effortSummary.totalEntries} entries</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400">{profile.effortSummary.totalEntries} entries</p>
+            <Link href="/profile/effort-log" className="text-xs font-medium text-primary-600 hover:underline">
+              View all &rarr;
+            </Link>
+          </div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs text-gray-400">Skills</p>
