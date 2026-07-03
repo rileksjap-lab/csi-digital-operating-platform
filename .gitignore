@@ -38,3 +38,6 @@ uploads/
 *.tsbuildinfo
 next-env.d.ts
 docs/unpacked_review/
+
+# Word lock files
+~$*.docx
