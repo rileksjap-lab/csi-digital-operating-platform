@@ -48,6 +48,7 @@ function WoListInner() {
     limit: searchParams.get("limit") ?? "25",
   });
   const [cursor, setCursor] = useState<string | null>(searchParams.get("after"));
+  const [pageOffset, setPageOffset] = useState(0);
 
   // Build query params from state
   const buildParams = useCallback(() => {
@@ -92,11 +93,13 @@ function WoListInner() {
   const updateFilter = useCallback((key: keyof Filters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setCursor(null);
+    setPageOffset(0);
   }, []);
 
   const updateFilters = useCallback((updates: Partial<Filters>) => {
     setFilters((prev) => ({ ...prev, ...updates }));
     setCursor(null);
+    setPageOffset(0);
   }, []);
 
   const clearAll = useCallback(() => {
@@ -106,14 +109,19 @@ function WoListInner() {
       sortBy: "createdAt", sortDir: "desc", limit: "25",
     });
     setCursor(null);
+    setPageOffset(0);
   }, []);
 
   const handleNextPage = useCallback(() => {
-    if (data?.meta?.nextCursor) setCursor(data.meta.nextCursor);
-  }, [data?.meta?.nextCursor]);
+    if (data?.meta?.nextCursor) {
+      setCursor(data.meta.nextCursor);
+      setPageOffset((prev) => prev + (data.rows?.length ?? 0));
+    }
+  }, [data?.meta?.nextCursor, data?.rows?.length]);
 
   const handleFirstPage = useCallback(() => {
     setCursor(null);
+    setPageOffset(0);
   }, []);
 
   const handleSort = useCallback((key: string) => {
@@ -124,6 +132,7 @@ function WoListInner() {
       return { ...prev, sortBy: key, sortDir: "asc" };
     });
     setCursor(null);
+    setPageOffset(0);
   }, []);
 
   return (
@@ -164,6 +173,7 @@ function WoListInner() {
           rows={data.rows as Parameters<typeof WoDataTable>[0]["rows"]}
           meta={data.meta}
           cursor={cursor}
+          pageOffset={pageOffset}
           sortBy={filters.sortBy}
           sortDir={filters.sortDir}
           onSort={handleSort}

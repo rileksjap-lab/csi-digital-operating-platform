@@ -60,6 +60,7 @@ function InboxInner() {
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
   const [cursor, setCursor] = useState<string | null>(searchParams.get("after"));
+  const [pageOffset, setPageOffset] = useState(0);
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
@@ -128,25 +129,30 @@ function InboxInner() {
     setQuery("");
     setSearchInput("");
     setCursor(null);
+    setPageOffset(0);
   }
 
   const updateStatusFilter = useCallback((newStatus: string) => {
     setStatusFilter(newStatus);
     setCursor(null);
+    setPageOffset(0);
   }, []);
 
   const updateQuery = useCallback((newQuery: string) => {
     setQuery(newQuery);
     setCursor(null);
+    setPageOffset(0);
   }, []);
 
   function handleNextPage() {
     if (!data?.meta?.nextCursor) return;
     setCursor(data.meta.nextCursor);
+    setPageOffset((prev) => prev + (data?.rows?.length ?? 0));
   }
 
   function handleFirstPage() {
     setCursor(null);
+    setPageOffset(0);
   }
 
   const activeStatuses = statusFilter.split(",").filter(Boolean);
@@ -364,7 +370,11 @@ function InboxInner() {
 
           {data.meta && (
             <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-xs text-gray-500">
-              <span>Showing {data.rows.length} of {data.meta.total} work orders</span>
+              <span>
+                {data.rows.length > 0
+                  ? `Showing ${pageOffset + 1}-${pageOffset + data.rows.length} of ${data.meta.total} work orders`
+                  : `Showing 0 of ${data.meta.total} work orders`}
+              </span>
               <div className="flex items-center gap-2">
                 {cursor && (
                   <button

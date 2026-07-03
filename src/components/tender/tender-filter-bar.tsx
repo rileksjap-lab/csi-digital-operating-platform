@@ -53,6 +53,7 @@ export default function TenderFilterBar() {
         params.delete(key);
       }
       params.delete("after");
+      params.delete("offset");
       router.replace(`?${params.toString()}`);
     },
     [searchParams, router]

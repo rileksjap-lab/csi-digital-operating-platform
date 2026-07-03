@@ -31,6 +31,7 @@ interface Props {
   rows: WoRow[];
   meta: PaginationMeta | null;
   cursor: string | null;
+  pageOffset: number;
   sortBy: string;
   sortDir: string;
   onSort: (key: string) => void;
@@ -52,7 +53,7 @@ const COLUMNS = [
   { key: "createdAt", label: "Created", sortable: true },
 ];
 
-export default function WoDataTable({ rows, meta, cursor, sortBy, sortDir, onSort, onNextPage, onFirstPage }: Props) {
+export default function WoDataTable({ rows, meta, cursor, pageOffset, sortBy, sortDir, onSort, onNextPage, onFirstPage }: Props) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
       <div className="overflow-x-auto">
@@ -159,7 +160,9 @@ export default function WoDataTable({ rows, meta, cursor, sortBy, sortDir, onSor
       {meta && (
         <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-xs text-gray-500">
           <span>
-            Showing {rows.length} of {meta.total} work orders
+            {rows.length > 0
+              ? `Showing ${pageOffset + 1}-${pageOffset + rows.length} of ${meta.total} work orders`
+              : `Showing 0 of ${meta.total} work orders`}
           </span>
           <div className="flex items-center gap-2">
             {cursor && (

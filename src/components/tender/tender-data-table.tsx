@@ -49,6 +49,8 @@ export default function TenderDataTable({ rows, meta }: Props) {
   const currentSort = searchParams.get("sortBy") ?? "createdAt";
   const currentDir = searchParams.get("sortDir") ?? "desc";
 
+  const pageOffset = parseInt(searchParams.get("offset") ?? "0", 10) || 0;
+
   function handleSort(key: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (currentSort === key) {
@@ -58,6 +60,7 @@ export default function TenderDataTable({ rows, meta }: Props) {
       params.set("sortDir", "asc");
     }
     params.delete("after");
+    params.delete("offset");
     router.replace(`?${params.toString()}`);
   }
 
@@ -65,6 +68,7 @@ export default function TenderDataTable({ rows, meta }: Props) {
     if (!meta?.nextCursor) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("after", meta.nextCursor);
+    params.set("offset", String(pageOffset + rows.length));
     router.replace(`?${params.toString()}`);
   }
 
@@ -158,7 +162,9 @@ export default function TenderDataTable({ rows, meta }: Props) {
       {meta && (
         <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-xs text-gray-500">
           <span>
-            Showing {rows.length} of {meta.total} tenders
+            {rows.length > 0
+              ? `Showing ${pageOffset + 1}-${pageOffset + rows.length} of ${meta.total} tenders`
+              : `Showing 0 of ${meta.total} tenders`}
           </span>
           {meta.hasNextPage && (
             <button
