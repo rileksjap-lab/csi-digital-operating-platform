@@ -1456,7 +1456,53 @@ export async function cancelWorkOrder(
   }
 }
 
-export async function deleteWoTask(taskId: string): Promise<boolean> {
-  const result = await query(`DELETE FROM wo_task WHERE id = $1`, [taskId]);
-  return (result.rowCount ?? 0) > 0;
+export async function deleteWoTask(
+  taskId: string,
+  session: AuthSession
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const taskRes = await client.query(
+      `SELECT id, csi_wo_id AS "csiWoId", taskno AS "taskNo", description,
+              assignedto AS "assignedTo", progress, scope, status
+       FROM wo_task WHERE id = $1`,
+      [taskId]
+    );
+    if (taskRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+    const task = taskRes.rows[0];
+
+    const result = await client.query(`DELETE FROM wo_task WHERE id = $1`, [taskId]);
+
+    await insertAuditEntry(
+      {
+        entityName: "WO_TASK",
+        entityId: taskId,
+        action: "Delete",
+        oldValue: JSON.stringify({
+          woId: task.csiWoId,
+          taskNo: task.taskNo,
+          description: task.description,
+          assignedTo: task.assignedTo,
+          progress: task.progress,
+          scope: task.scope,
+          status: task.status,
+        }),
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+    return (result.rowCount ?? 0) > 0;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }

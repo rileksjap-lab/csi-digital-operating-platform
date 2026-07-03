@@ -32,10 +32,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
   try {
-    await requireAuth(request);
+    const session = await requireAuth(request);
     const { taskId } = await params;
 
-    const deleted = await deleteWoTask(taskId);
+    const deleted = await deleteWoTask(taskId, session);
     if (!deleted) return notFound("Task not found");
     return ok({ deleted: true });
   } catch (err) {
