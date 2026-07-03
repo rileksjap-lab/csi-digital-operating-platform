@@ -379,6 +379,74 @@ export async function patchEffortEntry(
   }
 }
 
+// ─── Delete (same rules as patch: own-entry+same-day, HOD/SM any entry) ────
+
+export async function deleteEffortEntry(
+  entryId: string,
+  session: AuthSession
+): Promise<{ error?: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const entryRes = await client.query(
+      `SELECT e.id AS "Id", e.staffid AS "StaffId", e.logdate AS "LogDate",
+              e.hours AS "Hours", e.notes AS "Notes"
+       FROM effort_log e
+       WHERE e.id = $1`,
+      [entryId]
+    );
+    if (entryRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { error: "NOT_FOUND" };
+    }
+    const entry = entryRes.rows[0];
+
+    const isLeadRole = ["HOD", "SolutionManager"].includes(session.role);
+
+    // Must be the staff who created the entry (unless HOD/SM)
+    if (!isLeadRole && entry.StaffId !== session.staffId) {
+      await client.query("ROLLBACK");
+      return { error: "NOT_OWN_ENTRY" };
+    }
+
+    // Same-day deletes only (unless HOD/SM)
+    if (!isLeadRole) {
+      const today = new Date().toISOString().slice(0, 10);
+      const logDateStr = String(entry.LogDate).slice(0, 10);
+      if (logDateStr !== today) {
+        await client.query("ROLLBACK");
+        return { error: "NOT_SAME_DAY" };
+      }
+    }
+
+    // Partitioned table: need logdate in WHERE for partition pruning
+    await client.query(
+      `DELETE FROM effort_log WHERE id = $1 AND logdate = $2`,
+      [entryId, entry.LogDate]
+    );
+
+    await insertAuditEntry(
+      {
+        entityName: "EFFORT_LOG",
+        entityId: entryId,
+        action: "Delete",
+        oldValue: JSON.stringify({ hours: parseFloat(String(entry.Hours)), notes: entry.Notes }),
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+    return {};
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 function mapEffortRow(r: Record<string, unknown>): EffortListItem {
   return {
     id: r.Id as string,

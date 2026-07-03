@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { apiFetcher, apiPost, apiPatch } from "@/lib/api/fetcher";
+import { apiFetcher, apiPost, apiPatch, apiDelete } from "@/lib/api/fetcher";
 
 interface StaffOption {
   Id: string;
@@ -50,6 +50,7 @@ export default function WoEffortForm({
   const [editHours, setEditHours] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const canLog = isAssignee || isLead;
   const { data: staffList } = useSWR<StaffOption[]>(
@@ -112,6 +113,19 @@ export default function WoEffortForm({
     const entryDate = entry.logDate.slice(0, 10);
     return entryDate === today;
   };
+
+  async function handleDelete(entryId: string) {
+    if (!window.confirm("Delete this effort entry? This cannot be undone.")) return;
+    setDeletingId(entryId);
+    try {
+      await apiDelete(`/api/effort/${entryId}`);
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div>
@@ -252,14 +266,23 @@ export default function WoEffortForm({
                   <>
                     <td className="px-4 py-2 text-right tabular-nums">{e.hours}</td>
                     <td className="px-4 py-2 text-gray-500 text-xs">{e.notes ?? "—"}</td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
                       {canEditEntry(e) && (
-                        <button
-                          onClick={() => startEdit(e)}
-                          className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                        >
-                          Edit
-                        </button>
+                        <>
+                          <button
+                            onClick={() => startEdit(e)}
+                            className="text-xs text-primary-600 hover:text-primary-700 font-medium mr-3"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(e.id)}
+                            disabled={deletingId === e.id}
+                            className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+                          >
+                            {deletingId === e.id ? "Deleting..." : "Delete"}
+                          </button>
+                        </>
                       )}
                     </td>
                   </>

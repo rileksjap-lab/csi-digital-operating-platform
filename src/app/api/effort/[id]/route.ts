@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { requireAuth, requireRole } from "@/lib/auth/guards";
-import { ok, badRequest, notFound, zodError, internalError } from "@/lib/response";
-import { patchEffortEntry } from "@/lib/repositories/effort.repo";
+import { ok, badRequest, notFound, zodError, internalError, noContent } from "@/lib/response";
+import { patchEffortEntry, deleteEffortEntry } from "@/lib/repositories/effort.repo";
 import { effortPatchSchema } from "@/lib/validations/wo.schema";
 
 export async function PATCH(
@@ -36,6 +36,34 @@ export async function PATCH(
     if (err instanceof Response) return err;
     const reqId = request.headers.get("x-request-id") ?? "unknown";
     console.error("[effort/:id] PATCH error", err);
+    return internalError(reqId);
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await requireAuth(request);
+    requireRole(session, "HOD", "SolutionManager", "TeamLead", "BIMTeamLead", "TeamMember", "BIMModeler");
+
+    const { id } = await params;
+    const { error } = await deleteEffortEntry(id, session);
+
+    if (error === "NOT_FOUND") return notFound("Effort entry not found");
+    if (error === "NOT_OWN_ENTRY") {
+      return badRequest("You can only delete your own effort entries");
+    }
+    if (error === "NOT_SAME_DAY") {
+      return badRequest("Effort entries can only be deleted on the same day they were logged");
+    }
+
+    return noContent();
+  } catch (err) {
+    if (err instanceof Response) return err;
+    const reqId = request.headers.get("x-request-id") ?? "unknown";
+    console.error("[effort/:id] DELETE error", err);
     return internalError(reqId);
   }
 }
