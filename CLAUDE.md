@@ -44,19 +44,35 @@ builds on the last and is the authoritative source for its domain:
 
 ## What's Already Built
 
-- **`/migrations`** — 13 PostgreSQL migrations + 2 seed scripts, all
-  individually tested against a live PostgreSQL 16 instance. Run
-  `./migrations/run_all.sh <dbname>` to stand up the full schema. See
-  `migrations/README.md` for what was tested and two real bugs that were
-  found and fixed (partitioned-table primary keys, and an audit-log
-  immutability gap on new partitions — both documented inline).
-- **`/prototype`** — A high-fidelity, clickable frontend-only prototype
-  (`CSI_Digital_Operating_Platform_Prototype.jsx` / `.html`) covering 14 of
-  the 19 screens, with realistic sample data matching the documented domain
-  (work orders, tenders, staff, certifications). React + Tailwind + Chart.js,
-  no backend. Treat this as a visual/UX reference when building the real
-  screens, not as production code to import directly — it uses local mock
-  state, not real API calls.
+- **`/migrations`** — 30 PostgreSQL migrations + seed scripts, tested against
+  a live PostgreSQL 16 instance. Run `./migrations/run_all.sh <dbname>` to
+  stand up the full schema. See `migrations/README.md` for what was tested.
+  Beyond the original 25-table spec, later migrations added: OTP/registration,
+  notifications, WO discussion threads, announcements, task templates, role
+  permissions, and misc data fixes (department names, usable hours, etc.).
+- **`/prototype`** — The original frontend-only clickable prototype. Superseded
+  by the real app in `/src`; kept for historical UX reference only.
+- **`/src`** — The real Next.js application (see below).
+- **`/worker`** — FastAPI compute worker scaffold (capacity/tender scoring).
+
+### Application modules (in `/src/app`)
+
+- **Auth** — SSO login (dev bypass when OIDC unconfigured), self-registration
+  with admin approval + OTP verification
+- **Work Orders** — inbox (external/internal tabs), list, detail, create,
+  assign, effort logging, evidence upload (soft-delete), approvals, cancel,
+  discussion threads w/ @mentions, email digest, progress view, task
+  templates per request type
+- **Tenders** — pipeline list/detail/create
+- **Capacity** — workload summaries, per-staff capacity view
+- **KPI**, **Skills** (certifications/assessments/training), **Calendar**,
+  **Announcements**, **Notifications**, **Reports**, **Profile**
+- **Admin** — departments, roles, permissions, role-split, complexity tiers,
+  multiplier factors, request types, task templates, pending-staff approval,
+  audit log viewer
+
+Remaining wireframe screens and FRs not yet built should be checked against
+`UIUX_Wireframe_Spec.docx` and `PRD.docx` rather than assumed complete.
 
 ## Tech Stack (per SAD §3, §16.1)
 
@@ -93,9 +109,31 @@ don't silently deviate from them:
 - **A capacity Go/No-Go override is HOD-only and requires a logged reason**
   — both must be present together or neither (see the CHECK constraint on
   `GONOGO_EVALUATION` in migration 007).
+- **CSIDOP is multi-department**: CSI now, CMT later. Sidebar/modules are
+  fully department-scoped (not the same menu with filtered data). Shared
+  modules: Tender Pipeline view, Go/No-Go, Executive Dashboard. Build
+  CSI-only modules first (CSI WOs, CSI Capacity, Skills & Cert, KPI &
+  Evidence); CMT modules (Tender Intake, Commercial/Pricing, Submission
+  Tracking) come later.
+- **Tender ownership is split**: CMT owns intake/commercial/submission; CSI
+  owns technical (solution design, effort, technical writeup). Go/No-Go is
+  decided by a joint committee (HOD CSI + HOD CMT). CSI's Tender module
+  should stay read-only pipeline view + Go/No-Go record + link to WO — don't
+  build tender create/edit for CSI users.
+- **Work orders originate in EWM** (org-wide Extended Work Management
+  system used by all departments), not in CSIDOP. Two WO types: **External**
+  (from EWM, has an External WO Number — currently registered manually,
+  EWM API sync pending) and **Internal** (created directly in CSIDOP by CSI
+  HOD/Manager for internal initiatives/R&D/training — the WO create form
+  is a permanent feature for this, not a placeholder).
 
 ## Current Phase
 
-Migrations are built and tested. Next step is scaffolding the actual Next.js
-+ FastAPI application against this schema and the API Specification.
-No application code exists yet — this is a clean start on the codebase.
+Application scaffolding is done and under active development. Auth, Work
+Orders (the core module), Tenders, Capacity, KPI, Skills, Calendar,
+Announcements, Notifications, Reports, Profile, and Admin all have working
+frontend + API + DB layers. Recent work has focused on WO pagination, SLA
+calculation correctness, evidence upload, and UI polish (login page
+redesign). Treat this as an actively evolving app, not a clean-start
+scaffold — check `/src/app` directly for what exists before assuming a
+screen or endpoint is missing.
