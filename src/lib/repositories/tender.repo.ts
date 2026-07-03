@@ -5,6 +5,7 @@ import {
   encodeCursor,
   decodeCursor,
   buildCursorWhere,
+  cursorValue,
 } from "@/lib/db/repo-utils";
 import { insertAuditEntry } from "@/lib/db/audit";
 
@@ -155,9 +156,7 @@ export async function listTenders(
     hasNextPage && lastRow
       ? encodeCursor(
           lastRow.Id as string,
-          String(
-            lastRow[sortColKey(filters.sortBy)] ?? lastRow.CreatedAt
-          )
+          cursorValue(lastRow[sortColKey(filters.sortBy)] ?? lastRow.CreatedAt)
         )
       : null;
 

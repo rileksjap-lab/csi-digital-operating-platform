@@ -5,6 +5,7 @@ import {
   type CursorPage,
   encodeCursor,
   decodeCursor,
+  cursorValue,
 } from "@/lib/db/repo-utils";
 import { insertAuditEntry } from "@/lib/db/audit";
 
@@ -131,7 +132,7 @@ export async function listEffortEntries(
     hasNextPage && lastRow
       ? encodeCursor(
           lastRow.Id as string,
-          String(lastRow[filters.sortBy === "logDate" ? "LogDate" : "CreatedAt"])
+          cursorValue(lastRow[filters.sortBy === "logDate" ? "LogDate" : "CreatedAt"])
         )
       : null;
 

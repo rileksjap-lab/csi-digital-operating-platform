@@ -15,6 +15,16 @@ export function encodeCursor(id: string, sortValue: string): string {
   );
 }
 
+// node-postgres returns JS Date objects for timestamp/date columns. Stringifying
+// those with String()/template literals uses Date.prototype.toString() (e.g.
+// "Mon Jun 29 2026 14:42:13 GMT+0000 (Coordinated Universal Time)"), which
+// Postgres cannot parse back as a timestamptz — always route Date values through
+// toISOString() before they go into a cursor or a query parameter.
+export function cursorValue(v: unknown): string {
+  if (v instanceof Date) return v.toISOString();
+  return String(v);
+}
+
 export function decodeCursor(
   cursor: string
 ): { id: string; sv: string } | null {
