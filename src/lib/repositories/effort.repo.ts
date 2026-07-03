@@ -21,6 +21,7 @@ export interface EffortListItem {
   hours: number;
   notes: string | null;
   createdAt: string;
+  loggedByName: string | null;
 }
 
 export interface EffortListFilters {
@@ -101,10 +102,11 @@ export async function listEffortEntries(
     SELECT e.id AS "Id", e.csi_wo_id AS "WoId", w.csi_wo_no AS "CsiWoNo",
            e.staffid AS "StaffId", s.name AS "StaffName",
            e.logdate AS "LogDate", e.hours AS "Hours", e.notes AS "Notes",
-           e.createdat AS "CreatedAt"
+           e.createdat AS "CreatedAt", lb.name AS "LoggedByName"
     FROM effort_log e
     JOIN csi_wo w ON w.id = e.csi_wo_id
     JOIN staff s ON s.id = e.staffid
+    LEFT JOIN staff lb ON lb.id = e.loggedby AND lb.id != e.staffid
     WHERE 1=1
     ${whereStr}
     ORDER BY ${sortCol} ${dir}, e.id ${dir}
@@ -155,6 +157,7 @@ function mapEffortItem(r: Record<string, unknown>): EffortListItem {
     hours: parseFloat(String(r.Hours)),
     notes: (r.Notes as string) ?? null,
     createdAt: String(r.CreatedAt),
+    loggedByName: (r.LoggedByName as string) ?? null,
   };
 }
 
@@ -217,12 +220,14 @@ export async function createEffortEntry(
       targetStaffName = staffRes.rows[0].Name;
     }
 
-    // Insert effort entry under the target staff
+    // Insert effort entry under the target staff; loggedby records who actually
+    // submitted it, only when logging on behalf of someone else
+    const loggedBy = targetStaffId !== session.staffId ? session.staffId : null;
     const result = await client.query<{ Id: string; CreatedAt: string }>(
-      `INSERT INTO effort_log (csi_wo_id, staffid, logdate, hours, notes)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO effort_log (csi_wo_id, staffid, logdate, hours, notes, loggedby)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id AS "Id", createdat AS "CreatedAt"`,
-      [input.woId, targetStaffId, input.logDate, input.hours, input.notes ?? null]
+      [input.woId, targetStaffId, input.logDate, input.hours, input.notes ?? null, loggedBy]
     );
     const row = result.rows[0];
 
@@ -256,6 +261,7 @@ export async function createEffortEntry(
         hours: input.hours,
         notes: input.notes ?? null,
         createdAt: String(row.CreatedAt),
+        loggedByName: loggedBy ? session.displayName : null,
       },
     };
   } catch (err) {
@@ -281,10 +287,13 @@ export async function patchEffortEntry(
     const entryRes = await client.query(
       `SELECT e.id AS "Id", e.csi_wo_id AS "WoId", e.staffid AS "StaffId",
               e.logdate AS "LogDate", e.hours AS "Hours", e.notes AS "Notes",
-              e.createdat AS "CreatedAt",
+              e.createdat AS "CreatedAt", e.loggedby AS "LoggedBy",
+              s.name AS "StaffName", lb.name AS "LoggedByName",
               w.csi_wo_no AS "CsiWoNo", w.status AS "WoStatus"
        FROM effort_log e
        JOIN csi_wo w ON w.id = e.csi_wo_id
+       JOIN staff s ON s.id = e.staffid
+       LEFT JOIN staff lb ON lb.id = e.loggedby
        WHERE e.id = $1`,
       [entryId]
     );
@@ -356,20 +365,18 @@ export async function patchEffortEntry(
 
     await client.query("COMMIT");
 
-    // Get staff name for response
-    const staffRes = await query(`SELECT name AS "Name" FROM staff WHERE id = $1`, [session.staffId]);
-
     return {
       result: {
         id: entry.Id as string,
         woId: entry.WoId as string,
         csiWoNo: entry.CsiWoNo as string,
-        staffId: session.staffId,
-        staffName: (staffRes.rows[0]?.Name as string) ?? session.displayName,
+        staffId: entry.StaffId as string,
+        staffName: entry.StaffName as string,
         logDate: logDateStr,
         hours: input.hours ?? parseFloat(String(entry.Hours)),
         notes: input.notes !== undefined ? input.notes : (entry.Notes as string) ?? null,
         createdAt: String(entry.CreatedAt),
+        loggedByName: (entry.LoggedByName as string) ?? null,
       },
     };
   } catch (err) {
@@ -454,10 +461,11 @@ function mapEffortRow(r: Record<string, unknown>): EffortListItem {
     woId: r.WoId as string,
     csiWoNo: r.CsiWoNo as string,
     staffId: r.StaffId as string,
-    staffName: "",
+    staffName: r.StaffName as string,
     logDate: String(r.LogDate).slice(0, 10),
     hours: parseFloat(String(r.Hours)),
     notes: (r.Notes as string) ?? null,
     createdAt: String(r.CreatedAt),
+    loggedByName: (r.LoggedByName as string) ?? null,
   };
 }

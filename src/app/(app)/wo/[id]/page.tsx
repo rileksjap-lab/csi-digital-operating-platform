@@ -71,6 +71,7 @@ interface WoDetail {
     logDate: string;
     hours: number;
     notes: string | null;
+    loggedByName: string | null;
   }[];
   evidenceItems: {
     id: string;

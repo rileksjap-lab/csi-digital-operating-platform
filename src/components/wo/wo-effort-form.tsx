@@ -17,6 +17,7 @@ interface EffortEntry {
   logDate: string;
   hours: number;
   notes: string | null;
+  loggedByName: string | null;
 }
 
 interface WoEffortFormProps {
@@ -223,7 +224,14 @@ export default function WoEffortForm({
                 <td className="px-4 py-2 text-gray-500">
                   {new Date(e.logDate).toLocaleDateString("en-MY")}
                 </td>
-                <td className="px-4 py-2">{e.staffName}</td>
+                <td className="px-4 py-2">
+                  {e.staffName}
+                  {e.loggedByName && (
+                    <span className="ml-1.5 text-xs text-gray-400">
+                      (logged by {e.loggedByName})
+                    </span>
+                  )}
+                </td>
                 {editingId === e.id ? (
                   <>
                     <td className="px-4 py-2 text-right">

@@ -421,6 +421,7 @@ interface EffortItem {
   logDate: string;
   hours: number;
   notes: string | null;
+  loggedByName: string | null;
 }
 
 interface EvidenceItem {
@@ -496,9 +497,10 @@ export async function getWorkOrderById(
     ),
     query(
       `SELECT e.id AS "Id", e.logdate AS "LogDate", e.hours AS "Hours", e.notes AS "Notes",
-              s.name AS "StaffName"
+              s.name AS "StaffName", lb.name AS "LoggedByName"
        FROM effort_log e
        JOIN staff s ON s.id = e.staffid
+       LEFT JOIN staff lb ON lb.id = e.loggedby AND lb.id != e.staffid
        WHERE e.csi_wo_id = $1
        ORDER BY e.logdate DESC`,
       [id]
@@ -637,6 +639,7 @@ export async function getWorkOrderById(
       logDate: String(e.LogDate),
       hours: parseFloat(String(e.Hours)),
       notes: (e.Notes as string) ?? null,
+      loggedByName: (e.LoggedByName as string) ?? null,
     })),
     evidenceItems: evidence.rows.map((ev) => ({
       id: ev.Id as string,

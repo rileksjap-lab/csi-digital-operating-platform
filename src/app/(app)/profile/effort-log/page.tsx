@@ -16,6 +16,7 @@ interface EffortEntry {
   hours: number;
   notes: string | null;
   createdAt: string;
+  loggedByName: string | null;
 }
 
 interface EffortListResponse {
@@ -169,7 +170,14 @@ function MyEffortLogInner() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{e.hours}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{e.notes ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      {e.notes ?? "—"}
+                      {e.loggedByName && (
+                        <div className="mt-0.5 text-gray-400">
+                          Logged by {e.loggedByName}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
