@@ -275,6 +275,7 @@ export default function WoDetailPage() {
           label="Tender"
           value={wo.tender ? wo.tender.tenderNo : "—"}
         />
+        <Field label="Tender No / Project Code" value={wo.tenderOrProjectCode ?? "—"} />
         <Field label="Created By" value={wo.createdBy.name} />
         <Field
           label="Assigned To"
