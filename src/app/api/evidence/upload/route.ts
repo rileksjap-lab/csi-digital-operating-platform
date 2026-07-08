@@ -7,24 +7,13 @@ export const runtime = "nodejs";
 
 export const maxDuration = 60;
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 
 const ALLOWED_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
-  "text/plain",
-  "text/csv",
-  "application/zip",
-  "application/x-rar-compressed",
 ]);
 
 export async function POST(request: NextRequest) {
@@ -56,8 +45,8 @@ export async function POST(request: NextRequest) {
       return badRequest("File is empty");
     }
 
-    if (!ALLOWED_TYPES.has(file.type) && file.type !== "") {
-      return badRequest(`File type '${file.type}' is not allowed`);
+    if (!ALLOWED_TYPES.has(file.type)) {
+      return badRequest("Only screenshot images (JPG, PNG, GIF, WEBP) are allowed");
     }
 
     const scope = buildScopeFilter(session);

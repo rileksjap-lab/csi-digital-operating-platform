@@ -29,7 +29,11 @@ const EVIDENCE_TYPES = [
   "Other",
 ];
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
+
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+const ACCEPTED_HINT = "Screenshots only (JPG, PNG, GIF, WEBP) — max 2 MB";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -39,12 +43,7 @@ function formatFileSize(bytes: number): string {
 
 function fileIcon(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  if (["pdf"].includes(ext)) return "PDF";
-  if (["doc", "docx"].includes(ext)) return "DOC";
-  if (["xls", "xlsx"].includes(ext)) return "XLS";
-  if (["ppt", "pptx"].includes(ext)) return "PPT";
   if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "IMG";
-  if (["zip", "rar"].includes(ext)) return "ZIP";
   return "FILE";
 }
 
@@ -66,8 +65,12 @@ export default function WoEvidencePanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileSelect(file: File) {
+    if (!ALLOWED_TYPES.has(file.type)) {
+      setError("Only screenshot images (JPG, PNG, GIF, WEBP) are allowed.");
+      return;
+    }
     if (file.size > MAX_FILE_SIZE) {
-      setError(`File too large (${formatFileSize(file.size)}). Maximum is 20 MB.`);
+      setError(`File too large (${formatFileSize(file.size)}). Maximum is 2 MB.`);
       return;
     }
     setError(null);
@@ -190,7 +193,7 @@ export default function WoEvidencePanel({
                   type="file"
                   onChange={handleInputChange}
                   className="hidden"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv,.zip,.rar"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
                 />
                 {selectedFile ? (
                   <div className="flex items-center gap-3">
@@ -223,12 +226,11 @@ export default function WoEvidencePanel({
                     <p className="text-sm text-gray-600">
                       <span className="font-medium text-primary-600">Click to browse</span> or drag and drop
                     </p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      PDF, DOC, XLS, PPT, Images, ZIP — max 20 MB
-                    </p>
+                    <p className="mt-1 text-xs text-gray-400">{ACCEPTED_HINT}</p>
                   </>
                 )}
               </div>
+              <p className="text-xs text-gray-400">{ACCEPTED_HINT}</p>
 
               {/* Caption */}
               <div>
