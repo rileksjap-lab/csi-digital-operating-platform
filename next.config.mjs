@@ -7,6 +7,9 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: "25mb",
     },
+    // pdfkit reads its font metrics files from disk at runtime (__dirname-relative);
+    // webpack bundling for API routes breaks that unless the package is left external.
+    serverComponentsExternalPackages: ["pdfkit"],
   },
 
   // Server-side env vars validated at startup — prevent silent misconfiguration

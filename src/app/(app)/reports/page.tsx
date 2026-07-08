@@ -153,7 +153,8 @@ function ParameterPanel({
   const [success, setSuccess] = useState("");
 
   const isBlocked = BLOCKED_REPORTS.includes(report.code);
-  const needsWorker = ["PDF", "PPTX", "Excel"].includes(format);
+  const needsWorker = ["Excel"].includes(format);
+  const BINARY_FORMATS: Record<string, string> = { CSV: "csv", PDF: "pdf", PPTX: "pptx" };
 
   async function handleGenerate() {
     setError("");
@@ -172,7 +173,8 @@ function ParameterPanel({
         }),
       });
 
-      if (exportFormat === "CSV") {
+      const ext = BINARY_FORMATS[exportFormat];
+      if (ext) {
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
           setError(json.error?.message ?? `Error ${res.status}`);
@@ -182,10 +184,10 @@ function ParameterPanel({
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${report.code}_${periodFrom}_${periodTo}.csv`;
+        a.download = `${report.code}_${periodFrom}_${periodTo}.${ext}`;
         a.click();
         URL.revokeObjectURL(url);
-        setSuccess("CSV downloaded successfully");
+        setSuccess(`${exportFormat} downloaded successfully`);
       } else {
         const json = await res.json();
         if (!json.success) {
@@ -272,14 +274,14 @@ function ParameterPanel({
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-500">
           {needsWorker
-            ? "PDF/PPTX/Excel formats require the FastAPI compute worker. Use CSV for immediate export."
+            ? "Excel format requires the FastAPI compute worker. Use CSV, PDF, or PPTX for immediate export."
             : `Export ${report.name} data as ${format}.`}
         </p>
         <button
           disabled={generating || isBlocked || needsWorker}
           onClick={handleGenerate}
           className="btn-primary"
-          title={isBlocked ? "This report requires the FastAPI compute worker" : needsWorker ? "Select CSV format for immediate export" : ""}
+          title={isBlocked ? "This report requires the FastAPI compute worker" : needsWorker ? "Select CSV, PDF, or PPTX for immediate export" : ""}
         >
           {generating ? "Generating..." : "Generate Report"}
         </button>

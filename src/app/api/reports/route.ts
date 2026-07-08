@@ -3,6 +3,8 @@ import { requireAuth, buildScopeFilter } from "@/lib/auth/guards";
 import type { ScopeFilter } from "@/lib/auth/guards";
 import { ok, badRequest, internalError } from "@/lib/response";
 import { query } from "@/lib/db/pool";
+import PDFDocument from "pdfkit";
+import PptxGenJS from "pptxgenjs";
 
 function scopeWhere(scope: ScopeFilter, staffAlias: string, offset: number): { clause: string; params: unknown[] } {
   switch (scope.scope) {
@@ -45,6 +47,77 @@ function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
     lines.push(headers.map((h) => escape(row[h])).join(","));
   }
   return lines.join("\r\n");
+}
+
+function toPdf(title: string, headers: string[], rows: Record<string, unknown>[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    doc.fontSize(16).font("Helvetica-Bold").text(title);
+    doc.moveDown(0.5);
+
+    const left = doc.page.margins.left;
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const colWidth = usableWidth / headers.length;
+    const rowHeight = 18;
+    const bottomLimit = doc.page.height - doc.page.margins.bottom;
+
+    function drawRow(values: string[], y: number, bold: boolean) {
+      doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(8);
+      values.forEach((v, i) => {
+        doc.text(v, left + i * colWidth, y, { width: colWidth - 4, height: rowHeight, ellipsis: true });
+      });
+    }
+
+    let y = doc.y;
+    drawRow(headers, y, true);
+    y += rowHeight;
+    doc.moveTo(left, y - 2).lineTo(left + usableWidth, y - 2).strokeColor("#cccccc").stroke();
+
+    for (const row of rows) {
+      if (y + rowHeight > bottomLimit) {
+        doc.addPage();
+        y = doc.page.margins.top;
+        drawRow(headers, y, true);
+        y += rowHeight;
+        doc.moveTo(left, y - 2).lineTo(left + usableWidth, y - 2).strokeColor("#cccccc").stroke();
+      }
+      drawRow(headers.map((h) => String(row[h] ?? "")), y, false);
+      y += rowHeight;
+    }
+
+    doc.end();
+  });
+}
+
+async function toPptx(title: string, headers: string[], rows: Record<string, unknown>[]): Promise<Buffer> {
+  const pptx = new PptxGenJS();
+  const CHUNK = 20;
+  const pages: Record<string, unknown>[][] = [];
+  for (let i = 0; i < rows.length; i += CHUNK) pages.push(rows.slice(i, i + CHUNK));
+  if (pages.length === 0) pages.push([]);
+
+  for (const [pageIndex, slice] of pages.entries()) {
+    const slide = pptx.addSlide();
+    slide.addText(pages.length > 1 ? `${title} (${pageIndex + 1}/${pages.length})` : title, {
+      x: 0.3, y: 0.2, w: 9.4, h: 0.5, fontSize: 18, bold: true,
+    });
+    const headerRow = headers.map((h) => ({
+      text: h,
+      options: { bold: true, fill: { color: "EEEEEE" }, fontSize: 9 },
+    }));
+    const dataRows = slice.map((row) =>
+      headers.map((h) => ({ text: String(row[h] ?? ""), options: { fontSize: 8 } }))
+    );
+    slide.addTable([headerRow, ...dataRows], { x: 0.3, y: 0.8, w: 9.4, autoPage: false });
+  }
+
+  const result = await pptx.write({ outputType: "nodebuffer" });
+  return Buffer.from(result as Uint8Array);
 }
 
 type ReportCode =
@@ -462,8 +535,8 @@ export async function POST(request: NextRequest) {
     if (!periodFrom || !periodTo) return badRequest("periodFrom and periodTo are required");
 
     const outFormat = (format ?? "CSV").toUpperCase();
-    if (!["CSV", "JSON"].includes(outFormat)) {
-      return badRequest("Only CSV and JSON formats are available. PDF/PPTX require the FastAPI compute worker.");
+    if (!["CSV", "JSON", "PDF", "PPTX"].includes(outFormat)) {
+      return badRequest("Unsupported format. Use CSV, JSON, PDF, or PPTX.");
     }
 
     const { headers, rows, title } = await generateReport(
@@ -480,6 +553,28 @@ export async function POST(request: NextRequest) {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
           "Content-Disposition": `attachment; filename="${reportCode}_${periodFrom}_${periodTo}.csv"`,
+        },
+      });
+    }
+
+    if (outFormat === "PDF") {
+      const pdf = await toPdf(title, headers, rows);
+      return new Response(new Uint8Array(pdf), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${reportCode}_${periodFrom}_${periodTo}.pdf"`,
+        },
+      });
+    }
+
+    if (outFormat === "PPTX") {
+      const pptx = await toPptx(title, headers, rows);
+      return new Response(new Uint8Array(pptx), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "Content-Disposition": `attachment; filename="${reportCode}_${periodFrom}_${periodTo}.pptx"`,
         },
       });
     }

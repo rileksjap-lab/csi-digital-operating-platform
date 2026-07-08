@@ -37,6 +37,10 @@ interface Props {
   onSort: (key: string) => void;
   onNextPage: () => void;
   onFirstPage: () => void;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onToggleRow?: (id: string) => void;
+  onToggleAll?: () => void;
 }
 
 const COLUMNS = [
@@ -53,13 +57,40 @@ const COLUMNS = [
   { key: "createdAt", label: "Created", sortable: true },
 ];
 
-export default function WoDataTable({ rows, meta, cursor, pageOffset, sortBy, sortDir, onSort, onNextPage, onFirstPage }: Props) {
+export default function WoDataTable({
+  rows,
+  meta,
+  cursor,
+  pageOffset,
+  sortBy,
+  sortDir,
+  onSort,
+  onNextPage,
+  onFirstPage,
+  selectable = false,
+  selectedIds,
+  onToggleRow,
+  onToggleAll,
+}: Props) {
+  const allSelected = selectable && rows.length > 0 && rows.every((r) => selectedIds?.has(r.id));
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
+              {selectable && (
+                <th className="px-4 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={onToggleAll}
+                    aria-label="Select all"
+                    className="rounded border-gray-300"
+                  />
+                </th>
+              )}
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
@@ -84,7 +115,7 @@ export default function WoDataTable({ rows, meta, cursor, pageOffset, sortBy, so
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={COLUMNS.length}
+                  colSpan={COLUMNS.length + (selectable ? 1 : 0)}
                   className="px-4 py-12 text-center text-gray-400"
                 >
                   No work orders found
@@ -96,6 +127,17 @@ export default function WoDataTable({ rows, meta, cursor, pageOffset, sortBy, so
                 key={row.id}
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
               >
+                {selectable && (
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds?.has(row.id) ?? false}
+                      onChange={() => onToggleRow?.(row.id)}
+                      aria-label={`Select ${row.csiWoNo}`}
+                      className="rounded border-gray-300"
+                    />
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <Link
                     href={`/wo/${row.id}`}

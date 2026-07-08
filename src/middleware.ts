@@ -13,7 +13,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname === "/api/health" ||
     pathname === "/api/digest" ||
-    pathname === "/api/sla-check";
+    pathname === "/api/sla-check" ||
+    (pathname === "/api/kpi" && request.method === "POST");
 
   if (pathname.startsWith("/api/") && !isAuthRoute) {
     const sessionCookie = request.cookies.get("csidop_session");

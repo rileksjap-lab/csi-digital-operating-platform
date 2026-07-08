@@ -776,13 +776,13 @@ function ScoreBoard({ wo }: { wo: WoDetail }) {
       {/* SLA */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 flex flex-col items-center justify-center">
         <span className={`text-3xl font-bold tabular-nums ${
-          wo.slaStatus === "Overdue" ? "text-red-600" :
-          wo.slaStatus === "AtRisk" ? "text-amber-600" : "text-green-600"
+          wo.slaStatus === "Breached" ? "text-red-600" :
+          wo.slaStatus === "Warning" ? "text-amber-600" : "text-green-600"
         }`}>
           {wo.slaDaysRemaining != null ? `${Math.abs(wo.slaDaysRemaining)}d` : "—"}
         </span>
         <span className="mt-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
-          {wo.slaStatus === "Overdue" ? "SLA Overdue" : wo.slaStatus === "AtRisk" ? "SLA At Risk" : "SLA Remaining"}
+          {wo.slaStatus === "Breached" ? "SLA Overdue" : wo.slaStatus === "Warning" ? "SLA At Risk" : "SLA Remaining"}
         </span>
       </div>
     </div>
