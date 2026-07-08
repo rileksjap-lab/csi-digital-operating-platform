@@ -55,6 +55,7 @@ export const woCreateSchema = z.object({
   tenderId: z.string().uuid().optional(),
   indicativeValue: z.number().nonnegative().optional(),
   dueDate: z.string().date().optional(),
+  createdAt: z.string().datetime().optional(),
 });
 
 export type WoCreateInput = z.infer<typeof woCreateSchema>;

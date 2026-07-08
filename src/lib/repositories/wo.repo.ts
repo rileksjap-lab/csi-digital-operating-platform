@@ -697,6 +697,7 @@ export interface WoCreateInput {
   tenderId?: string;
   indicativeValue?: number;
   dueDate?: string;
+  createdAt?: string;
 }
 
 export interface WoCreated {
@@ -734,10 +735,12 @@ export async function createWorkOrder(
     }
 
     // 2. Generate CSI_WO_No: 300-DDMMYYYY-NNN
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, "0");
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const yyyy = now.getFullYear();
+    // Uses the (possibly backdated) createdAt so the WO number reflects when
+    // the work actually originated, not just when it was entered into CSIDOP
+    const effectiveCreatedAt = input.createdAt ? new Date(input.createdAt) : new Date();
+    const dd = String(effectiveCreatedAt.getDate()).padStart(2, "0");
+    const mm = String(effectiveCreatedAt.getMonth() + 1).padStart(2, "0");
+    const yyyy = effectiveCreatedAt.getFullYear();
     const dateStr = `${dd}${mm}${yyyy}`;
     const prefix = `300-${dateStr}-`;
 
@@ -748,6 +751,15 @@ export async function createWorkOrder(
     const seq = parseInt(seqResult.rows[0].cnt, 10) + 1;
     const csiWoNo = `${prefix}${String(seq).padStart(3, "0")}`;
 
+    // Due date: use the explicit value if given, otherwise derive it from
+    // SLA working days (matching the same working-day math used to display
+    // the SLA countdown), so it isn't silently left blank
+    const dueDate =
+      input.dueDate ??
+      (input.slaWorkingDays
+        ? addWorkingDays(effectiveCreatedAt, input.slaWorkingDays).toISOString().slice(0, 10)
+        : null);
+
     // 3. Insert CSI_WO with new fields
     const woResult = await client.query<{ Id: string; CreatedAt: string }>(
       `INSERT INTO csi_wo
@@ -755,8 +767,8 @@ export async function createWorkOrder(
          priorityinterdepart, priorityinternal, indicativevalue,
          complexityvalue, tierid, createdby, duedate,
          sourceofwo, slaworkingdays, monitoringstaffid,
-         tenderorprojectcode, remark, requestername)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+         tenderorprojectcode, remark, requestername, createdat)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        RETURNING id AS "Id", createdat AS "CreatedAt"`,
       [
         csiWoNo,
@@ -770,13 +782,14 @@ export async function createWorkOrder(
         input.complexityValue ?? null,
         input.tierId,
         session.staffId,
-        input.dueDate ?? null,
+        dueDate,
         input.sourceOfWO,
         input.slaWorkingDays ?? null,
         input.monitoringStaffId ?? null,
         input.tenderOrProjectCode ?? null,
         input.remark ?? null,
         input.requesterName ?? null,
+        effectiveCreatedAt.toISOString(),
       ]
     );
     const wo = woResult.rows[0];
