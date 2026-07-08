@@ -259,6 +259,50 @@ export function notifyWoReturned(
   })().catch(() => {});
 }
 
+export function notifyWoSlaWarning(
+  staffId: string,
+  wo: { id: string; csiWoNo: string; title: string; priority?: string; dueDate?: string }
+): void {
+  (async () => {
+    const email = await getStaffEmail(staffId);
+    if (!email) return;
+    await send(
+      email,
+      `SLA Warning: ${wo.csiWoNo} due soon`,
+      wrap("Work Order SLA Warning", `
+        <p style="color:#374151;font-size:14px;margin:0 0 12px;">
+          Work order <strong>${wo.csiWoNo}</strong> is due
+          <span style="color:#d97706;font-weight:600;">today or tomorrow</span>.
+        </p>
+        ${woFields(wo)}
+        ${actionButton("View Work Order", wo.id)}
+      `)
+    );
+  })().catch(() => {});
+}
+
+export function notifyWoSlaBreach(
+  staffId: string,
+  wo: { id: string; csiWoNo: string; title: string; priority?: string; dueDate?: string }
+): void {
+  (async () => {
+    const email = await getStaffEmail(staffId);
+    if (!email) return;
+    await send(
+      email,
+      `SLA Breached: ${wo.csiWoNo} is overdue`,
+      wrap("Work Order SLA Breached", `
+        <p style="color:#374151;font-size:14px;margin:0 0 12px;">
+          Work order <strong>${wo.csiWoNo}</strong> has
+          <span style="color:#dc2626;font-weight:600;">breached its SLA</span> and is overdue.
+        </p>
+        ${woFields(wo)}
+        ${actionButton("View Work Order", wo.id)}
+      `)
+    );
+  })().catch(() => {});
+}
+
 export function notifyNewWoFromEmail(
   woId: string,
   csiWoNo: string,

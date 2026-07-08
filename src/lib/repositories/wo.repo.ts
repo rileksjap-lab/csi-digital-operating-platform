@@ -289,7 +289,7 @@ function countWorkingDays(from: Date, to: Date): number {
   return count;
 }
 
-function computeSla(
+export function computeSla(
   createdAt: unknown,
   slaTotalDays: unknown,
   status: string
