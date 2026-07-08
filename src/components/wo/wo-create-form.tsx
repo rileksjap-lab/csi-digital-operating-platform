@@ -57,6 +57,8 @@ export default function WoCreateForm({ lookups, onSuccess }: WoCreateFormProps) 
   const [complexityValue, setComplexityValue] = useState("");
   const [monitoringStaffId, setMonitoringStaffId] = useState("");
   const [remark, setRemark] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [createdDate, setCreatedDate] = useState("");
 
   // Optional initial assignment
   const [assigneeId, setAssigneeId] = useState("");
@@ -117,6 +119,8 @@ export default function WoCreateForm({ lookups, onSuccess }: WoCreateFormProps) 
     if (complexityValue) body.complexityValue = Number(complexityValue);
     if (monitoringStaffId) body.monitoringStaffId = monitoringStaffId;
     if (remark.trim()) body.remark = remark.trim();
+    if (dueDate) body.dueDate = dueDate;
+    if (createdDate) body.createdAt = new Date(`${createdDate}T00:00:00`).toISOString();
 
     // Optional assignment
     if (assigneeId && assignedHours) {
@@ -254,6 +258,23 @@ export default function WoCreateForm({ lookups, onSuccess }: WoCreateFormProps) 
               Tier 1 = Simple, Tier 2 = Moderate, Tier 3 = Complex. Determines approval level.
             </p>
           </div>
+
+          {/* Created Date */}
+          <div>
+            <label htmlFor="createdDate" className="block text-sm font-medium text-gray-700">
+              Created Date
+            </label>
+            <input
+              id="createdDate"
+              type="date"
+              value={createdDate}
+              onChange={(e) => setCreatedDate(e.target.value)}
+              className={INPUT_CLS}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Defaults to today. Backdate if this WO originated earlier — this also affects the generated WO number.
+            </p>
+          </div>
         </div>
       </fieldset>
 
@@ -337,6 +358,23 @@ export default function WoCreateForm({ lookups, onSuccess }: WoCreateFormProps) 
               className={INPUT_CLS}
               placeholder="e.g. 10"
             />
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
+              Due Date
+            </label>
+            <input
+              id="dueDate"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className={INPUT_CLS}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Leave blank to auto-calculate from SLA working days
+            </p>
           </div>
         </div>
       </fieldset>
