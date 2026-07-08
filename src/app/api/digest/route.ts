@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
-import { ok, badRequest, internalError } from "@/lib/response";
+import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { ok, internalError } from "@/lib/response";
 import { query } from "@/lib/db/pool";
 import { sendDigestEmail } from "@/lib/email/digest";
 
@@ -7,8 +8,13 @@ export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return badRequest("Unauthorized");
+    const isCronCall = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+    // Cron-triggered (scheduled digest) OR an HOD/SM manually clicking
+    // "Send Digest" on the dashboard — both are legitimate callers.
+    if (!isCronCall) {
+      const session = await requireAuth(request);
+      requireRole(session, "HOD", "SolutionManager");
     }
 
     const body = await request.json().catch(() => ({}));
@@ -35,6 +41,7 @@ export async function POST(request: NextRequest) {
 
     return ok({ sent, period });
   } catch (err) {
+    if (err instanceof Response) return err;
     console.error("[digest] POST error", err);
     return internalError(request.headers.get("x-request-id") ?? "unknown");
   }
