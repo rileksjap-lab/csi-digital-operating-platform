@@ -4,7 +4,7 @@
     {
       "name": "nextdev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["--prefix", "apps/csidop", "run", "dev"],
       "port": 3000,
       "autoPort": false
     }

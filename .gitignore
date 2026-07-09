@@ -1,43 +1,20 @@
-# Dependencies
+# Repo-wide ignores. Each app under apps/ also has its own, more specific
+# .gitignore (e.g. apps/csidop/.gitignore) for app-specific paths.
 node_modules/
-.pnp
-.pnp.js
-
-# Build output
 .next/
 out/
 dist/
 build/
-
-# Environment files
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Python
-worker/__pycache__/
-worker/.venv/
-worker/venv/
-worker/*.pyc
-worker/.env
-
-# Debug
+.env.*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Uploaded files
-uploads/
-
-# Misc
 .DS_Store
 *.pem
 .vercel
 *.tsbuildinfo
 next-env.d.ts
-docs/unpacked_review/
-
-# Word lock files
 ~$*.docx
+docs/unpacked_review/
