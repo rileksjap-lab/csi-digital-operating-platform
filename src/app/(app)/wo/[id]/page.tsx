@@ -226,7 +226,7 @@ export default function WoDetailPage() {
           <button
             onClick={handleComplete}
             disabled={actionLoading}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded bg-primary-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50"
           >
             Mark Complete
           </button>

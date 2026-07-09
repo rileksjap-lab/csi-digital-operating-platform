@@ -8,6 +8,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
       colors: {
         navy: {
           50: "#eef2f7",
@@ -23,16 +26,21 @@ const config: Config = {
           950: "#091221",
         },
         primary: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
+          // Deep navy — ties to the sidebar/login dark theme for everyday
+          // buttons and links. The brand red (#ED1F24) is reserved for
+          // identity moments (logo, login page) rather than routine
+          // actions, since red already carries risk/warning meaning
+          // throughout this ops dashboard (overdue, SLA breach, cancel).
+          50: "#eef2f7",
+          100: "#d4dce8",
+          200: "#a9b9d1",
+          300: "#7e96ba",
+          400: "#5373a3",
+          500: "#2d4a7c",
+          600: "#243d66",
+          700: "#1b2f4f",
+          800: "#152541",
+          900: "#0f1b33",
         },
         accent: {
           50: "#fff7ed",
@@ -45,12 +53,14 @@ const config: Config = {
           700: "#c2410c",
         },
         danger: {
-          50: "#fef2f2",
-          100: "#fee2e2",
-          400: "#f87171",
-          500: "#ef4444",
-          600: "#dc2626",
-          700: "#b91c1c",
+          // Rose, not red — keeps destructive actions visually distinct
+          // from the brand-red primary color
+          50: "#fff1f2",
+          100: "#ffe4e6",
+          400: "#fb7185",
+          500: "#f43f5e",
+          600: "#e11d48",
+          700: "#be123c",
         },
         success: {
           50: "#f0fdf4",
