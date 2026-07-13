@@ -1296,6 +1296,20 @@ export async function approveWorkOrder(
 
 // ─── WO Tasks (checklist) ───────────────────────────────────────────────────
 
+export async function getWoAssigneeAndStatus(
+  woId: string
+): Promise<{ assignedTo: string | null; status: string } | null> {
+  const result = await query<{ AssignedTo: string | null; Status: string }>(
+    `SELECT assignedto AS "AssignedTo", status AS "Status" FROM csi_wo WHERE id = $1`,
+    [woId]
+  );
+  if (result.rows.length === 0) return null;
+  return {
+    assignedTo: result.rows[0].AssignedTo,
+    status: result.rows[0].Status,
+  };
+}
+
 export async function addWoTask(
   woId: string,
   input: { description: string; assignedTo?: string; scope?: string },
