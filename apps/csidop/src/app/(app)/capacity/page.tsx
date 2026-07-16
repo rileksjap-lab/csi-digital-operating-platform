@@ -52,14 +52,37 @@ const BAND_BAR: Record<Band, string> = {
 
 const BAND_FILTERS: Band[] = ["Free", "Safe", "Warning", "Overloaded"];
 
+interface PodSummary {
+  pod: string;
+  counts: Record<Band, number>;
+  total: number;
+  avgUtilizationPct: number;
+}
+
+function buildPodSummaries(staff: StaffUtilization[]): PodSummary[] {
+  const groups = new Map<string, StaffUtilization[]>();
+  for (const s of staff) {
+    const pod = s.subTeam ?? "Unassigned";
+    if (!groups.has(pod)) groups.set(pod, []);
+    groups.get(pod)!.push(s);
+  }
+  return Array.from(groups.entries())
+    .map(([pod, members]) => {
+      const counts: Record<Band, number> = { Free: 0, Safe: 0, Warning: 0, Overloaded: 0 };
+      for (const m of members) counts[m.band]++;
+      const avgUtilizationPct = Math.round(
+        members.reduce((sum, m) => sum + m.utilizationPct, 0) / members.length
+      );
+      return { pod, counts, total: members.length, avgUtilizationPct };
+    })
+    .sort((a, b) => a.pod.localeCompare(b.pod));
+}
+
 export default function CapacityPage() {
   const [bandFilter, setBandFilter] = useState<Band | null>(null);
+  const [podFilter, setPodFilter] = useState<string | null>(null);
 
-  const url = bandFilter
-    ? `/api/capacity?band=${bandFilter}`
-    : "/api/capacity";
-
-  const { data, error, isLoading } = useSWR<UtilizationResponse>(url, apiFetcher);
+  const { data, error, isLoading } = useSWR<UtilizationResponse>("/api/capacity", apiFetcher);
 
   if (isLoading) {
     return (
@@ -80,6 +103,14 @@ export default function CapacityPage() {
   if (!data) return null;
 
   const { departmentSummary: ds, staff, cacheTimestamp } = data;
+
+  const podSummaries = buildPodSummaries(staff);
+  const podFiltered = podFilter
+    ? staff.filter((s) => (s.subTeam ?? "Unassigned") === podFilter)
+    : staff;
+  const filteredStaff = bandFilter
+    ? podFiltered.filter((s) => s.band === bandFilter)
+    : podFiltered;
 
   return (
     <div className="space-y-6">
@@ -102,6 +133,52 @@ export default function CapacityPage() {
         />
       </div>
 
+      {/* Capacity by Pod */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700">Capacity by Pod</h2>
+          {podFilter && (
+            <button
+              onClick={() => setPodFilter(null)}
+              className="text-xs font-medium text-primary-600 hover:text-primary-700"
+            >
+              Clear pod filter
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {podSummaries.map((p) => (
+            <button
+              key={p.pod}
+              onClick={() => setPodFilter(podFilter === p.pod ? null : p.pod)}
+              className={`rounded-lg border p-4 text-left transition-colors ${
+                podFilter === p.pod
+                  ? "border-primary-400 bg-primary-50"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-800">{p.pod}</span>
+                <span className="text-xs text-gray-400">{p.total} staff</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                <span className="tabular-nums">{p.avgUtilizationPct}% avg</span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {BAND_FILTERS.map((b) => (
+                  <span
+                    key={b}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${BAND_STYLES[b]}`}
+                  >
+                    {b} {p.counts[b]}
+                  </span>
+                ))}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Band filter pills */}
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -112,7 +189,7 @@ export default function CapacityPage() {
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
         >
-          All ({staff.length})
+          All ({podFiltered.length})
         </button>
         {BAND_FILTERS.map((b) => (
           <button
@@ -147,14 +224,14 @@ export default function CapacityPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {staff.length === 0 && (
+              {filteredStaff.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-12 text-center text-gray-400">
                     No staff found
                   </td>
                 </tr>
               )}
-              {staff.map((s) => (
+              {filteredStaff.map((s) => (
                 <tr key={s.staffId} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-800">{s.name}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{s.roleCode}</td>
