@@ -98,6 +98,7 @@ export interface DashboardData {
   skillHeatmap: SkillHeatRow[];
   auditLogCount: number;
   woByRequestType: { month: string; requestType: string; count: number }[];
+  taskDurationByDomain: { domain: string; avgDays: number; taskCount: number }[];
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -145,6 +146,7 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
     certDetailRes,
     auditCountRes,
     woByReqTypeRes,
+    taskDurationRes,
   ] = await Promise.all([
     // Core KPIs
     query<{ status: string; count: string }>(
@@ -313,6 +315,19 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
        ORDER BY m.d, count DESC`,
       scopeParams
     ),
+    // Avg task duration by domain (completed tasks only)
+    query<{ domain: string; avgDays: string; taskCount: string }>(
+      `SELECT COALESCE(rt.domain, 'Unset') AS domain,
+              ROUND(AVG(wt.datecompleted - wt.datecreated), 1) AS "avgDays",
+              COUNT(*)::int AS "taskCount"
+       FROM wo_task wt
+       JOIN csi_wo w ON w.id = wt.csi_wo_id
+       JOIN request_type rt ON rt.id = w.requesttypeid
+       WHERE wt.datecompleted IS NOT NULL ${woScope}
+       GROUP BY rt.domain
+       ORDER BY "avgDays" DESC`,
+      scopeParams
+    ),
   ]);
 
   // Process WO counts
@@ -440,6 +455,11 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
       month: r.month,
       requestType: r.requestType,
       count: parseInt(String(r.count), 10),
+    })),
+    taskDurationByDomain: taskDurationRes.rows.map(r => ({
+      domain: r.domain,
+      avgDays: parseFloat(r.avgDays),
+      taskCount: parseInt(String(r.taskCount), 10),
     })),
   };
 }

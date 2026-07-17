@@ -76,6 +76,7 @@ interface DashboardData {
   skillHeatmap: { staff: string; scores: Record<string, number> }[];
   auditLogCount: number;
   woByRequestType: { month: string; requestType: string; count: number }[];
+  taskDurationByDomain: { domain: string; avgDays: number; taskCount: number }[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -457,6 +458,41 @@ export default function DashboardPage() {
               </div>
             );
           })()}
+
+          {/* Avg Task Duration by Domain */}
+          {d.taskDurationByDomain.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+              <div className="flex items-baseline justify-between mb-4">
+                <h3 className="font-semibold text-gray-900 text-sm">Avg Task Duration by Domain</h3>
+                <span className="text-xs text-gray-400">days to complete</span>
+              </div>
+              <div className="h-[220px]">
+                <Bar data={{
+                  labels: d.taskDurationByDomain.map(t => t.domain),
+                  datasets: [{
+                    label: "Avg days",
+                    data: d.taskDurationByDomain.map(t => t.avgDays),
+                    backgroundColor: BLUE,
+                    borderRadius: 3,
+                  }],
+                }} options={{
+                  responsive: true, maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx) => {
+                          const row = d.taskDurationByDomain[ctx.dataIndex];
+                          return `${row.avgDays}d avg (${row.taskCount} tasks)`;
+                        },
+                      },
+                    },
+                  },
+                  scales: { x: { grid: CHART_NO_GRID }, y: { grid: CHART_GRID, beginAtZero: true } },
+                }} />
+              </div>
+            </div>
+          )}
 
           {/* Recent WOs + WO by Status */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

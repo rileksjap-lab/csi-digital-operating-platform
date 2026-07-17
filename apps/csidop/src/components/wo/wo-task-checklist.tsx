@@ -11,7 +11,15 @@ interface TaskItem {
   progress: number;
   scope: string;
   status: string;
+  dateCreated: string;
   dateCompleted: string | null;
+}
+
+function taskDurationDays(dateCreated: string, dateCompleted: string | null): number | null {
+  if (!dateCompleted) return null;
+  const start = new Date(dateCreated);
+  const end = new Date(dateCompleted);
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
 interface WoTaskChecklistProps {
@@ -141,6 +149,7 @@ export default function WoTaskChecklist({
               <th className="px-4 py-2 text-left w-20">Scope</th>
               <th className="px-4 py-2 text-center w-32">Progress</th>
               <th className="px-4 py-2 text-center w-16">Status</th>
+              <th className="px-4 py-2 text-center w-20">Duration</th>
               {canEdit && <th className="px-4 py-2 text-right w-24">Actions</th>}
             </tr>
           </thead>
@@ -227,6 +236,17 @@ export default function WoTaskChecklist({
                         Active
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {(() => {
+                      const days = taskDurationDays(t.dateCreated, t.dateCompleted);
+                      if (days === null) return <span className="text-xs text-gray-400">—</span>;
+                      return (
+                        <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          {days}d
+                        </span>
+                      );
+                    })()}
                   </td>
                   {canEdit && (
                     <td className="px-4 py-2 text-right whitespace-nowrap">
