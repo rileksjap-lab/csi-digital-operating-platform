@@ -99,6 +99,8 @@ export interface DashboardData {
   auditLogCount: number;
   woByRequestType: { month: string; requestType: string; count: number }[];
   taskDurationByDomain: { domain: string; avgDays: number; taskCount: number }[];
+  taskBacklogByDomain: { domain: string; openTaskCount: number }[];
+  woBySource: { source: string; count: number; value: number }[];
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -147,6 +149,8 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
     auditCountRes,
     woByReqTypeRes,
     taskDurationRes,
+    taskBacklogRes,
+    woBySourceRes,
   ] = await Promise.all([
     // Core KPIs
     query<{ status: string; count: string }>(
@@ -328,6 +332,29 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
        ORDER BY "avgDays" DESC`,
       scopeParams
     ),
+    // Task backlog by domain (currently incomplete tasks)
+    query<{ domain: string; openTaskCount: string }>(
+      `SELECT COALESCE(rt.domain, 'Unset') AS domain,
+              COUNT(*)::int AS "openTaskCount"
+       FROM wo_task wt
+       JOIN csi_wo w ON w.id = wt.csi_wo_id
+       JOIN request_type rt ON rt.id = w.requesttypeid
+       WHERE wt.status = 'Active' AND wt.datecompleted IS NULL ${woScope}
+       GROUP BY rt.domain
+       ORDER BY "openTaskCount" DESC`,
+      scopeParams
+    ),
+    // WO count/value by source (requesting department)
+    query<{ source: string; count: string; value: string }>(
+      `SELECT COALESCE(w.sourceofwo, 'Unset') AS source,
+              COUNT(*)::int AS count,
+              COALESCE(SUM(w.indicativevalue), 0) AS value
+       FROM csi_wo w
+       WHERE 1=1 ${woScope}
+       GROUP BY w.sourceofwo
+       ORDER BY count DESC`,
+      scopeParams
+    ),
   ]);
 
   // Process WO counts
@@ -460,6 +487,15 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
       domain: r.domain,
       avgDays: parseFloat(r.avgDays),
       taskCount: parseInt(String(r.taskCount), 10),
+    })),
+    taskBacklogByDomain: taskBacklogRes.rows.map(r => ({
+      domain: r.domain,
+      openTaskCount: parseInt(String(r.openTaskCount), 10),
+    })),
+    woBySource: woBySourceRes.rows.map(r => ({
+      source: r.source,
+      count: parseInt(String(r.count), 10),
+      value: parseFloat(r.value),
     })),
   };
 }

@@ -12,7 +12,7 @@ export const woListQuerySchema = z.object({
   q: z.string().max(200).optional(),
   sourceType: z.string().max(50).optional(),
   sortBy: z
-    .enum(["csiWoNo", "title", "priority", "dueDate", "status", "createdAt"])
+    .enum(["csiWoNo", "title", "priority", "dueDate", "status", "createdAt", "lastActivityAt"])
     .default("createdAt"),
   sortDir: z.enum(["asc", "desc"]).default("desc"),
   limit: z.coerce.number().int().min(1).max(100).default(25),

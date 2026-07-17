@@ -33,6 +33,7 @@ const SOURCES = ["CMT", "CSA", "CPO", "CBA", "CST", "CSO", "CGI", "CSF", "CHO", 
 const SORT_OPTIONS = [
   { value: "createdAt:desc", label: "Newest first" },
   { value: "createdAt:asc", label: "Oldest first" },
+  { value: "lastActivityAt:asc", label: "Stale (oldest activity first)" },
   { value: "dueDate:asc", label: "Due date (soonest)" },
   { value: "dueDate:desc", label: "Due date (latest)" },
   { value: "csiWoNo:desc", label: "WO No. (newest)" },

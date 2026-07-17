@@ -45,6 +45,7 @@ export interface WoListItem {
   evidenceCount: number;
   progressPercent: number;
   createdAt: string;
+  lastActivityAt: string;
 }
 
 export interface WoListFilters {
@@ -71,6 +72,7 @@ const SORT_MAP: Record<string, string> = {
   dueDate: "w.duedate",
   status: "w.status",
   createdAt: "w.createdat",
+  lastActivityAt: "COALESCE(w.updatedat, w.createdat)",
 };
 
 export async function listWorkOrders(
@@ -190,6 +192,7 @@ export async function listWorkOrders(
       ct.tiercode AS "TierCode", ct.tiername AS "TierName",
       sa.name AS "AssignedToName",
       w.duedate AS "DueDate", w.status AS "Status", w.createdat AS "CreatedAt",
+      COALESCE(w.updatedat, w.createdat) AS "LastActivityAt",
       (rt.slaackdays + rt.slaclassifydays + rt.slaroutedays) AS "SlaTotalDays",
       COALESCE((SELECT SUM(e.hours) FROM effort_log e WHERE e.csi_wo_id = w.id), 0) AS "EffortTotal",
       (SELECT COUNT(*) FROM evidence_deliverable ed WHERE ed.csi_wo_id = w.id AND ed.removedat IS NULL) AS "EvidenceCount",
@@ -251,6 +254,7 @@ function sortColKey(sortBy: string): string {
     dueDate: "DueDate",
     status: "Status",
     createdAt: "CreatedAt",
+    lastActivityAt: "LastActivityAt",
   };
   return map[sortBy] ?? "CreatedAt";
 }
@@ -342,6 +346,7 @@ function mapWoListItem(row: Record<string, unknown>): WoListItem {
     evidenceCount: parseInt(String(row.EvidenceCount), 10),
     progressPercent: parseInt(String(row.ProgressPercent ?? 0), 10),
     createdAt: String(row.CreatedAt),
+    lastActivityAt: String(row.LastActivityAt),
   };
 }
 

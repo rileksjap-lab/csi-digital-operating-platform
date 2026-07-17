@@ -78,9 +78,34 @@ function buildPodSummaries(staff: StaffUtilization[]): PodSummary[] {
     .sort((a, b) => a.pod.localeCompare(b.pod));
 }
 
+type SortKey =
+  | "name" | "roleCode" | "subTeam" | "assignedHoursThisPeriod"
+  | "workedHoursThisPeriod" | "remainingCapacityHours" | "utilizationPct" | "openWoCount" | "band";
+
+function sortStaff(list: StaffUtilization[], key: SortKey, dir: "asc" | "desc"): StaffUtilization[] {
+  const sorted = [...list].sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (typeof av === "number" && typeof bv === "number") return av - bv;
+    return String(av ?? "").localeCompare(String(bv ?? ""));
+  });
+  return dir === "asc" ? sorted : sorted.reverse();
+}
+
 export default function CapacityPage() {
   const [bandFilter, setBandFilter] = useState<Band | null>(null);
   const [podFilter, setPodFilter] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function handleSortClick(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const { data, error, isLoading } = useSWR<UtilizationResponse>("/api/capacity", apiFetcher);
 
@@ -108,9 +133,10 @@ export default function CapacityPage() {
   const podFiltered = podFilter
     ? staff.filter((s) => (s.subTeam ?? "Unassigned") === podFilter)
     : staff;
-  const filteredStaff = bandFilter
+  const bandFiltered = bandFilter
     ? podFiltered.filter((s) => s.band === bandFilter)
     : podFiltered;
+  const filteredStaff = sortKey ? sortStaff(bandFiltered, sortKey, sortDir) : bandFiltered;
 
   return (
     <div className="space-y-6">
@@ -212,15 +238,15 @@ export default function CapacityPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Sub-Team</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase text-right">Assigned (h)</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase text-right">Worked (h)</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase text-right">Remaining (h)</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase w-48">Utilization</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase text-center">Open WOs</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Band</th>
+                <SortableTh label="Name" sortKey="name" current={sortKey} dir={sortDir} onClick={handleSortClick} />
+                <SortableTh label="Role" sortKey="roleCode" current={sortKey} dir={sortDir} onClick={handleSortClick} />
+                <SortableTh label="Sub-Team" sortKey="subTeam" current={sortKey} dir={sortDir} onClick={handleSortClick} />
+                <SortableTh label="Assigned (h)" sortKey="assignedHoursThisPeriod" current={sortKey} dir={sortDir} onClick={handleSortClick} align="right" />
+                <SortableTh label="Worked (h)" sortKey="workedHoursThisPeriod" current={sortKey} dir={sortDir} onClick={handleSortClick} align="right" />
+                <SortableTh label="Remaining (h)" sortKey="remainingCapacityHours" current={sortKey} dir={sortDir} onClick={handleSortClick} align="right" />
+                <SortableTh label="Utilization" sortKey="utilizationPct" current={sortKey} dir={sortDir} onClick={handleSortClick} className="w-48" />
+                <SortableTh label="Open WOs" sortKey="openWoCount" current={sortKey} dir={sortDir} onClick={handleSortClick} align="center" />
+                <SortableTh label="Band" sortKey="band" current={sortKey} dir={sortDir} onClick={handleSortClick} />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -306,5 +332,39 @@ function GaugeCard({
         />
       </div>
     </div>
+  );
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  current,
+  dir,
+  onClick,
+  align = "left",
+  className = "",
+}: {
+  label: string;
+  sortKey: SortKey;
+  current: SortKey | null;
+  dir: "asc" | "desc";
+  onClick: (key: SortKey) => void;
+  align?: "left" | "right" | "center";
+  className?: string;
+}) {
+  const alignClass = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  const isActive = current === sortKey;
+  return (
+    <th
+      onClick={() => onClick(sortKey)}
+      className={`px-4 py-3 text-xs font-medium uppercase cursor-pointer select-none hover:text-gray-700 ${
+        isActive ? "text-gray-800" : "text-gray-500"
+      } ${alignClass} ${className}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {isActive && <span className="text-primary-600">{dir === "asc" ? "↑" : "↓"}</span>}
+      </span>
+    </th>
   );
 }
