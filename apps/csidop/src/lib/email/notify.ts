@@ -339,3 +339,85 @@ export function notifyNewWoFromEmail(
     }
   })().catch(() => {});
 }
+
+export function notifyNewWoFromEwm(
+  woId: string,
+  csiWoNo: string,
+  title: string,
+  extWoNo: string,
+  requesterName: string
+): void {
+  (async () => {
+    // Notify HOD CSI
+    const result = await query<{ email: string }>(
+      `SELECT s.email FROM staff s
+       JOIN role r ON r.id = s.roleid
+       JOIN department d ON d.id = s.deptid
+       WHERE r.rolecode = 'HOD' AND d.deptcode = 'CSI' AND s.status = 'Active'`
+    );
+
+    for (const row of result.rows) {
+      await send(
+        row.email,
+        `New WO from EWM: ${csiWoNo}`,
+        wrap("New Work Order from EWM", `
+          <p style="color:#374151;font-size:14px;margin:0 0 12px;">
+            A new work order has been automatically imported from EWM.
+          </p>
+          <table style="border-collapse:collapse;margin:12px 0;">
+            ${field("CSI WO No.", csiWoNo)}
+            ${field("EWM WO No.", extWoNo)}
+            ${field("Title", title)}
+            ${field("Requester", requesterName || "—")}
+          </table>
+          ${actionButton("View & Assign", woId)}
+        `)
+      );
+    }
+  })().catch(() => {});
+}
+
+export function notifyWoCancelledByEwm(
+  staffId: string,
+  wo: { id: string; csiWoNo: string; title: string }
+): void {
+  (async () => {
+    const email = await getStaffEmail(staffId);
+    if (!email) return;
+    await send(
+      email,
+      `WO Cancelled in EWM: ${wo.csiWoNo}`,
+      wrap("Work Order Cancelled in EWM", `
+        <p style="color:#374151;font-size:14px;margin:0 0 12px;">
+          Work order <strong>${wo.csiWoNo}</strong> was cancelled in EWM and has
+          been automatically marked <span style="color:#dc2626;font-weight:600;">Cancelled</span> in CSIDOP.
+        </p>
+        ${woFields(wo)}
+        ${actionButton("View Work Order", wo.id)}
+      `)
+    );
+  })().catch(() => {});
+}
+
+export function notifyWoCompletedInEwm(
+  staffId: string,
+  wo: { id: string; csiWoNo: string; title: string }
+): void {
+  (async () => {
+    const email = await getStaffEmail(staffId);
+    if (!email) return;
+    await send(
+      email,
+      `EWM shows WO as completed: ${wo.csiWoNo}`,
+      wrap("Work Order Marked Completed in EWM", `
+        <p style="color:#374151;font-size:14px;margin:0 0 12px;">
+          EWM shows work order <strong>${wo.csiWoNo}</strong> as completed/closed on
+          their end. CSIDOP does not auto-close work orders on this signal — please
+          finalize evidence and approval in CSIDOP if the work is actually done.
+        </p>
+        ${woFields(wo)}
+        ${actionButton("View Work Order", wo.id)}
+      `)
+    );
+  })().catch(() => {});
+}

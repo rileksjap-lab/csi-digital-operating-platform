@@ -14,6 +14,7 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/health" ||
     pathname === "/api/digest" ||
     pathname === "/api/sla-check" ||
+    pathname === "/api/ewm-sync" ||
     (pathname === "/api/kpi" && request.method === "POST");
 
   if (pathname.startsWith("/api/") && !isAuthRoute) {
