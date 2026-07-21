@@ -75,10 +75,15 @@ const SORT_MAP: Record<string, string> = {
   lastActivityAt: "COALESCE(w.updatedat, w.createdat)",
 };
 
-export async function listWorkOrders(
+interface WoFilterWhereOpts {
+  excludeRequestType?: boolean;
+}
+
+function buildWoFilterWheres(
   filters: WoListFilters,
-  scope: ScopeFilter
-): Promise<CursorPage<WoListItem>> {
+  scope: ScopeFilter,
+  opts: WoFilterWhereOpts = {}
+): { wheres: string[]; params: unknown[]; paramIdx: number } {
   const params: unknown[] = [];
   const wheres: string[] = [];
   let paramIdx = 1;
@@ -103,7 +108,7 @@ export async function listWorkOrders(
     params.push(filters.domain);
     paramIdx++;
   }
-  if (filters.requestTypeId) {
+  if (filters.requestTypeId && !opts.excludeRequestType) {
     wheres.push(`AND w.requesttypeid = $${paramIdx}`);
     params.push(filters.requestTypeId);
     paramIdx++;
@@ -153,6 +158,18 @@ export async function listWorkOrders(
       paramIdx++;
     }
   }
+
+  return { wheres, params, paramIdx };
+}
+
+export async function listWorkOrders(
+  filters: WoListFilters,
+  scope: ScopeFilter
+): Promise<CursorPage<WoListItem>> {
+  const built = buildWoFilterWheres(filters, scope);
+  const wheres = built.wheres;
+  const params = built.params;
+  let paramIdx = built.paramIdx;
 
   // Cursor — kept separate so the count query excludes it
   const sortCol = SORT_MAP[filters.sortBy] ?? "w.createdat";
@@ -244,6 +261,49 @@ export async function listWorkOrders(
     hasNextPage,
     nextCursor,
   };
+}
+
+export interface WoTypeCount {
+  requestTypeId: string;
+  typeName: string;
+  count: number;
+  soonestDueDate: string | null;
+}
+
+// Counts (and soonest due date) per request type, respecting every filter
+// except requestTypeId itself — so all type cards stay visible and clickable
+// regardless of which one is currently selected, same interaction as
+// Capacity by Pod on the Capacity Dashboard.
+export async function getWoTypeCounts(
+  filters: WoListFilters,
+  scope: ScopeFilter
+): Promise<WoTypeCount[]> {
+  const { wheres, params } = buildWoFilterWheres(filters, scope, { excludeRequestType: true });
+  const whereStr = wheres.join("\n      ");
+
+  const result = await query<{
+    RequestTypeId: string;
+    TypeName: string;
+    Count: number;
+    SoonestDueDate: string | null;
+  }>(
+    `SELECT rt.id AS "RequestTypeId", rt.typename AS "TypeName",
+            COUNT(*)::int AS "Count", MIN(w.duedate) AS "SoonestDueDate"
+     FROM csi_wo w
+     JOIN request_type rt ON rt.id = w.requesttypeid
+     WHERE 1=1
+       ${whereStr}
+     GROUP BY rt.id, rt.typename
+     ORDER BY "Count" DESC`,
+    params
+  );
+
+  return result.rows.map((r) => ({
+    requestTypeId: r.RequestTypeId,
+    typeName: r.TypeName,
+    count: r.Count,
+    soonestDueDate: r.SoonestDueDate,
+  }));
 }
 
 function sortColKey(sortBy: string): string {

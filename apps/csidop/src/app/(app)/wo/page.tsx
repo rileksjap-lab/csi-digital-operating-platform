@@ -10,6 +10,7 @@ import { useAuthStore } from "@/lib/stores/auth.store";
 import { apiFetcher, apiPost } from "@/lib/api/fetcher";
 import WoFilterBar from "@/components/wo/wo-filter-bar";
 import WoDataTable from "@/components/wo/wo-data-table";
+import WoTypeCards from "@/components/wo/wo-type-cards";
 
 const WO_CREATE_ROLES: Role[] = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
 const BULK_ACTION_ROLES: Role[] = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
@@ -34,6 +35,7 @@ interface WoListResponse {
 interface Filters {
   status: string;
   domain: string;
+  requestTypeId: string;
   q: string;
   assignedTo: string;
   sourceType: string;
@@ -63,6 +65,7 @@ function WoListInner() {
   const [filters, setFilters] = useState<Filters>({
     status: searchParams.get("status") ?? "",
     domain: searchParams.get("domain") ?? "",
+    requestTypeId: searchParams.get("requestTypeId") ?? "",
     q: searchParams.get("q") ?? "",
     assignedTo: searchParams.get("assignedTo") ?? "",
     sourceType: searchParams.get("sourceType") ?? "",
@@ -80,6 +83,7 @@ function WoListInner() {
     const p = new URLSearchParams();
     if (filters.status) p.set("status", filters.status);
     if (filters.domain) p.set("domain", filters.domain);
+    if (filters.requestTypeId) p.set("requestTypeId", filters.requestTypeId);
     if (filters.q) p.set("q", filters.q);
     if (filters.assignedTo) p.set("assignedTo", filters.assignedTo);
     if (filters.sourceType) p.set("sourceType", filters.sourceType);
@@ -91,6 +95,20 @@ function WoListInner() {
     if (cursor) p.set("after", cursor);
     return p;
   }, [filters, cursor]);
+
+  // Same filters as the table, minus requestTypeId — so every type card
+  // stays visible and clickable regardless of which one is active.
+  const buildTypeCardParams = useCallback(() => {
+    const p = new URLSearchParams();
+    if (filters.status) p.set("status", filters.status);
+    if (filters.domain) p.set("domain", filters.domain);
+    if (filters.q) p.set("q", filters.q);
+    if (filters.assignedTo) p.set("assignedTo", filters.assignedTo);
+    if (filters.sourceType) p.set("sourceType", filters.sourceType);
+    if (filters.dueDateFrom) p.set("dueDateFrom", filters.dueDateFrom);
+    if (filters.dueDateTo) p.set("dueDateTo", filters.dueDateTo);
+    return p;
+  }, [filters]);
 
   // Sync URL bar so refresh preserves state
   useEffect(() => {
@@ -212,13 +230,17 @@ function WoListInner() {
 
   const clearAll = useCallback(() => {
     setFilters({
-      status: "", domain: "", q: "", assignedTo: "",
+      status: "", domain: "", requestTypeId: "", q: "", assignedTo: "",
       sourceType: "", dueDateFrom: "", dueDateTo: "",
       sortBy: "createdAt", sortDir: "desc", limit: "25",
     });
     setCursor(null);
     setPageOffset(0);
   }, []);
+
+  const selectType = useCallback((id: string) => {
+    updateFilter("requestTypeId", filters.requestTypeId === id ? "" : id);
+  }, [filters.requestTypeId, updateFilter]);
 
   const handleNextPage = useCallback(() => {
     if (data?.meta?.nextCursor) {
@@ -256,6 +278,12 @@ function WoListInner() {
           </Link>
         )}
       </div>
+
+      <WoTypeCards
+        queryString={buildTypeCardParams().toString()}
+        activeTypeId={filters.requestTypeId}
+        onSelect={selectType}
+      />
 
       <WoFilterBar
         filters={filters}
