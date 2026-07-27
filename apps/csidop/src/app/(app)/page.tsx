@@ -75,7 +75,7 @@ interface DashboardData {
   skillDomains: string[];
   skillHeatmap: { staff: string; scores: Record<string, number> }[];
   auditLogCount: number;
-  woByRequestType: { month: string; requestType: string; count: number }[];
+  woByDomainCurrentMonth: { domain: string; count: number }[];
   taskDurationByDomain: { domain: string; avgDays: number; taskCount: number }[];
   taskBacklogByDomain: { domain: string; openTaskCount: number }[];
   woBySource: { source: string; count: number; value: number }[];
@@ -86,6 +86,19 @@ interface DashboardData {
 const ACCENT = "#ED1F24";
 const BLUE = "#2563eb";
 const GREEN = "#16a34a";
+
+const DOMAIN_COLORS: Record<string, string> = {
+  "Solution Design": "#2a78d6",
+  BIM: "#eb6834",
+  Consultancy: "#1baf7a",
+  "Project Monitoring": "#eda100",
+  "Google CP": "#4a3aa7",
+  Others: "#e87ba4",
+  Unset: "#a8a29e",
+};
+function domainColor(domain: string): string {
+  return DOMAIN_COLORS[domain] ?? "#a8a29e";
+}
 
 function Spinner() {
   return (
@@ -487,40 +500,46 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* WO by Request Type */}
-          {d.woByRequestType.length > 0 && (() => {
-            const months = [...new Set(d.woByRequestType.map(r => r.month))];
-            const types = [...new Set(d.woByRequestType.map(r => r.requestType))];
-            const TYPE_COLORS = [
-              "#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6",
-              "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
-              "#14b8a6", "#e11d48", "#a855f7",
-            ];
+          {/* WO mix by domain, current month */}
+          {d.woByDomainCurrentMonth.length > 0 && (() => {
+            const total = d.woByDomainCurrentMonth.reduce((sum, r) => sum + r.count, 0);
             return (
               <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-                <h3 className="font-semibold text-gray-900 text-sm mb-4">Monthly WO by Request Type</h3>
-                <div className="h-[260px]">
-                  <Bar data={{
-                    labels: months,
-                    datasets: types.map((t, i) => ({
-                      label: t,
-                      data: months.map(m => {
-                        const found = d.woByRequestType.find(r => r.month === m && r.requestType === t);
-                        return found?.count ?? 0;
-                      }),
-                      backgroundColor: TYPE_COLORS[i % TYPE_COLORS.length],
-                      borderRadius: 2,
-                    })),
-                  }} options={{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: {
-                      legend: { display: true, position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } },
-                    },
-                    scales: {
-                      x: { stacked: true, grid: CHART_NO_GRID },
-                      y: { stacked: true, grid: CHART_GRID, beginAtZero: true },
-                    },
-                  }} />
+                <div className="flex items-baseline justify-between mb-1">
+                  <h3 className="font-semibold text-gray-900 text-sm">WO mix this month, by domain</h3>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">
+                  {new Date().toLocaleDateString("en-MY", { month: "long", year: "numeric" })}
+                </p>
+                <div className="flex items-center gap-6">
+                  <div className="relative w-[160px] h-[160px] shrink-0">
+                    <Doughnut data={{
+                      labels: d.woByDomainCurrentMonth.map(r => r.domain),
+                      datasets: [{
+                        data: d.woByDomainCurrentMonth.map(r => r.count),
+                        backgroundColor: d.woByDomainCurrentMonth.map(r => domainColor(r.domain)),
+                        borderWidth: 2, borderColor: "#FFFFFF",
+                      }],
+                    }} options={{
+                      responsive: true, maintainAspectRatio: false, cutout: "72%",
+                      plugins: { legend: { display: false } },
+                    }} />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-xl font-bold text-gray-900">{total}</span>
+                      <span className="text-[11px] text-gray-400">total WOs</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+                    {d.woByDomainCurrentMonth.map(r => (
+                      <div key={r.domain} className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0">
+                          <span style={{ background: domainColor(r.domain) }} className="w-2 h-2 rounded-sm shrink-0" />
+                          <span className="truncate">{r.domain}</span>
+                        </span>
+                        <span className="text-xs font-semibold text-gray-900 shrink-0">{r.count}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
@@ -562,29 +581,36 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {d.taskBacklogByDomain.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-                <div className="flex items-baseline justify-between mb-4">
-                  <h3 className="font-semibold text-gray-900 text-sm">Task Backlog by Domain</h3>
-                  <span className="text-xs text-gray-400">open tasks now</span>
+            {d.taskBacklogByDomain.length > 0 && (() => {
+              const maxCount = Math.max(...d.taskBacklogByDomain.map(t => t.openTaskCount), 1);
+              return (
+                <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+                  <div className="flex items-baseline justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900 text-sm">Task Backlog by Domain</h3>
+                    <span className="text-xs text-gray-400">open tasks now</span>
+                  </div>
+                  <div className="flex flex-col gap-3.5">
+                    {d.taskBacklogByDomain.map(t => (
+                      <div key={t.domain}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-gray-700">{t.domain}</span>
+                          <span className="text-xs font-semibold text-gray-900">{t.openTaskCount}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.max((t.openTaskCount / maxCount) * 100, 3)}%`,
+                              background: domainColor(t.domain),
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="h-[220px]">
-                  <Bar data={{
-                    labels: d.taskBacklogByDomain.map(t => t.domain),
-                    datasets: [{
-                      label: "Open tasks",
-                      data: d.taskBacklogByDomain.map(t => t.openTaskCount),
-                      backgroundColor: ACCENT,
-                      borderRadius: 3,
-                    }],
-                  }} options={{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { x: { grid: CHART_NO_GRID }, y: { grid: CHART_GRID, beginAtZero: true } },
-                  }} />
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Recent WOs + WO by Status */}
