@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR, { mutate } from "swr";
-import { apiFetcher } from "@/lib/api/fetcher";
+import { apiFetcher, apiPatch } from "@/lib/api/fetcher";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -677,12 +677,27 @@ function CertificationForm({ onClose, onSuccess }: { onClose: () => void; onSucc
 function TrainingTab() {
   const [statusFilter, setStatusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState("");
 
   const url = statusFilter
     ? `/api/skills/training?status=${statusFilter}`
     : "/api/skills/training";
 
   const { data, error, isLoading } = useSWR<TrainingPlanRow[]>(url, apiFetcher);
+
+  const handleStatusChange = async (id: string, status: string) => {
+    setUpdatingId(id);
+    setUpdateError("");
+    try {
+      await apiPatch(`/api/skills/training/${id}`, { status });
+      mutate(url);
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   if (isLoading) return <Spinner />;
   if (error) return <ErrorBox message={error.message} />;
@@ -734,6 +749,10 @@ function TrainingTab() {
         <span className="text-xs text-gray-400">
           {data.length} plan{data.length !== 1 ? "s" : ""}
         </span>
+
+        {updateError && (
+          <span className="text-xs font-medium text-red-600">{updateError}</span>
+        )}
 
         <div className="ml-auto">
           <button
@@ -789,7 +808,19 @@ function TrainingTab() {
                     ) : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge className={TRAINING_STATUS_COLORS[tp.status] ?? ""}>{tp.status}</Badge>
+                    <select
+                      value={tp.status}
+                      disabled={updatingId === tp.id}
+                      onChange={(e) => handleStatusChange(tp.id, e.target.value)}
+                      className={`rounded-full border-0 px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
+                        TRAINING_STATUS_COLORS[tp.status] ?? ""
+                      }`}
+                    >
+                      <option value="Planned">Planned</option>
+                      <option value="InProgress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
                   </td>
                 </tr>
               ))}
