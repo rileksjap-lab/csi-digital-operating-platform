@@ -1380,40 +1380,61 @@ export async function addWoTask(
   input: { description: string; assignedTo?: string; scope?: string },
   session: AuthSession
 ): Promise<WoTaskItem> {
-  const seqResult = await query<{ maxNo: string | null }>(
-    `SELECT MAX(taskno) AS "maxNo" FROM wo_task WHERE csi_wo_id = $1`,
-    [woId]
-  );
-  const nextNo = (parseInt(seqResult.rows[0]?.maxNo ?? "0", 10) || 0) + 1;
+  // pg_advisory_xact_lock serializes concurrent adds to the same WO's
+  // checklist (e.g. two near-simultaneous clicks, or two tabs) so the
+  // MAX(taskno)+1 read below can't race with another add — the lock is
+  // held for the duration of this transaction and auto-released on
+  // commit/rollback. uq_wotask_wo_taskno (017_wo_form_redesign.sql)
+  // already stops a raw duplicate taskno from being written, but without
+  // this lock a race would surface as a confusing constraint-violation
+  // error instead of both tasks just being added cleanly.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [woId]);
 
-  const result = await query<{ Id: string; DateCreated: string }>(
-    `INSERT INTO wo_task (csi_wo_id, taskno, description, assignedto, scope)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id AS "Id", datecreated AS "DateCreated"`,
-    [woId, nextNo, input.description, input.assignedTo ?? null, input.scope ?? "Internal"]
-  );
-
-  let assignedToName: string | null = null;
-  if (input.assignedTo) {
-    const staffResult = await query<{ Name: string }>(
-      `SELECT name AS "Name" FROM staff WHERE id = $1`,
-      [input.assignedTo]
+    const seqResult = await client.query<{ maxNo: string | null }>(
+      `SELECT MAX(taskno) AS "maxNo" FROM wo_task WHERE csi_wo_id = $1`,
+      [woId]
     );
-    assignedToName = (staffResult.rows[0]?.Name as string) ?? null;
-  }
+    const nextNo = (parseInt(seqResult.rows[0]?.maxNo ?? "0", 10) || 0) + 1;
 
-  return {
-    id: result.rows[0].Id,
-    taskNo: nextNo,
-    description: input.description,
-    assignedToId: input.assignedTo ?? null,
-    assignedToName,
-    progress: 0,
-    scope: input.scope ?? "Internal",
-    status: "Active",
-    dateCreated: String(result.rows[0].DateCreated),
-    dateCompleted: null,
-  };
+    const result = await client.query<{ Id: string; DateCreated: string }>(
+      `INSERT INTO wo_task (csi_wo_id, taskno, description, assignedto, scope)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id AS "Id", datecreated AS "DateCreated"`,
+      [woId, nextNo, input.description, input.assignedTo ?? null, input.scope ?? "Internal"]
+    );
+
+    let assignedToName: string | null = null;
+    if (input.assignedTo) {
+      const staffResult = await client.query<{ Name: string }>(
+        `SELECT name AS "Name" FROM staff WHERE id = $1`,
+        [input.assignedTo]
+      );
+      assignedToName = (staffResult.rows[0]?.Name as string) ?? null;
+    }
+
+    await client.query("COMMIT");
+
+    return {
+      id: result.rows[0].Id,
+      taskNo: nextNo,
+      description: input.description,
+      assignedToId: input.assignedTo ?? null,
+      assignedToName,
+      progress: 0,
+      scope: input.scope ?? "Internal",
+      status: "Active",
+      dateCreated: String(result.rows[0].DateCreated),
+      dateCompleted: null,
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateWoTask(
