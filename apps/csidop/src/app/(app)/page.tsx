@@ -127,6 +127,36 @@ function KpiCard({
   );
 }
 
+function DialGauge({ label, value, displayValue, color }: {
+  label: string; value: number; displayValue: string; color: string;
+}) {
+  const clamped = Math.max(0, Math.min(100, value));
+  const r = 30;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - clamped / 100);
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow text-center">
+      <svg width="72" height="72" viewBox="0 0 72 72" className="mx-auto">
+        <circle cx="36" cy="36" r={r} fill="none" stroke="#F1F5F9" strokeWidth="8" />
+        <circle
+          cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="8"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          strokeLinecap="round" transform="rotate(-90 36 36)"
+        />
+        <text x="36" y="41" textAnchor="middle" fontSize="15" fontWeight="600" fill="#1e293b">
+          {displayValue}
+        </text>
+      </svg>
+      <p className="mt-2 text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
+    </div>
+  );
+}
+
+function RagDot({ status }: { status: "green" | "amber" | "red" }) {
+  const color = status === "green" ? "#1D9E75" : status === "amber" ? "#BA7517" : "#E24B4A";
+  return <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ background: color }} />;
+}
+
 function UtilGauge({ label, value, threshold, color }: {
   label: string; value: number; threshold: number; color: string;
 }) {
@@ -274,9 +304,6 @@ function DigestButton() {
 
 // ─── Tab Icons (SVG) ────────────────────────────────────────────────────────
 
-function IconClipboard({ className }: { className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>;
-}
 function IconCheck({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 }
@@ -368,18 +395,56 @@ export default function DashboardPage() {
       {tab === "Operations" && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Open Work Orders" value={d.kpis.woOpen + d.kpis.woInProgress}
-              sub={`${d.kpis.woInProgress} in progress`}
-              icon={<IconClipboard className="h-5 w-5 text-blue-600" />} accentBg="#EEF4FB" />
-            <KpiCard label="Closed This Month" value={d.kpis.woClosed}
-              sub={totalWo > 0 ? `${((d.kpis.woClosed / totalWo) * 100).toFixed(1)}% closure rate` : "—"}
-              icon={<IconCheck className="h-5 w-5 text-green-600" />} accentBg="#EAF3DE" />
-            <KpiCard label="Overdue WOs" value={d.kpis.woOverdue}
-              sub={d.kpis.woOverdue > 0 ? "Action required" : "All on track"}
-              icon={<IconAlert className="h-5 w-5 text-red-500" />} accentBg="#FCEBEB" />
-            <KpiCard label="SLA Achievement" value={`${d.kpis.slaAchievement}%`}
-              sub="Target: ≥ 90%"
-              icon={<IconTarget className="h-5 w-5 text-amber-600" />} accentBg="#FEF9EC" />
+            <DialGauge
+              label="Open Work Orders"
+              displayValue={String(d.kpis.woOpen + d.kpis.woInProgress)}
+              value={totalWo > 0 ? ((d.kpis.woOpen + d.kpis.woInProgress) / totalWo) * 100 : 0}
+              color="#378ADD"
+            />
+            <DialGauge
+              label="Closed This Month"
+              displayValue={String(d.kpis.woClosed)}
+              value={totalWo > 0 ? (d.kpis.woClosed / totalWo) * 100 : 0}
+              color="#1D9E75"
+            />
+            <DialGauge
+              label="Overdue WOs"
+              displayValue={String(d.kpis.woOverdue)}
+              value={
+                d.kpis.woOpen + d.kpis.woInProgress > 0
+                  ? (d.kpis.woOverdue / (d.kpis.woOpen + d.kpis.woInProgress)) * 100
+                  : 0
+              }
+              color={d.kpis.woOverdue > 0 ? "#E24B4A" : "#1D9E75"}
+            />
+            <DialGauge
+              label="SLA Achievement"
+              displayValue={`${d.kpis.slaAchievement}%`}
+              value={d.kpis.slaAchievement}
+              color={d.kpis.slaAchievement >= 90 ? "#1D9E75" : d.kpis.slaAchievement >= 75 ? "#BA7517" : "#E24B4A"}
+            />
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Operational Health</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">SLA compliance</span>
+                <RagDot status={d.kpis.slaAchievement >= 90 ? "green" : d.kpis.slaAchievement >= 75 ? "amber" : "red"} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">Capacity utilization</span>
+                <RagDot status={d.kpis.overloadedCount > 0 ? "red" : d.kpis.warningCount > 0 ? "amber" : "green"} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">Overdue work orders</span>
+                <RagDot status={d.kpis.woOverdue > 0 ? "red" : "green"} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">Certification expiry</span>
+                <RagDot status={d.kpis.expiringCerts > 0 ? "amber" : "green"} />
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
