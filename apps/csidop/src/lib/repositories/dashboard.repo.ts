@@ -332,14 +332,16 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
        ORDER BY "avgDays" DESC`,
       scopeParams
     ),
-    // Task backlog by domain (currently incomplete tasks)
+    // Task backlog by domain (currently incomplete tasks on still-open WOs —
+    // a Closed/Cancelled WO's leftover incomplete tasks aren't real backlog)
     query<{ domain: string; openTaskCount: string }>(
       `SELECT COALESCE(rt.domain, 'Unset') AS domain,
               COUNT(*)::int AS "openTaskCount"
        FROM wo_task wt
        JOIN csi_wo w ON w.id = wt.csi_wo_id
        JOIN request_type rt ON rt.id = w.requesttypeid
-       WHERE wt.status = 'Active' AND wt.datecompleted IS NULL ${woScope}
+       WHERE wt.status = 'Active' AND wt.datecompleted IS NULL
+         AND w.status NOT IN ('Closed', 'Cancelled') ${woScope}
        GROUP BY rt.domain
        ORDER BY "openTaskCount" DESC`,
       scopeParams
