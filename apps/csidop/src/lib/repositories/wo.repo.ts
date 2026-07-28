@@ -55,6 +55,7 @@ export interface WoListFilters {
   tierId?: string;
   tenderId?: string;
   assignedTo?: string;
+  pod?: string;
   dueDateFrom?: string;
   dueDateTo?: string;
   q?: string;
@@ -77,6 +78,7 @@ const SORT_MAP: Record<string, string> = {
 
 interface WoFilterWhereOpts {
   excludeRequestType?: boolean;
+  excludePod?: boolean;
 }
 
 function buildWoFilterWheres(
@@ -129,6 +131,20 @@ function buildWoFilterWheres(
     wheres.push(`AND w.assignedto = $${paramIdx}`);
     params.push(filters.assignedTo);
     paramIdx++;
+  }
+  // Pod comes from the assignee's subteam, not a column on csi_wo itself —
+  // a subquery keeps this portable across callers that may not have
+  // joined staff (e.g. getWoPodCounts doesn't need the join otherwise).
+  if (filters.pod && !opts.excludePod) {
+    if (filters.pod === "Unassigned") {
+      wheres.push(`AND w.assignedto IS NULL`);
+    } else {
+      wheres.push(
+        `AND w.assignedto IN (SELECT id FROM staff WHERE subteam = $${paramIdx})`
+      );
+      params.push(filters.pod);
+      paramIdx++;
+    }
   }
   if (filters.dueDateFrom) {
     wheres.push(`AND w.duedate >= $${paramIdx}`);
@@ -301,6 +317,47 @@ export async function getWoTypeCounts(
   return result.rows.map((r) => ({
     requestTypeId: r.RequestTypeId,
     typeName: r.TypeName,
+    count: r.Count,
+    soonestDueDate: r.SoonestDueDate,
+  }));
+}
+
+export interface WoPodCount {
+  pod: string;
+  count: number;
+  soonestDueDate: string | null;
+}
+
+// Counts (and soonest due date) per pod — pod comes from the assignee's
+// subteam, so unassigned WOs bucket into "Unassigned" rather than being
+// dropped. Respects every filter except pod itself, same interaction as
+// the request-type cards.
+export async function getWoPodCounts(
+  filters: WoListFilters,
+  scope: ScopeFilter
+): Promise<WoPodCount[]> {
+  const { wheres, params } = buildWoFilterWheres(filters, scope, { excludePod: true });
+  const whereStr = wheres.join("\n      ");
+
+  const result = await query<{
+    Pod: string;
+    Count: number;
+    SoonestDueDate: string | null;
+  }>(
+    `SELECT COALESCE(sa.subteam, 'Unassigned') AS "Pod",
+            COUNT(*)::int AS "Count", MIN(w.duedate) AS "SoonestDueDate"
+     FROM csi_wo w
+     JOIN request_type rt ON rt.id = w.requesttypeid
+     LEFT JOIN staff sa ON sa.id = w.assignedto
+     WHERE 1=1
+       ${whereStr}
+     GROUP BY COALESCE(sa.subteam, 'Unassigned')
+     ORDER BY "Count" DESC`,
+    params
+  );
+
+  return result.rows.map((r) => ({
+    pod: r.Pod,
     count: r.Count,
     soonestDueDate: r.SoonestDueDate,
   }));

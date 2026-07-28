@@ -7,6 +7,7 @@ export const woListQuerySchema = z.object({
   tierId: z.string().uuid().optional(),
   tenderId: z.string().uuid().optional(),
   assignedTo: z.string().optional(),
+  pod: z.string().max(30).optional(),
   dueDateFrom: z.string().date().optional(),
   dueDateTo: z.string().date().optional(),
   q: z.string().max(200).optional(),

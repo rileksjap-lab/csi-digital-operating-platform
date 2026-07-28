@@ -11,6 +11,7 @@ import { apiFetcher, apiPost } from "@/lib/api/fetcher";
 import WoFilterBar from "@/components/wo/wo-filter-bar";
 import WoDataTable from "@/components/wo/wo-data-table";
 import WoTypeCards from "@/components/wo/wo-type-cards";
+import WoPodCards from "@/components/wo/wo-pod-cards";
 
 const WO_CREATE_ROLES: Role[] = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
 const BULK_ACTION_ROLES: Role[] = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
@@ -36,6 +37,7 @@ interface Filters {
   status: string;
   domain: string;
   requestTypeId: string;
+  pod: string;
   q: string;
   assignedTo: string;
   sourceType: string;
@@ -66,6 +68,7 @@ function WoListInner() {
     status: searchParams.get("status") ?? "",
     domain: searchParams.get("domain") ?? "",
     requestTypeId: searchParams.get("requestTypeId") ?? "",
+    pod: searchParams.get("pod") ?? "",
     q: searchParams.get("q") ?? "",
     assignedTo: searchParams.get("assignedTo") ?? "",
     sourceType: searchParams.get("sourceType") ?? "",
@@ -84,6 +87,7 @@ function WoListInner() {
     if (filters.status) p.set("status", filters.status);
     if (filters.domain) p.set("domain", filters.domain);
     if (filters.requestTypeId) p.set("requestTypeId", filters.requestTypeId);
+    if (filters.pod) p.set("pod", filters.pod);
     if (filters.q) p.set("q", filters.q);
     if (filters.assignedTo) p.set("assignedTo", filters.assignedTo);
     if (filters.sourceType) p.set("sourceType", filters.sourceType);
@@ -102,6 +106,22 @@ function WoListInner() {
     const p = new URLSearchParams();
     if (filters.status) p.set("status", filters.status);
     if (filters.domain) p.set("domain", filters.domain);
+    if (filters.pod) p.set("pod", filters.pod);
+    if (filters.q) p.set("q", filters.q);
+    if (filters.assignedTo) p.set("assignedTo", filters.assignedTo);
+    if (filters.sourceType) p.set("sourceType", filters.sourceType);
+    if (filters.dueDateFrom) p.set("dueDateFrom", filters.dueDateFrom);
+    if (filters.dueDateTo) p.set("dueDateTo", filters.dueDateTo);
+    return p;
+  }, [filters]);
+
+  // Same filters as the table, minus pod — so every pod card stays visible
+  // and clickable regardless of which one is active.
+  const buildPodCardParams = useCallback(() => {
+    const p = new URLSearchParams();
+    if (filters.status) p.set("status", filters.status);
+    if (filters.domain) p.set("domain", filters.domain);
+    if (filters.requestTypeId) p.set("requestTypeId", filters.requestTypeId);
     if (filters.q) p.set("q", filters.q);
     if (filters.assignedTo) p.set("assignedTo", filters.assignedTo);
     if (filters.sourceType) p.set("sourceType", filters.sourceType);
@@ -230,7 +250,7 @@ function WoListInner() {
 
   const clearAll = useCallback(() => {
     setFilters({
-      status: "", domain: "", requestTypeId: "", q: "", assignedTo: "",
+      status: "", domain: "", requestTypeId: "", pod: "", q: "", assignedTo: "",
       sourceType: "", dueDateFrom: "", dueDateTo: "",
       sortBy: "createdAt", sortDir: "desc", limit: "25",
     });
@@ -241,6 +261,10 @@ function WoListInner() {
   const selectType = useCallback((id: string) => {
     updateFilter("requestTypeId", filters.requestTypeId === id ? "" : id);
   }, [filters.requestTypeId, updateFilter]);
+
+  const selectPod = useCallback((pod: string) => {
+    updateFilter("pod", filters.pod === pod ? "" : pod);
+  }, [filters.pod, updateFilter]);
 
   const handleNextPage = useCallback(() => {
     if (data?.meta?.nextCursor) {
@@ -283,6 +307,12 @@ function WoListInner() {
         queryString={buildTypeCardParams().toString()}
         activeTypeId={filters.requestTypeId}
         onSelect={selectType}
+      />
+
+      <WoPodCards
+        queryString={buildPodCardParams().toString()}
+        activePod={filters.pod}
+        onSelect={selectPod}
       />
 
       <WoFilterBar
