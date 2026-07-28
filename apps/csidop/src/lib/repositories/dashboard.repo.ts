@@ -242,14 +242,21 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
        LEFT JOIN effort_log e ON e.logdate >= m.d AND e.logdate < m.d + INTERVAL '1 month'
        GROUP BY m.d ORDER BY m.d`
     ),
-    // Staff utilization for the current month. Only IsCurrent assignment rows
-    // count — historical/superseded reassignment rows (IsCurrent = false)
-    // were being summed in too, inflating utilization by every past
-    // reassignment (confirmed against prod: one staff member had 14
-    // assignment rows this month, only 9 of them IsCurrent). A staff member
-    // can legitimately have several IsCurrent rows across different WOs at
-    // once — a DB-level unique index (uq_assignment_one_current_per_wo)
-    // guarantees at most one per WO, so summing across WOs is correct.
+    // Staff utilization for the current month. Three conditions, each fixing
+    // a real double-count confirmed against prod data:
+    // 1. IsCurrent = true — historical/superseded reassignment rows were
+    //    being summed too (one staff member had 14 assignment rows this
+    //    month, only 9 IsCurrent).
+    // 2. WO not Closed/Cancelled — IsCurrent only means "not reassigned to
+    //    someone else", not "the WO is still open"; a closed WO's row stays
+    //    IsCurrent forever, so finished work kept counting as live workload.
+    //    Uses EXISTS rather than an extra LEFT JOIN so an excluded WO drops
+    //    the assignment row itself, not just nulls out its own columns.
+    // 3. assigneddate >= this month — scopes to current-month workload.
+    // A staff member can legitimately have several IsCurrent rows across
+    // different WOs at once — a DB-level unique index
+    // (uq_assignment_one_current_per_wo) guarantees at most one per WO, so
+    // summing across WOs is correct.
     query<{ id: string; name: string; rolecode: string; deptcode: string; assigned: string; capacity: string }>(
       `SELECT s.id, s.name, r.rolecode, d.deptcode,
               COALESCE(SUM(a.assignedhours), 0)::float AS assigned,
@@ -260,6 +267,10 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
        LEFT JOIN assignment a ON a.staffid = s.id
          AND a.iscurrent = true
          AND a.assigneddate >= date_trunc('month', CURRENT_DATE)
+         AND EXISTS (
+           SELECT 1 FROM csi_wo w2
+           WHERE w2.id = a.csi_wo_id AND w2.status NOT IN ('Closed', 'Cancelled')
+         )
        WHERE s.status = 'Active'
        GROUP BY s.id, s.name, r.rolecode, d.deptcode, s.productivityfactor
        ORDER BY assigned DESC`
