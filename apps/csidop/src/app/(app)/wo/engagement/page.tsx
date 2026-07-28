@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/api/fetcher";
+import WoPageTabs from "@/components/wo/wo-page-tabs";
 
 interface RequestTypeOption {
   Id: string;
@@ -134,16 +135,14 @@ export default function EngagementOverviewPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="space-y-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">Engagement Overview</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Leads, Tender / RFP, and Tender / Pre-Bid work — active engagements only
           </p>
         </div>
-        <Link href="/wo" className="text-sm font-medium text-primary-600 hover:text-primary-700">
-          ← Back to Work Orders
-        </Link>
+        <WoPageTabs active="engagement" />
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">

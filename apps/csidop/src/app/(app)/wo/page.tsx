@@ -12,6 +12,7 @@ import WoFilterBar from "@/components/wo/wo-filter-bar";
 import WoDataTable from "@/components/wo/wo-data-table";
 import WoTypeCards from "@/components/wo/wo-type-cards";
 import WoPodCards from "@/components/wo/wo-pod-cards";
+import WoPageTabs from "@/components/wo/wo-page-tabs";
 
 const WO_CREATE_ROLES: Role[] = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
 const BULK_ACTION_ROLES: Role[] = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
@@ -54,6 +55,7 @@ function WoListInner() {
   const canCreate = user ? WO_CREATE_ROLES.includes(user.role) : false;
   const canBulkAct = user ? BULK_ACTION_ROLES.includes(user.role) : false;
 
+  const [groupBy, setGroupBy] = useState<"type" | "pod">("type");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState<"reassign" | "cancel" | null>(null);
   const [bulkStaffId, setBulkStaffId] = useState("");
@@ -291,15 +293,9 @@ function WoListInner() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-800">Work Orders</h1>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/wo/engagement"
-            className="text-sm font-medium text-primary-600 hover:text-primary-700"
-          >
-            Engagement Overview →
-          </Link>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-gray-800">Work Orders</h1>
           {canCreate && (
             <Link
               href="/wo/new"
@@ -309,19 +305,52 @@ function WoListInner() {
             </Link>
           )}
         </div>
+        <WoPageTabs active="wo" />
       </div>
 
-      <WoTypeCards
-        queryString={buildTypeCardParams().toString()}
-        activeTypeId={filters.requestTypeId}
-        onSelect={selectType}
-      />
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700">Group by</h2>
+          <div className="inline-flex rounded-md bg-gray-100 p-0.5">
+            <button
+              onClick={() => setGroupBy("type")}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                groupBy === "type"
+                  ? "bg-white text-primary-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Type
+            </button>
+            <button
+              onClick={() => setGroupBy("pod")}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                groupBy === "pod"
+                  ? "bg-white text-primary-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Pod
+            </button>
+          </div>
+        </div>
 
-      <WoPodCards
-        queryString={buildPodCardParams().toString()}
-        activePod={filters.pod}
-        onSelect={selectPod}
-      />
+        {groupBy === "type" ? (
+          <WoTypeCards
+            queryString={buildTypeCardParams().toString()}
+            activeTypeId={filters.requestTypeId}
+            onSelect={selectType}
+            hideHeading
+          />
+        ) : (
+          <WoPodCards
+            queryString={buildPodCardParams().toString()}
+            activePod={filters.pod}
+            onSelect={selectPod}
+            hideHeading
+          />
+        )}
+      </div>
 
       <WoFilterBar
         filters={filters}
