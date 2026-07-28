@@ -107,3 +107,28 @@ export const trainingListQuerySchema = z.object({
   staffId: z.string().uuid().optional(),
   status: z.enum(TRAINING_STATUSES).optional(),
 });
+
+// ─── Skill self-assessment (quarterly questionnaire) ────────────────────────
+
+const SELF_ASSESSMENT_STATUSES = ["PendingReview", "Confirmed", "Rejected"] as const;
+
+export const selfAssessmentSubmitSchema = z.object({
+  skillId: z.string().uuid(),
+  answers: z.record(z.string(), z.number().int().min(0).max(3)),
+});
+
+export const selfAssessmentListQuerySchema = z.object({
+  staffId: z.string().uuid().optional(),
+  status: z.enum(SELF_ASSESSMENT_STATUSES).optional(),
+  domain: z.enum(TECHNOLOGY_DOMAINS).optional(),
+});
+
+export const selfAssessmentReviewSchema = z
+  .object({
+    decision: z.enum(["Confirmed", "Rejected"]),
+    reviewNote: z.string().min(1).max(500).optional(),
+  })
+  .refine((d) => d.decision !== "Rejected" || !!d.reviewNote, {
+    message: "reviewNote is required when rejecting a self-assessment",
+    path: ["reviewNote"],
+  });

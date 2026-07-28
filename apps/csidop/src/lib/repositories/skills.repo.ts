@@ -2,6 +2,7 @@ import pool, { query } from "@/lib/db/pool";
 import type { ScopeFilter } from "@/lib/auth/guards";
 import type { AuthSession } from "@/lib/types/api";
 import { insertAuditEntry } from "@/lib/db/audit";
+import { currentQuarterLabel, computeSuggestedLevel, validateAnswers } from "@/lib/skills/rubric";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,26 @@ export interface CertificationRow {
   daysUntilExpiry: number | null;
   status: string;
   evidenceFile: string | null;
+}
+
+export interface SelfAssessmentRow {
+  id: string;
+  staffId: string;
+  staffName: string;
+  staffCode: string;
+  deptCode: string;
+  skillId: string;
+  skillName: string;
+  technologyDomain: string;
+  quarterLabel: string;
+  answers: Record<string, number>;
+  totalScore: number;
+  suggestedLevel: string;
+  status: string;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  submittedAt: string;
 }
 
 export interface TrainingPlanRow {
@@ -205,7 +226,7 @@ export async function upsertAssessment(
       await insertAuditEntry(
         {
           entityName: "STAFF_SKILL",
-          entityId: `${input.staffId}:${input.skillId}`,
+          entityId: input.staffId,
           action: "Update",
           fieldName: "CompetencyLevel",
           oldValue: existing.rows[0].competencylevel,
@@ -223,7 +244,7 @@ export async function upsertAssessment(
       await insertAuditEntry(
         {
           entityName: "STAFF_SKILL",
-          entityId: `${input.staffId}:${input.skillId}`,
+          entityId: input.staffId,
           action: "Insert",
           newValue: JSON.stringify(input),
           performedBy: session.staffId,
@@ -626,4 +647,215 @@ export async function patchTrainingPlan(
   } finally {
     client.release();
   }
+}
+
+// ─── Skill self-assessment (quarterly questionnaire) ────────────────────────
+
+const SELF_ASSESSMENT_SELECT = `
+  SELECT sa.id AS "id",
+         sa.staffid AS "staffId",
+         s.name AS "staffName",
+         s.staffcode AS "staffCode",
+         d.deptcode AS "deptCode",
+         sa.skillid AS "skillId",
+         sk.skillname AS "skillName",
+         sk.technologydomain AS "technologyDomain",
+         sa.quarterlabel AS "quarterLabel",
+         sa.answers AS "answers",
+         sa.totalscore AS "totalScore",
+         sa.suggestedlevel AS "suggestedLevel",
+         sa.status AS "status",
+         r.name AS "reviewedByName",
+         sa.reviewedat AS "reviewedAt",
+         sa.reviewnote AS "reviewNote",
+         sa.submittedat AS "submittedAt"
+  FROM skill_self_assessment sa
+  JOIN staff s ON s.id = sa.staffid
+  JOIN department d ON d.id = s.deptid
+  JOIN skill sk ON sk.id = sa.skillid
+  LEFT JOIN staff r ON r.id = sa.reviewedby
+`;
+
+export async function listSelfAssessments(
+  filters: { staffId?: string; status?: string; domain?: string },
+  scope: ScopeFilter
+): Promise<SelfAssessmentRow[]> {
+  const params: unknown[] = [];
+  const conditions: string[] = ["s.status = 'Active'"];
+
+  if (filters.staffId) {
+    params.push(filters.staffId);
+    conditions.push(`sa.staffid = $${params.length}`);
+  }
+  if (filters.status) {
+    params.push(filters.status);
+    conditions.push(`sa.status = $${params.length}`);
+  }
+  if (filters.domain) {
+    params.push(filters.domain);
+    conditions.push(`sk.technologydomain = $${params.length}`);
+  }
+
+  const { clause: scopeClause, params: scopeParams } = staffScopeWhere(scope, params.length + 1);
+  params.push(...scopeParams);
+
+  const { rows } = await query<SelfAssessmentRow>(
+    `${SELF_ASSESSMENT_SELECT}
+     WHERE ${conditions.join(" AND ")} ${scopeClause}
+     ORDER BY sa.submittedat DESC`,
+    params
+  );
+  return rows;
+}
+
+export async function submitSelfAssessment(
+  input: { skillId: string; answers: Record<string, number> },
+  session: AuthSession
+): Promise<SelfAssessmentRow> {
+  const { valid, totalScore } = validateAnswers(input.answers);
+  if (!valid) {
+    throw Object.assign(new Error("Every rubric question must be answered with a score of 0-3"), { code: "INVALID_ANSWERS" });
+  }
+  const suggestedLevel = computeSuggestedLevel(totalScore);
+  const quarterLabel = currentQuarterLabel();
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO skill_self_assessment
+         (staffid, skillid, quarterlabel, answers, totalscore, suggestedlevel)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      [session.staffId, input.skillId, quarterLabel, JSON.stringify(input.answers), totalScore, suggestedLevel]
+    );
+    const id = rows[0].id;
+
+    await insertAuditEntry(
+      {
+        entityName: "SKILL_SELF_ASSESSMENT",
+        entityId: id,
+        action: "Insert",
+        newValue: JSON.stringify({ ...input, quarterLabel, totalScore, suggestedLevel }),
+        performedBy: session.staffId,
+      },
+      client
+    );
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const { rows } = await query<SelfAssessmentRow>(
+    `${SELF_ASSESSMENT_SELECT}
+     WHERE sa.staffid = $1 AND sa.skillid = $2 AND sa.quarterlabel = $3`,
+    [session.staffId, input.skillId, quarterLabel]
+  );
+  return rows[0];
+}
+
+export async function reviewSelfAssessment(
+  id: string,
+  input: { decision: "Confirmed" | "Rejected"; reviewNote?: string },
+  scope: ScopeFilter,
+  session: AuthSession
+): Promise<SelfAssessmentRow | null> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { clause: scopeClause, params: scopeParams } = staffScopeWhere(scope, 2);
+    const existing = await client.query<{
+      status: string;
+      staffid: string;
+      skillid: string;
+      suggestedlevel: string;
+    }>(
+      `SELECT sa.status, sa.staffid, sa.skillid, sa.suggestedlevel
+       FROM skill_self_assessment sa
+       JOIN staff s ON s.id = sa.staffid
+       WHERE sa.id = $1 ${scopeClause}
+       FOR UPDATE OF sa`,
+      [id, ...scopeParams]
+    );
+    if (existing.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    if (existing.rows[0].status !== "PendingReview") {
+      await client.query("ROLLBACK");
+      throw Object.assign(new Error("This self-assessment has already been reviewed"), { code: "ALREADY_REVIEWED" });
+    }
+
+    await client.query(
+      `UPDATE skill_self_assessment
+       SET status = $1, reviewedby = $2, reviewedat = now(), reviewnote = $3, updatedat = now()
+       WHERE id = $4`,
+      [input.decision, session.staffId, input.reviewNote ?? null, id]
+    );
+
+    await insertAuditEntry(
+      {
+        entityName: "SKILL_SELF_ASSESSMENT",
+        entityId: id,
+        action: "Update",
+        fieldName: "Status",
+        oldValue: "PendingReview",
+        newValue: input.decision,
+        reason: input.reviewNote ?? null,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    if (input.decision === "Confirmed") {
+      const { staffid, skillid, suggestedlevel } = existing.rows[0];
+      const priorLevel = await client.query<{ competencylevel: string }>(
+        `SELECT competencylevel FROM staff_skill WHERE staffid = $1 AND skillid = $2`,
+        [staffid, skillid]
+      );
+      if (priorLevel.rows.length > 0) {
+        await client.query(
+          `UPDATE staff_skill
+           SET competencylevel = $1, lastassessmentdate = CURRENT_DATE, assessedby = $2, updatedat = now()
+           WHERE staffid = $3 AND skillid = $4`,
+          [suggestedlevel, session.staffId, staffid, skillid]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO staff_skill (staffid, skillid, competencylevel, lastassessmentdate, assessedby)
+           VALUES ($1, $2, $3, CURRENT_DATE, $4)`,
+          [staffid, skillid, suggestedlevel, session.staffId]
+        );
+      }
+      await insertAuditEntry(
+        {
+          entityName: "STAFF_SKILL",
+          entityId: staffid,
+          action: priorLevel.rows.length > 0 ? "Update" : "Insert",
+          fieldName: "CompetencyLevel",
+          oldValue: priorLevel.rows[0]?.competencylevel ?? null,
+          newValue: suggestedlevel,
+          performedBy: session.staffId,
+        },
+        client
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const { rows } = await query<SelfAssessmentRow>(
+    `${SELF_ASSESSMENT_SELECT} WHERE sa.id = $1`,
+    [id]
+  );
+  return rows[0] ?? null;
 }

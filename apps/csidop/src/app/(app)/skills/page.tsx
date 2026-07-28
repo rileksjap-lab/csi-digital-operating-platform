@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR, { mutate } from "swr";
 import { apiFetcher, apiPatch } from "@/lib/api/fetcher";
+import SelfAssessmentTab from "@/components/skills/self-assessment-tab";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -62,10 +63,11 @@ interface TrainingPlanRow {
   createdAt: string;
 }
 
-type Tab = "competency" | "certifications" | "training";
+type Tab = "competency" | "self-assessment" | "certifications" | "training";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "competency", label: "Skills & Competency" },
+  { key: "self-assessment", label: "Self-Assessment" },
   { key: "certifications", label: "Certifications" },
   { key: "training", label: "Training Plans" },
 ];
@@ -130,6 +132,7 @@ export default function SkillsPage() {
       </div>
 
       {tab === "competency" && <CompetencyTab />}
+      {tab === "self-assessment" && <SelfAssessmentTab />}
       {tab === "certifications" && <CertificationsTab />}
       {tab === "training" && <TrainingTab />}
     </div>
