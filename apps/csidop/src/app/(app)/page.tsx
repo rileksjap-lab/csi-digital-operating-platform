@@ -531,12 +531,10 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex flex-col gap-2.5 flex-1 min-w-0">
                     {d.woByDomainCurrentMonth.map(r => (
-                      <div key={r.domain} className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0">
-                          <span style={{ background: domainColor(r.domain) }} className="w-2 h-2 rounded-sm shrink-0" />
-                          <span className="truncate">{r.domain}</span>
-                        </span>
-                        <span className="text-xs font-semibold text-gray-900 shrink-0">{r.count}</span>
+                      <div key={r.domain} className="flex items-center gap-1.5 text-xs text-gray-600 min-w-0">
+                        <span style={{ background: domainColor(r.domain) }} className="w-2 h-2 rounded-sm shrink-0" />
+                        <span className="truncate">{r.domain}</span>
+                        <span className="font-semibold text-gray-900 shrink-0">({r.count})</span>
                       </div>
                     ))}
                   </div>
