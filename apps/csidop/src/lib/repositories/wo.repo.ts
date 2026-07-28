@@ -37,6 +37,7 @@ export interface WoListItem {
   tierCode: number;
   tierName: string;
   assignedToName: string | null;
+  indicativeValue: number | null;
   dueDate: string | null;
   slaDaysRemaining: number | null;
   slaStatus: SlaStatus | null;
@@ -111,8 +112,9 @@ function buildWoFilterWheres(
     paramIdx++;
   }
   if (filters.requestTypeId && !opts.excludeRequestType) {
-    wheres.push(`AND w.requesttypeid = $${paramIdx}`);
-    params.push(filters.requestTypeId);
+    const requestTypeIds = filters.requestTypeId.split(",").map((s) => s.trim());
+    wheres.push(`AND w.requesttypeid = ANY($${paramIdx}::uuid[])`);
+    params.push(requestTypeIds);
     paramIdx++;
   }
   if (filters.tierId) {
@@ -223,7 +225,7 @@ export async function listWorkOrders(
       w.priorityinterdepart AS "Priority", w.sourceofwo AS "SourceOfWO",
       w.slaworkingdays AS "SLAWorkingDays",
       ct.tiercode AS "TierCode", ct.tiername AS "TierName",
-      sa.name AS "AssignedToName",
+      sa.name AS "AssignedToName", w.indicativevalue AS "IndicativeValue",
       w.duedate AS "DueDate", w.status AS "Status", w.createdat AS "CreatedAt",
       COALESCE(w.updatedat, w.createdat) AS "LastActivityAt",
       (rt.slaackdays + rt.slaclassifydays + rt.slaroutedays) AS "SlaTotalDays",
@@ -455,6 +457,7 @@ function mapWoListItem(row: Record<string, unknown>): WoListItem {
     tierCode: Number(row.TierCode),
     tierName: row.TierName as string,
     assignedToName: (row.AssignedToName as string) ?? null,
+    indicativeValue: row.IndicativeValue != null ? parseFloat(String(row.IndicativeValue)) : null,
     dueDate: row.DueDate ? String(row.DueDate) : null,
     slaDaysRemaining,
     slaStatus,

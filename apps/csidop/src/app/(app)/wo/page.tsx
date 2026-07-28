@@ -293,14 +293,22 @@ function WoListInner() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-800">Work Orders</h1>
-        {canCreate && (
+        <div className="flex items-center gap-3">
           <Link
-            href="/wo/new"
-            className="rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            href="/wo/engagement"
+            className="text-sm font-medium text-primary-600 hover:text-primary-700"
           >
-            New Work Order
+            Engagement Overview →
           </Link>
-        )}
+          {canCreate && (
+            <Link
+              href="/wo/new"
+              className="rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            >
+              New Work Order
+            </Link>
+          )}
+        </div>
       </div>
 
       <WoTypeCards

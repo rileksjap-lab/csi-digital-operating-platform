@@ -3,7 +3,7 @@ import { z } from "zod";
 export const woListQuerySchema = z.object({
   status: z.string().optional(),
   domain: z.string().optional(),
-  requestTypeId: z.string().uuid().optional(),
+  requestTypeId: z.string().optional(), // comma-separated UUIDs, matching status
   tierId: z.string().uuid().optional(),
   tenderId: z.string().uuid().optional(),
   assignedTo: z.string().optional(),
