@@ -170,9 +170,10 @@ function RagDot({ status }: { status: "green" | "amber" | "red" }) {
   return <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ background: color }} />;
 }
 
-function UtilGauge({ label, value, threshold, color }: {
-  label: string; value: number; threshold: number; color: string;
+function UtilGauge({ label, value, threshold }: {
+  label: string; value: number; threshold: number;
 }) {
+  const color = value > threshold ? "#E24B4A" : value > threshold * 0.85 ? "#BA7517" : "#1D9E75";
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
       <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{label}</p>
@@ -668,8 +669,8 @@ export default function DashboardPage() {
       {tab === "Resource" && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <UtilGauge label="CSI Utilization" value={d.kpis.csiUtilization} threshold={85} color={GREEN} />
-            <UtilGauge label="CMT Utilization" value={d.kpis.cmtUtilization} threshold={80} color={BLUE} />
+            <UtilGauge label="CSI Utilization" value={d.kpis.csiUtilization} threshold={85} />
+            <UtilGauge label="CMT Utilization" value={d.kpis.cmtUtilization} threshold={80} />
             <KpiCard label="Overloaded Staff" value={d.kpis.overloadedCount}
               sub={d.staffUtilization.filter(s => s.band === "Overloaded").map(s => s.name.split(" ")[0]).join(", ") || "None"}
               icon={<IconAlert className="h-5 w-5 text-red-500" />} accentBg="#FCEBEB" />

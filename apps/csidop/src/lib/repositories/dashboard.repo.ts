@@ -242,7 +242,14 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
        LEFT JOIN effort_log e ON e.logdate >= m.d AND e.logdate < m.d + INTERVAL '1 month'
        GROUP BY m.d ORDER BY m.d`
     ),
-    // Staff utilization
+    // Staff utilization for the current month. Only IsCurrent assignment rows
+    // count — historical/superseded reassignment rows (IsCurrent = false)
+    // were being summed in too, inflating utilization by every past
+    // reassignment (confirmed against prod: one staff member had 14
+    // assignment rows this month, only 9 of them IsCurrent). A staff member
+    // can legitimately have several IsCurrent rows across different WOs at
+    // once — a DB-level unique index (uq_assignment_one_current_per_wo)
+    // guarantees at most one per WO, so summing across WOs is correct.
     query<{ id: string; name: string; rolecode: string; deptcode: string; assigned: string; capacity: string }>(
       `SELECT s.id, s.name, r.rolecode, d.deptcode,
               COALESCE(SUM(a.assignedhours), 0)::float AS assigned,
@@ -251,6 +258,7 @@ export async function getDashboard(scope: ScopeFilter): Promise<DashboardData> {
        JOIN role r ON r.id = s.roleid
        JOIN department d ON d.id = s.deptid
        LEFT JOIN assignment a ON a.staffid = s.id
+         AND a.iscurrent = true
          AND a.assigneddate >= date_trunc('month', CURRENT_DATE)
        WHERE s.status = 'Active'
        GROUP BY s.id, s.name, r.rolecode, d.deptcode, s.productivityfactor
