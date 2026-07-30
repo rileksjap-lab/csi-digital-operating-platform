@@ -12,6 +12,7 @@ interface StaffSkillRow {
   staffCode: string;
   deptCode: string;
   subTeam: string | null;
+  roleCode: string;
   skillId: string;
   skillName: string;
   technologyDomain: string;
@@ -41,6 +42,7 @@ const DOMAINS = [
   "AI / HPC",
   "BIM",
   "Consultancy",
+  "Soft Skills",
 ];
 
 const PLAN_ROLES = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];

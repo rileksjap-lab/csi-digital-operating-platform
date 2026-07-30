@@ -28,6 +28,7 @@ interface StaffSkillRow {
   staffCode: string;
   deptCode: string;
   subTeam: string | null;
+  roleCode: string;
   skillId: string;
   skillName: string;
   technologyDomain: string;
@@ -85,6 +86,7 @@ const DOMAINS = [
   "AI / HPC",
   "BIM",
   "Consultancy",
+  "Soft Skills",
 ];
 
 const COMPETENCY_LEVELS = ["Beginner", "Intermediate", "Advanced", "Expert"];
@@ -182,7 +184,7 @@ function CompetencyTab() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard label="Total Assessments" value={data.length} />
         <KpiCard label="Staff Assessed" value={uniqueStaff} />
-        <KpiCard label="Domains Covered" value={`${uniqueDomains}/8`} sub={uniqueDomains < 8 ? "Gaps exist" : "Full coverage"} />
+        <KpiCard label="Domains Covered" value={`${uniqueDomains}/${DOMAINS.length}`} sub={uniqueDomains < DOMAINS.length ? "Gaps exist" : "Full coverage"} />
         <KpiCard label="Expert-Level" value={expertCount} sub={`${beginnerCount} at Beginner`} />
       </div>
 

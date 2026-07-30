@@ -10,6 +10,7 @@ interface StaffSkillRow {
   staffCode: string;
   deptCode: string;
   subTeam: string | null;
+  roleCode: string;
   skillId: string;
   skillName: string;
   technologyDomain: string;
@@ -17,6 +18,16 @@ interface StaffSkillRow {
   lastAssessmentDate: string;
   assessedByName: string;
 }
+
+const ROLE_LABELS: Record<string, string> = {
+  HOD: "HOD",
+  SM: "Solution Manager",
+  TL: "Team Lead",
+  TM: "Team Member",
+  BIM_MOD: "BIM Modeler",
+  BIM_TL: "BIM Team Lead",
+  GU: "Guest",
+};
 
 const DOMAINS = [
   "Cloud",
@@ -27,6 +38,7 @@ const DOMAINS = [
   "AI / HPC",
   "BIM",
   "Consultancy",
+  "Soft Skills",
 ];
 
 const PLAN_ROLES = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
@@ -54,6 +66,7 @@ export default function CompetencyHeatmap({ rows }: Props) {
   const canPlan = user ? PLAN_ROLES.includes(user.role) : false;
 
   const [podFilter, setPodFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const [expandedCell, setExpandedCell] = useState<string | null>(null);
   const [planTarget, setPlanTarget] = useState<{
     staffId: string;
@@ -68,9 +81,19 @@ export default function CompetencyHeatmap({ rows }: Props) {
     [rows]
   );
 
+  const roles = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.roleCode))).sort(),
+    [rows]
+  );
+
   const filteredRows = useMemo(
-    () => (podFilter ? rows.filter((r) => (r.subTeam ?? "Unassigned") === podFilter) : rows),
-    [rows, podFilter]
+    () =>
+      rows.filter(
+        (r) =>
+          (!podFilter || (r.subTeam ?? "Unassigned") === podFilter) &&
+          (!roleFilter || r.roleCode === roleFilter)
+      ),
+    [rows, podFilter, roleFilter]
   );
 
   const { staffList, matrix } = useMemo(() => {
@@ -116,6 +139,16 @@ export default function CompetencyHeatmap({ rows }: Props) {
           <option value="">All Pods</option>
           {pods.map((p) => (
             <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="">All Roles</option>
+          {roles.map((r) => (
+            <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
           ))}
         </select>
         <span className="text-xs text-gray-400">{staffList.length} staff</span>

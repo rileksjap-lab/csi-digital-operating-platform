@@ -50,6 +50,7 @@ const DOMAINS = [
   "AI / HPC",
   "BIM",
   "Consultancy",
+  "Soft Skills",
 ];
 
 const LEVEL_COLORS: Record<string, string> = {

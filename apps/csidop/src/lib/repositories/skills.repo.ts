@@ -18,6 +18,7 @@ export interface StaffSkillRow {
   staffCode: string;
   deptCode: string;
   subTeam: string | null;
+  roleCode: string;
   skillId: string;
   skillName: string;
   technologyDomain: string;
@@ -180,6 +181,7 @@ export async function listAssessments(
             s.staffcode AS "staffCode",
             d.deptcode AS "deptCode",
             s.subteam AS "subTeam",
+            r.rolecode AS "roleCode",
             sk.id AS "skillId",
             sk.skillname AS "skillName",
             sk.technologydomain AS "technologyDomain",
@@ -189,6 +191,7 @@ export async function listAssessments(
      FROM staff_skill ss
      JOIN staff s ON s.id = ss.staffid
      JOIN department d ON d.id = s.deptid
+     JOIN role r ON r.id = s.roleid
      JOIN skill sk ON sk.id = ss.skillid
      JOIN staff a ON a.id = ss.assessedby
      WHERE ${conditions.join(" AND ")} ${scopeClause}
@@ -263,6 +266,7 @@ export async function upsertAssessment(
               s.staffcode AS "staffCode",
               d.deptcode AS "deptCode",
               s.subteam AS "subTeam",
+              r.rolecode AS "roleCode",
               sk.id AS "skillId",
               sk.skillname AS "skillName",
               sk.technologydomain AS "technologyDomain",
@@ -272,6 +276,7 @@ export async function upsertAssessment(
        FROM staff_skill ss
        JOIN staff s ON s.id = ss.staffid
        JOIN department d ON d.id = s.deptid
+       JOIN role r ON r.id = s.roleid
        JOIN skill sk ON sk.id = ss.skillid
        JOIN staff a ON a.id = ss.assessedby
        WHERE ss.staffid = $1 AND ss.skillid = $2`,

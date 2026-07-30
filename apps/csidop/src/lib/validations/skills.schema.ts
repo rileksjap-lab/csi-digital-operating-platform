@@ -11,6 +11,7 @@ const TECHNOLOGY_DOMAINS = [
   "AI / HPC",
   "BIM",
   "Consultancy",
+  "Soft Skills",
 ] as const;
 
 export const skillCreateSchema = z.object({
