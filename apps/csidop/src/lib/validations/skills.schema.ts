@@ -123,6 +123,10 @@ export const selfAssessmentListQuerySchema = z.object({
   domain: z.enum(TECHNOLOGY_DOMAINS).optional(),
 });
 
+export const skillHistoryQuerySchema = z.object({
+  staffId: z.string().uuid(),
+});
+
 export const selfAssessmentReviewSchema = z
   .object({
     decision: z.enum(["Confirmed", "Rejected"]),

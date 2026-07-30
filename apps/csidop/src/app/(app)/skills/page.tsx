@@ -4,6 +4,8 @@ import { useState } from "react";
 import useSWR, { mutate } from "swr";
 import { apiFetcher, apiPatch } from "@/lib/api/fetcher";
 import SelfAssessmentTab from "@/components/skills/self-assessment-tab";
+import CompetencyHeatmap from "@/components/skills/competency-heatmap";
+import CompetencyByStaff from "@/components/skills/competency-by-staff";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -141,9 +143,12 @@ export default function SkillsPage() {
 
 // ─── Competency Tab ─────────────────────────────────────────────────────────
 
+type CompetencyView = "list" | "byDomain" | "byStaff";
+
 function CompetencyTab() {
   const [domainFilter, setDomainFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [view, setView] = useState<CompetencyView>("list");
   const url = domainFilter
     ? `/api/skills/assessments?domain=${encodeURIComponent(domainFilter)}`
     : "/api/skills/assessments";
@@ -178,8 +183,25 @@ function CompetencyTab() {
         <KpiCard label="Expert-Level" value={expertCount} sub={`${beginnerCount} at Beginner`} />
       </div>
 
-      {/* Filters + Add button */}
+      {/* View toggle + Filters + Add button */}
       <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-md bg-gray-100 p-0.5">
+          {([
+            { key: "list", label: "List" },
+            { key: "byDomain", label: "By Domain" },
+            { key: "byStaff", label: "By Staff" },
+          ] as { key: CompetencyView; label: string }[]).map((v) => (
+            <button
+              key={v.key}
+              onClick={() => setView(v.key)}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                view === v.key ? "bg-white text-primary-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
         <select
           value={domainFilter}
           onChange={(e) => setDomainFilter(e.target.value)}
@@ -204,7 +226,11 @@ function CompetencyTab() {
         </div>
       </div>
 
+      {view === "byDomain" && <CompetencyHeatmap rows={data} />}
+      {view === "byStaff" && <CompetencyByStaff rows={data} />}
+
       {/* Assessment table */}
+      {view === "list" && (
       <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -244,6 +270,7 @@ function CompetencyTab() {
           </table>
         </div>
       </div>
+      )}
 
       {/* Add Assessment slide-over */}
       {showForm && (

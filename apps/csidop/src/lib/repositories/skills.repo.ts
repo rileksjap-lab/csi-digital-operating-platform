@@ -231,6 +231,7 @@ export async function upsertAssessment(
           fieldName: "CompetencyLevel",
           oldValue: existing.rows[0].competencylevel,
           newValue: input.competencyLevel,
+          reason: input.skillId,
           performedBy: session.staffId,
         },
         client
@@ -247,6 +248,7 @@ export async function upsertAssessment(
           entityId: input.staffId,
           action: "Insert",
           newValue: JSON.stringify(input),
+          reason: input.skillId,
           performedBy: session.staffId,
         },
         client
@@ -282,6 +284,46 @@ export async function upsertAssessment(
   } finally {
     client.release();
   }
+}
+
+// ─── Assessment history (for the By Staff view) ─────────────────────────────
+
+export interface SkillHistoryEntry {
+  id: string;
+  skillId: string | null;
+  skillName: string | null;
+  technologyDomain: string | null;
+  action: string;
+  previousLevel: string | null;
+  newLevel: string | null;
+  performedByName: string;
+  performedAt: string;
+}
+
+export async function getSkillAssessmentHistory(
+  staffId: string,
+  scope: ScopeFilter
+): Promise<SkillHistoryEntry[]> {
+  const { clause: scopeClause, params: scopeParams } = staffScopeWhere(scope, 2);
+  const { rows } = await query<SkillHistoryEntry>(
+    `SELECT a.id AS "id",
+            sk.id AS "skillId",
+            sk.skillname AS "skillName",
+            sk.technologydomain AS "technologyDomain",
+            a.action AS "action",
+            a.oldvalue AS "previousLevel",
+            a.newvalue AS "newLevel",
+            COALESCE(p.name, 'System') AS "performedByName",
+            a.performedat AS "performedAt"
+     FROM audit_log a
+     JOIN staff s ON s.id = $1
+     LEFT JOIN skill sk ON sk.id::text = a.reason
+     LEFT JOIN staff p ON p.id = a.performedby
+     WHERE a.entityname = 'STAFF_SKILL' AND a.entityid = $1 ${scopeClause}
+     ORDER BY a.performedat DESC`,
+    [staffId, ...scopeParams]
+  );
+  return rows;
 }
 
 // ─── Certifications ─────────────────────────────────────────────────────────
@@ -839,6 +881,7 @@ export async function reviewSelfAssessment(
           fieldName: "CompetencyLevel",
           oldValue: priorLevel.rows[0]?.competencylevel ?? null,
           newValue: suggestedlevel,
+          reason: skillid,
           performedBy: session.staffId,
         },
         client
