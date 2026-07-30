@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAuthStore } from "@/lib/stores/auth.store";
+import QuickTrainingPlanModal from "./quick-training-plan-modal";
 
 interface StaffSkillRow {
   staffId: string;
@@ -27,6 +29,8 @@ const DOMAINS = [
   "Consultancy",
 ];
 
+const PLAN_ROLES = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
+
 const LEVEL_RANK: Record<string, number> = { Beginner: 1, Intermediate: 2, Advanced: 3, Expert: 4 };
 
 const LEVEL_BG: Record<string, string> = {
@@ -38,7 +42,7 @@ const LEVEL_BG: Record<string, string> = {
 
 interface CellDetail {
   level: string;
-  skills: { skillName: string; level: string }[];
+  skills: { skillId: string; skillName: string; level: string }[];
 }
 
 interface Props {
@@ -46,8 +50,18 @@ interface Props {
 }
 
 export default function CompetencyHeatmap({ rows }: Props) {
+  const user = useAuthStore((s) => s.user);
+  const canPlan = user ? PLAN_ROLES.includes(user.role) : false;
+
   const [podFilter, setPodFilter] = useState("");
   const [expandedCell, setExpandedCell] = useState<string | null>(null);
+  const [planTarget, setPlanTarget] = useState<{
+    staffId: string;
+    staffName: string;
+    domain: string;
+    presetSkillId?: string;
+    presetSkillName?: string;
+  } | null>(null);
 
   const pods = useMemo(
     () => Array.from(new Set(rows.map((r) => r.subTeam ?? "Unassigned"))).sort(),
@@ -70,9 +84,9 @@ export default function CompetencyHeatmap({ rows }: Props) {
       const domainMap = m.get(r.staffId)!;
       const existing = domainMap.get(r.technologyDomain);
       if (!existing) {
-        domainMap.set(r.technologyDomain, { level: r.competencyLevel, skills: [{ skillName: r.skillName, level: r.competencyLevel }] });
+        domainMap.set(r.technologyDomain, { level: r.competencyLevel, skills: [{ skillId: r.skillId, skillName: r.skillName, level: r.competencyLevel }] });
       } else {
-        existing.skills.push({ skillName: r.skillName, level: r.competencyLevel });
+        existing.skills.push({ skillId: r.skillId, skillName: r.skillName, level: r.competencyLevel });
         if (LEVEL_RANK[r.competencyLevel] > LEVEL_RANK[existing.level]) existing.level = r.competencyLevel;
       }
     }
@@ -85,9 +99,9 @@ export default function CompetencyHeatmap({ rows }: Props) {
   const expanded = useMemo(() => {
     if (!expandedCell) return null;
     const [staffId, domain] = expandedCell.split("|");
-    const cell = matrix.get(staffId)?.get(domain);
     const staff = staffList.find((s) => s.staffId === staffId);
-    if (!cell || !staff) return null;
+    if (!staff) return null;
+    const cell = matrix.get(staffId)?.get(domain) ?? null;
     return { staff, domain, cell };
   }, [expandedCell, matrix, staffList]);
 
@@ -136,17 +150,17 @@ export default function CompetencyHeatmap({ rows }: Props) {
                   const key = `${s.staffId}|${d}`;
                   return (
                     <td key={d} className="px-1 py-1 text-center">
-                      {cell ? (
-                        <button
-                          onClick={() => setExpandedCell(expandedCell === key ? null : key)}
-                          className={`w-full rounded px-2 py-1.5 text-[10px] font-semibold transition-transform hover:scale-105 ${LEVEL_BG[cell.level]}`}
-                          title={cell.skills.map((sk) => `${sk.skillName}: ${sk.level}`).join(", ")}
-                        >
-                          {cell.level.slice(0, 3)}
-                        </button>
-                      ) : (
-                        <span className="block px-2 py-1.5 text-[10px] text-gray-300">—</span>
-                      )}
+                      <button
+                        onClick={() => setExpandedCell(expandedCell === key ? null : key)}
+                        className={
+                          cell
+                            ? `w-full rounded px-2 py-1.5 text-[10px] font-semibold transition-transform hover:scale-105 ${LEVEL_BG[cell.level]}`
+                            : "w-full rounded px-2 py-1.5 text-[10px] text-gray-300 hover:bg-gray-50 hover:text-gray-400"
+                        }
+                        title={cell ? cell.skills.map((sk) => `${sk.skillName}: ${sk.level}`).join(", ") : "No assessment"}
+                      >
+                        {cell ? cell.level.slice(0, 3) : "—"}
+                      </button>
                     </td>
                   );
                 })}
@@ -166,14 +180,64 @@ export default function CompetencyHeatmap({ rows }: Props) {
       {expanded && (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs">
           <p className="font-medium text-gray-800">{expanded.staff.staffName} · {expanded.domain}</p>
-          <ul className="mt-1.5 space-y-0.5 text-gray-600">
-            {expanded.cell.skills.map((sk, i) => (
-              <li key={i}>
-                {sk.skillName}: <span className="font-medium text-gray-800">{sk.level}</span>
-              </li>
-            ))}
-          </ul>
+          {expanded.cell ? (
+            <ul className="mt-1.5 space-y-1">
+              {expanded.cell.skills.map((sk, i) => (
+                <li key={i} className="flex items-center justify-between gap-3">
+                  <span className="text-gray-600">
+                    {sk.skillName}: <span className="font-medium text-gray-800">{sk.level}</span>
+                  </span>
+                  {canPlan && (
+                    <button
+                      onClick={() =>
+                        setPlanTarget({
+                          staffId: expanded.staff.staffId,
+                          staffName: expanded.staff.staffName,
+                          domain: expanded.domain,
+                          presetSkillId: sk.skillId,
+                          presetSkillName: sk.skillName,
+                        })
+                      }
+                      className="shrink-0 text-[11px] font-medium text-primary-600 hover:text-primary-800"
+                    >
+                      Plan training →
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-1.5 flex items-center justify-between gap-3">
+              <span className="text-gray-500">No assessment yet</span>
+              {canPlan && (
+                <button
+                  onClick={() =>
+                    setPlanTarget({
+                      staffId: expanded.staff.staffId,
+                      staffName: expanded.staff.staffName,
+                      domain: expanded.domain,
+                    })
+                  }
+                  className="shrink-0 text-[11px] font-medium text-primary-600 hover:text-primary-800"
+                >
+                  Plan training →
+                </button>
+              )}
+            </div>
+          )}
         </div>
+      )}
+
+      {planTarget && (
+        <QuickTrainingPlanModal
+          staffId={planTarget.staffId}
+          staffName={planTarget.staffName}
+          domain={planTarget.domain}
+          presetSkillId={planTarget.presetSkillId}
+          presetSkillName={planTarget.presetSkillName}
+          onClose={() => setPlanTarget(null)}
+          onSuccess={() => setPlanTarget(null)}
+        />
       )}
     </div>
   );

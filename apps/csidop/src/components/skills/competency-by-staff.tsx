@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/api/fetcher";
+import { useAuthStore } from "@/lib/stores/auth.store";
+import QuickTrainingPlanModal from "./quick-training-plan-modal";
 
 interface StaffSkillRow {
   staffId: string;
@@ -41,6 +43,7 @@ const DOMAINS = [
   "Consultancy",
 ];
 
+const PLAN_ROLES = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
 const LEVEL_RANK: Record<string, number> = { Beginner: 1, Intermediate: 2, Advanced: 3, Expert: 4 };
 const LEVEL_NAMES = ["", "Beginner", "Intermediate", "Advanced", "Expert"];
 const LEVEL_BAR = ["", "bg-gray-400", "bg-blue-400", "bg-green-400", "bg-purple-500"];
@@ -50,6 +53,16 @@ interface Props {
 }
 
 export default function CompetencyByStaff({ rows }: Props) {
+  const user = useAuthStore((s) => s.user);
+  const canPlan = user ? PLAN_ROLES.includes(user.role) : false;
+  const [planTarget, setPlanTarget] = useState<{
+    staffId: string;
+    staffName: string;
+    domain: string;
+    presetSkillId?: string;
+    presetSkillName?: string;
+  } | null>(null);
+
   const staffList = useMemo(() => {
     const map = new Map<string, { staffId: string; staffName: string; deptCode: string }>();
     for (const r of rows) {
@@ -67,12 +80,16 @@ export default function CompetencyByStaff({ rows }: Props) {
   const staffRows = useMemo(() => rows.filter((r) => r.staffId === selectedStaffId), [rows, selectedStaffId]);
 
   const domainLevels = useMemo(() => {
-    const m = new Map<string, number>();
+    const ranks = new Map<string, number>();
+    const skillsByDomain = new Map<string, { skillId: string; skillName: string }[]>();
     for (const r of staffRows) {
       const rank = LEVEL_RANK[r.competencyLevel] ?? 0;
-      if (!m.has(r.technologyDomain) || rank > m.get(r.technologyDomain)!) m.set(r.technologyDomain, rank);
+      if (!ranks.has(r.technologyDomain) || rank > ranks.get(r.technologyDomain)!) ranks.set(r.technologyDomain, rank);
+      const list = skillsByDomain.get(r.technologyDomain) ?? [];
+      list.push({ skillId: r.skillId, skillName: r.skillName });
+      skillsByDomain.set(r.technologyDomain, list);
     }
-    return DOMAINS.map((d) => ({ domain: d, rank: m.get(d) ?? 0 }));
+    return DOMAINS.map((d) => ({ domain: d, rank: ranks.get(d) ?? 0, skills: skillsByDomain.get(d) ?? [] }));
   }, [staffRows]);
 
   const { data: history, isLoading: historyLoading } = useSWR<SkillHistoryEntry[]>(
@@ -99,19 +116,51 @@ export default function CompetencyByStaff({ rows }: Props) {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Competency by Domain</h3>
         <div className="space-y-2.5">
-          {domainLevels.map(({ domain, rank }) => (
-            <div key={domain} className="flex items-center gap-3">
-              <span className="w-44 shrink-0 text-xs text-gray-600">{domain}</span>
-              <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-100">
-                {rank > 0 && (
-                  <div className={`h-full rounded-full ${LEVEL_BAR[rank]}`} style={{ width: `${(rank / 4) * 100}%` }} />
+          {domainLevels.map(({ domain, rank, skills }) => {
+            const selectedStaff = staffList.find((s) => s.staffId === selectedStaffId);
+            const singleSkill = skills.length === 1 ? skills[0] : undefined;
+            return (
+              <div key={domain} className="flex items-center gap-3">
+                <span className="w-44 shrink-0 text-xs text-gray-600">{domain}</span>
+                <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  {rank > 0 && (
+                    <div className={`h-full rounded-full ${LEVEL_BAR[rank]}`} style={{ width: `${(rank / 4) * 100}%` }} />
+                  )}
+                </div>
+                <span className="w-24 shrink-0 text-right text-[11px] text-gray-500">{rank > 0 ? LEVEL_NAMES[rank] : "Not assessed"}</span>
+                {canPlan && selectedStaff && (
+                  <button
+                    onClick={() =>
+                      setPlanTarget({
+                        staffId: selectedStaff.staffId,
+                        staffName: selectedStaff.staffName,
+                        domain,
+                        presetSkillId: singleSkill?.skillId,
+                        presetSkillName: singleSkill?.skillName,
+                      })
+                    }
+                    className="shrink-0 text-[11px] font-medium text-primary-600 hover:text-primary-800"
+                  >
+                    Plan training
+                  </button>
                 )}
               </div>
-              <span className="w-24 shrink-0 text-right text-[11px] text-gray-500">{rank > 0 ? LEVEL_NAMES[rank] : "Not assessed"}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
+      {planTarget && (
+        <QuickTrainingPlanModal
+          staffId={planTarget.staffId}
+          staffName={planTarget.staffName}
+          domain={planTarget.domain}
+          presetSkillId={planTarget.presetSkillId}
+          presetSkillName={planTarget.presetSkillName}
+          onClose={() => setPlanTarget(null)}
+          onSuccess={() => setPlanTarget(null)}
+        />
+      )}
 
       <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
         <div className="border-b border-gray-200 px-4 py-2.5">
