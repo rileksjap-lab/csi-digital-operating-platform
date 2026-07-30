@@ -210,7 +210,7 @@ export default function CalendarPage() {
                   const cfg = EVENT_CONFIG[e.type];
                   const href =
                     e.type === "wo_deadline" ? `/wo/${e.id}` :
-                    e.type === "tender_closing" ? `/workloads` :
+                    e.type === "tender_closing" ? `/tenders/${e.id}` :
                     `/skills`;
 
                   return (
