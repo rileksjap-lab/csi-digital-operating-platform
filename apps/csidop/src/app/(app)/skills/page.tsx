@@ -6,6 +6,7 @@ import { apiFetcher, apiPatch } from "@/lib/api/fetcher";
 import SelfAssessmentTab from "@/components/skills/self-assessment-tab";
 import CompetencyHeatmap from "@/components/skills/competency-heatmap";
 import CompetencyByStaff from "@/components/skills/competency-by-staff";
+import ItKnowledgeTab from "@/components/skills/it-knowledge-tab";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -65,11 +66,12 @@ interface TrainingPlanRow {
   createdAt: string;
 }
 
-type Tab = "competency" | "self-assessment" | "certifications" | "training";
+type Tab = "competency" | "self-assessment" | "it-knowledge" | "certifications" | "training";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "competency", label: "Skills & Competency" },
   { key: "self-assessment", label: "Self-Assessment" },
+  { key: "it-knowledge", label: "IT Knowledge" },
   { key: "certifications", label: "Certifications" },
   { key: "training", label: "Training Plans" },
 ];
@@ -135,6 +137,7 @@ export default function SkillsPage() {
 
       {tab === "competency" && <CompetencyTab />}
       {tab === "self-assessment" && <SelfAssessmentTab />}
+      {tab === "it-knowledge" && <ItKnowledgeTab />}
       {tab === "certifications" && <CertificationsTab />}
       {tab === "training" && <TrainingTab />}
     </div>
