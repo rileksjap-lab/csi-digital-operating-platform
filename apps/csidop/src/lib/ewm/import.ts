@@ -1,5 +1,6 @@
 import pool, { query } from "@/lib/db/pool";
 import { insertAuditEntry } from "@/lib/db/audit";
+import { createNotification } from "@/lib/repositories/notification.repo";
 import { notifyNewWoFromEwm, notifyWoCancelledByEwm, notifyWoCompletedInEwm } from "@/lib/email/notify";
 import { listWorkOrders, type EwmWorkOrder } from "./client";
 import {
@@ -156,6 +157,21 @@ async function createWoFromEwm(wo: EwmWorkOrder, summary: EwmSyncSummary): Promi
     summary.imported++;
 
     notifyNewWoFromEwm(woId, csiWoNo, wo.header, wo.wo_number, wo.requester_name ?? "");
+
+    const hods = await query<{ id: string }>(
+      `SELECT s.id FROM staff s JOIN role r ON r.id = s.roleid
+       JOIN department d ON d.id = s.deptid
+       WHERE r.rolecode = 'HOD' AND d.deptcode = 'CSI' AND s.status = 'Active'`
+    );
+    for (const hod of hods.rows) {
+      createNotification({
+        staffId: hod.id,
+        title: `New WO from EWM: ${csiWoNo}`,
+        body: `${wo.header} (EWM ${wo.wo_number})`,
+        category: "WorkOrder",
+        linkUrl: `/wo/${woId}`,
+      }).catch((e) => console.error("[notification] create failed", e));
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[ewm-import] Failed to create WO from EWM id", wo.id, err);
@@ -205,6 +221,13 @@ async function applyEwmStatusChange(
       summary.cancelled++;
       if (monitoringOrAssignee) {
         notifyWoCancelledByEwm(monitoringOrAssignee, { id: csiWoId, csiWoNo, title });
+        createNotification({
+          staffId: monitoringOrAssignee,
+          title: `WO cancelled in EWM: ${csiWoNo}`,
+          body: title,
+          category: "WorkOrder",
+          linkUrl: `/wo/${csiWoId}`,
+        }).catch((e) => console.error("[notification] create failed", e));
       }
     } catch (err) {
       await client.query("ROLLBACK");
@@ -223,6 +246,13 @@ async function applyEwmStatusChange(
   ) {
     if (monitoringOrAssignee) {
       notifyWoCompletedInEwm(monitoringOrAssignee, { id: csiWoId, csiWoNo, title });
+      createNotification({
+        staffId: monitoringOrAssignee,
+        title: `EWM shows WO as completed: ${csiWoNo}`,
+        body: title,
+        category: "WorkOrder",
+        linkUrl: `/wo/${csiWoId}`,
+      }).catch((e) => console.error("[notification] create failed", e));
       summary.completedNotified++;
     }
   }
