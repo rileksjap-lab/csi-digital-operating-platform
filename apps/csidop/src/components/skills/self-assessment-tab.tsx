@@ -9,6 +9,7 @@ import {
   RUBRIC_ANSWER_SCALE,
   RUBRIC_MAX_SCORE,
   computeSuggestedLevel,
+  currentQuarterLabel,
 } from "@/lib/skills/rubric";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ interface SelfAssessmentRow {
 }
 
 const REVIEW_ROLES = ["HOD", "SolutionManager", "TeamLead", "BIMTeamLead"];
+const BIM_APP_ROLES = ["BIMModeler", "BIMTeamLead"];
 
 const DOMAINS = [
   "Cloud",
@@ -52,6 +54,8 @@ const DOMAINS = [
   "Consultancy",
   "Soft Skills",
 ];
+
+const NON_BIM_DOMAINS = DOMAINS.filter((d) => d !== "BIM");
 
 const LEVEL_COLORS: Record<string, string> = {
   Beginner: "bg-gray-100 text-gray-700",
@@ -77,6 +81,8 @@ const STATUS_LABELS: Record<string, string> = {
 export default function SelfAssessmentTab() {
   const user = useAuthStore((s) => s.user);
   const isReviewer = user ? REVIEW_ROLES.includes(user.role) : false;
+  const isBim = user ? BIM_APP_ROLES.includes(user.role) : false;
+  const applicableDomains = isBim ? ["BIM"] : NON_BIM_DOMAINS;
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -87,6 +93,10 @@ export default function SelfAssessmentTab() {
   const { data: pending, isLoading: pendingLoading } = useSWR<SelfAssessmentRow[]>(pendingUrl, apiFetcher);
 
   const pendingCount = (pending ?? []).length;
+  const quarter = currentQuarterLabel();
+  const coveredDomains = new Set(
+    (mine ?? []).filter((r) => r.quarterLabel === quarter).map((r) => r.technologyDomain)
+  );
 
   const refresh = () => {
     if (myUrl) mutate(myUrl);
@@ -108,6 +118,28 @@ export default function SelfAssessmentTab() {
         >
           <PlusIcon /> Take Assessment
         </button>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700">Domain Coverage — {quarter}</h2>
+          <span className="text-xs text-gray-400">{coveredDomains.size} / {applicableDomains.length} covered</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {applicableDomains.map((d) => {
+            const done = coveredDomains.has(d);
+            return (
+              <span
+                key={d}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                  done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                {done ? "✓" : "○"} {d}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {isReviewer && (
@@ -163,6 +195,7 @@ export default function SelfAssessmentTab() {
 
       {showForm && (
         <AssessmentQuestionnaire
+          allowedDomains={applicableDomains}
           onClose={() => setShowForm(false)}
           onSuccess={() => {
             setShowForm(false);
@@ -176,9 +209,18 @@ export default function SelfAssessmentTab() {
 
 // ─── Questionnaire form ─────────────────────────────────────────────────────
 
-function AssessmentQuestionnaire({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [domainFilter, setDomainFilter] = useState("");
-  const skillUrl = domainFilter ? `/api/skills?domain=${encodeURIComponent(domainFilter)}` : "/api/skills";
+function AssessmentQuestionnaire({
+  onClose,
+  onSuccess,
+  allowedDomains,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+  allowedDomains: string[];
+}) {
+  const locked = allowedDomains.length === 1;
+  const [domainFilter, setDomainFilter] = useState(locked ? allowedDomains[0] : "");
+  const skillUrl = domainFilter ? `/api/skills?domain=${encodeURIComponent(domainFilter)}` : null;
   const { data: skillList } = useSWR<SkillRow[]>(skillUrl, apiFetcher);
   const [skillId, setSkillId] = useState("");
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -214,28 +256,32 @@ function AssessmentQuestionnaire({ onClose, onSuccess }: { onClose: () => void; 
     <SlideOver title="Take Self-Assessment" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Domain">
+          <Field label="Domain" required>
             <select
               value={domainFilter}
               onChange={(e) => {
                 setDomainFilter(e.target.value);
                 setSkillId("");
               }}
-              className="input-field"
+              disabled={locked}
+              className="input-field disabled:bg-gray-100 disabled:text-gray-500"
             >
-              <option value="">All domains</option>
-              {DOMAINS.map((d) => (
+              {!locked && <option value="">Select domain...</option>}
+              {allowedDomains.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
           </Field>
           <Field label="Skill" required>
-            <select value={skillId} onChange={(e) => setSkillId(e.target.value)} className="input-field">
-              <option value="">Select skill...</option>
+            <select
+              value={skillId}
+              onChange={(e) => setSkillId(e.target.value)}
+              disabled={!domainFilter}
+              className="input-field disabled:bg-gray-100 disabled:text-gray-500"
+            >
+              <option value="">{domainFilter ? "Select skill..." : "Pick a domain first"}</option>
               {(skillList ?? []).map((sk) => (
-                <option key={sk.id} value={sk.id}>
-                  {sk.skillName}{!domainFilter ? ` (${sk.technologyDomain})` : ""}
-                </option>
+                <option key={sk.id} value={sk.id}>{sk.skillName}</option>
               ))}
             </select>
           </Field>
