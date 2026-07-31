@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/api/fetcher";
+import TeamActivityTab from "@/components/capacity/team-activity-tab";
 
 type Band = "Free" | "Safe" | "Warning" | "Overloaded";
 
@@ -92,7 +93,10 @@ function sortStaff(list: StaffUtilization[], key: SortKey, dir: "asc" | "desc"):
   return dir === "asc" ? sorted : sorted.reverse();
 }
 
+type View = "utilization" | "activity";
+
 export default function CapacityPage() {
+  const [view, setView] = useState<View>("utilization");
   const [bandFilter, setBandFilter] = useState<Band | null>(null);
   const [podFilter, setPodFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -107,27 +111,14 @@ export default function CapacityPage() {
     }
   }
 
-  const { data, error, isLoading } = useSWR<UtilizationResponse>("/api/capacity", apiFetcher);
+  const { data, error, isLoading } = useSWR<UtilizationResponse>(
+    view === "utilization" ? "/api/capacity" : null,
+    apiFetcher
+  );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error?.message ?? "Failed to load capacity data"}
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
-  const { departmentSummary: ds, staff, cacheTimestamp } = data;
+  const ds = data?.departmentSummary;
+  const staff = data?.staff ?? [];
+  const cacheTimestamp = data?.cacheTimestamp;
 
   const podSummaries = buildPodSummaries(staff);
   const podFiltered = podFilter
@@ -144,11 +135,46 @@ export default function CapacityPage() {
         <h1 className="text-xl font-semibold text-gray-800">
           Capacity Dashboard
         </h1>
-        <span className="text-xs text-gray-400">
-          Updated {new Date(cacheTimestamp).toLocaleTimeString("en-MY")}
-        </span>
+        {view === "utilization" && cacheTimestamp && (
+          <span className="text-xs text-gray-400">
+            Updated {new Date(cacheTimestamp).toLocaleTimeString("en-MY")}
+          </span>
+        )}
       </div>
 
+      <div className="inline-flex rounded-md bg-gray-100 p-0.5">
+        {([
+          { key: "utilization", label: "Utilization" },
+          { key: "activity", label: "Team Activity" },
+        ] as { key: View; label: string }[]).map((v) => (
+          <button
+            key={v.key}
+            onClick={() => setView(v.key)}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === v.key ? "bg-white text-primary-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "activity" && <TeamActivityTab />}
+
+      {view === "utilization" && isLoading && (
+        <div className="flex items-center justify-center py-20">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+        </div>
+      )}
+
+      {view === "utilization" && error && (
+        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error?.message ?? "Failed to load capacity data"}
+        </div>
+      )}
+
+      {view === "utilization" && ds && (
+      <>
       {/* Department summary gauge — CSI only (CMT module not yet built) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <GaugeCard
@@ -298,6 +324,8 @@ export default function CapacityPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
