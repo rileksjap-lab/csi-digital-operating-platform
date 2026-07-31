@@ -7,7 +7,11 @@ import { assessmentListQuerySchema, assessmentUpsertSchema } from "@/lib/validat
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth(request);
-    const scope = buildScopeFilter(session);
+    // Viewing the team's skill picture (heatmap / By Staff / List) is
+    // intentionally department-wide for every role — Self/Pod scope still
+    // governs who can *record* an assessment (POST below) or approve a
+    // self-assessment, just not who can look at the results.
+    const scope = { ...buildScopeFilter(session), scope: "Department" as const };
     const qs = Object.fromEntries(request.nextUrl.searchParams);
     const parsed = assessmentListQuerySchema.safeParse(qs);
     if (!parsed.success) return zodError(parsed.error);
