@@ -63,6 +63,8 @@ function WoListInner() {
   const [bulkReason, setBulkReason] = useState("");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const { data: staffList } = useSWR<StaffOption[]>(canBulkAct ? "/api/staff" : null, apiFetcher);
 
@@ -131,6 +133,53 @@ function WoListInner() {
     if (filters.dueDateTo) p.set("dueDateTo", filters.dueDateTo);
     return p;
   }, [filters]);
+
+  // Same filters + sort as the table, minus cursor/limit — export always
+  // pulls the full filtered, sorted list rather than just the current page.
+  const buildExportParams = useCallback(() => {
+    const p = new URLSearchParams();
+    if (filters.status) p.set("status", filters.status);
+    if (filters.domain) p.set("domain", filters.domain);
+    if (filters.requestTypeId) p.set("requestTypeId", filters.requestTypeId);
+    if (filters.pod) p.set("pod", filters.pod);
+    if (filters.q) p.set("q", filters.q);
+    if (filters.assignedTo) p.set("assignedTo", filters.assignedTo);
+    if (filters.sourceType) p.set("sourceType", filters.sourceType);
+    if (filters.dueDateFrom) p.set("dueDateFrom", filters.dueDateFrom);
+    if (filters.dueDateTo) p.set("dueDateTo", filters.dueDateTo);
+    p.set("sortBy", filters.sortBy);
+    p.set("sortDir", filters.sortDir);
+    return p;
+  }, [filters]);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/wo/export?${buildExportParams().toString()}`);
+      if (res.status === 401) {
+        window.location.href = "/api/auth/login";
+        return;
+      }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error?.message ?? `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = /filename="([^"]+)"/.exec(disposition);
+      a.download = match?.[1] ?? "work-orders.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }, [buildExportParams]);
 
   // Sync URL bar so refresh preserves state
   useEffect(() => {
@@ -357,7 +406,15 @@ function WoListInner() {
         onUpdateFilter={updateFilter}
         onUpdateFilters={updateFilters}
         onClearAll={clearAll}
+        onExport={handleExport}
+        exporting={exporting}
       />
+
+      {exportError && (
+        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {exportError}
+        </div>
+      )}
 
       {error && (
         <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
