@@ -68,9 +68,11 @@ interface Props {
   onUpdateFilter: (key: keyof Filters, value: string) => void;
   onUpdateFilters: (updates: Partial<Filters>) => void;
   onClearAll: () => void;
+  onExport?: () => void;
+  exporting?: boolean;
 }
 
-export default function WoFilterBar({ filters, onUpdateFilter, onUpdateFilters, onClearAll }: Props) {
+export default function WoFilterBar({ filters, onUpdateFilter, onUpdateFilters, onClearAll, onExport, exporting }: Props) {
   const [searchInput, setSearchInput] = useState(filters.q);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -203,6 +205,19 @@ export default function WoFilterBar({ filters, onUpdateFilter, onUpdateFilters, 
             className="text-xs text-red-500 hover:text-red-700 font-medium"
           >
             Clear all
+          </button>
+        )}
+
+        {onExport && (
+          <button
+            onClick={onExport}
+            disabled={exporting}
+            className="ml-auto flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+            </svg>
+            {exporting ? "Exporting..." : "Export CSV"}
           </button>
         )}
       </div>

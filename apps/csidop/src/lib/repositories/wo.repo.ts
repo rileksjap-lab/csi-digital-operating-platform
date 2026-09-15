@@ -281,6 +281,50 @@ export async function listWorkOrders(
   };
 }
 
+// Row cap for CSV export — generous enough for any realistic filtered list
+// while keeping the query bounded (export is unpaginated, unlike the list).
+const EXPORT_ROW_CAP = 10000;
+
+export async function listWorkOrdersForExport(
+  filters: WoListFilters,
+  scope: ScopeFilter
+): Promise<WoListItem[]> {
+  const { wheres, params, paramIdx } = buildWoFilterWheres(filters, scope);
+  const whereStr = wheres.join("\n      ");
+  const sortCol = SORT_MAP[filters.sortBy] ?? "w.createdat";
+  const dir = filters.sortDir;
+
+  const result = await query(
+    `
+    SELECT
+      w.id AS "Id", w.csi_wo_no AS "CSI_WO_No", ew.extwo_no AS "ExtWO_No", t.tenderno AS "TenderNo",
+      w.title AS "Title", rt.domain AS "Domain", rt.typename AS "RequestTypeName",
+      w.priorityinterdepart AS "Priority", w.sourceofwo AS "SourceOfWO",
+      w.slaworkingdays AS "SLAWorkingDays",
+      ct.tiercode AS "TierCode", ct.tiername AS "TierName",
+      sa.name AS "AssignedToName", w.indicativevalue AS "IndicativeValue",
+      w.duedate AS "DueDate", w.status AS "Status", w.createdat AS "CreatedAt",
+      COALESCE(w.updatedat, w.createdat) AS "LastActivityAt",
+      (rt.slaackdays + rt.slaclassifydays + rt.slaroutedays) AS "SlaTotalDays",
+      COALESCE((SELECT SUM(e.hours) FROM effort_log e WHERE e.csi_wo_id = w.id), 0) AS "EffortTotal",
+      (SELECT COUNT(*) FROM evidence_deliverable ed WHERE ed.csi_wo_id = w.id AND ed.removedat IS NULL) AS "EvidenceCount",
+      COALESCE((SELECT ROUND(AVG(wt.progress)) FROM wo_task wt WHERE wt.csi_wo_id = w.id AND wt.status = 'Active'), 0) AS "ProgressPercent"
+    FROM csi_wo w
+    JOIN request_type rt ON rt.id = w.requesttypeid
+    JOIN complexity_tier ct ON ct.id = w.tierid
+    LEFT JOIN external_wo ew ON ew.id = w.extwo_id
+    LEFT JOIN staff sa ON sa.id = w.assignedto
+    LEFT JOIN tender t ON t.id = w.tenderid
+    WHERE 1=1
+      ${whereStr}
+    ORDER BY ${sortCol} ${dir}, w.id ${dir}
+    LIMIT $${paramIdx}`,
+    [...params, EXPORT_ROW_CAP]
+  );
+
+  return result.rows.map(mapWoListItem);
+}
+
 export interface WoTypeCount {
   requestTypeId: string;
   typeName: string;
