@@ -33,6 +33,8 @@ export interface UtilizationResponse {
   departmentSummary: DepartmentSummary;
   staff: StaffUtilization[];
   cacheTimestamp: string;
+  period: string;
+  isCurrentPeriod: boolean;
 }
 
 export interface StaffUtilizationDetail extends StaffUtilization {
@@ -54,7 +56,7 @@ function toBand(pct: number): UtilizationBand {
 // ─── List utilization ───────────────────────────────────────────────────────
 
 export async function getUtilization(
-  filters: { deptCode?: string; band?: string },
+  filters: { deptCode?: string; band?: string; month?: string },
   scope: ScopeFilter
 ): Promise<UtilizationResponse> {
   const params: unknown[] = [];
@@ -83,10 +85,16 @@ export async function getUtilization(
 
   const whereStr = wheres.join("\n    ");
 
-  // Get staff with their assigned hours and worked hours for the current month
+  // Get staff with their assigned hours and worked hours for the selected
+  // month (defaults to the current month when none is given)
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const [targetYear, targetMonth] = filters.month
+    ? filters.month.split("-").map(Number)
+    : [now.getFullYear(), now.getMonth() + 1];
+  const monthStart = new Date(targetYear, targetMonth - 1, 1).toISOString().slice(0, 10);
+  const monthEnd = new Date(targetYear, targetMonth, 0).toISOString().slice(0, 10);
+  const period = `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
+  const isCurrentPeriod = targetYear === now.getFullYear() && targetMonth === now.getMonth() + 1;
 
   const staffResult = await query(
     `SELECT
@@ -176,6 +184,8 @@ export async function getUtilization(
     departmentSummary: summary,
     staff: filtered,
     cacheTimestamp: new Date().toISOString(),
+    period,
+    isCurrentPeriod,
   };
 }
 

@@ -35,6 +35,8 @@ interface UtilizationResponse {
   departmentSummary: DepartmentSummary;
   staff: StaffUtilization[];
   cacheTimestamp: string;
+  period: string;
+  isCurrentPeriod: boolean;
 }
 
 const BAND_STYLES: Record<Band, string> = {
@@ -95,12 +97,29 @@ function sortStaff(list: StaffUtilization[], key: SortKey, dir: "asc" | "desc"):
 
 type View = "utilization" | "activity";
 
+// Last 12 months, newest first, as "YYYY-MM" — the earliest a user can pick
+// is bounded by how far back effort_log actually has data, but we don't
+// query that up front; a month with nothing logged just shows 0%/0 staff.
+function generateMonthOptions(): { value: string; label: string }[] {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("en-MY", { month: "long", year: "numeric" });
+    options.push({ value, label });
+  }
+  return options;
+}
+
 export default function CapacityPage() {
   const [view, setView] = useState<View>("utilization");
   const [bandFilter, setBandFilter] = useState<Band | null>(null);
   const [podFilter, setPodFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const monthOptions = generateMonthOptions();
+  const [month, setMonth] = useState(monthOptions[0].value);
 
   function handleSortClick(key: SortKey) {
     if (sortKey === key) {
@@ -112,7 +131,7 @@ export default function CapacityPage() {
   }
 
   const { data, error, isLoading } = useSWR<UtilizationResponse>(
-    view === "utilization" ? "/api/capacity" : null,
+    view === "utilization" ? `/api/capacity?month=${month}` : null,
     apiFetcher
   );
 
@@ -142,22 +161,44 @@ export default function CapacityPage() {
         )}
       </div>
 
-      <div className="inline-flex rounded-md bg-gray-100 p-0.5">
-        {([
-          { key: "utilization", label: "Utilization" },
-          { key: "activity", label: "Team Activity" },
-        ] as { key: View; label: string }[]).map((v) => (
-          <button
-            key={v.key}
-            onClick={() => setView(v.key)}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-              view === v.key ? "bg-white text-primary-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
-            }`}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-md bg-gray-100 p-0.5">
+          {([
+            { key: "utilization", label: "Utilization" },
+            { key: "activity", label: "Team Activity" },
+          ] as { key: View; label: string }[]).map((v) => (
+            <button
+              key={v.key}
+              onClick={() => setView(v.key)}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                view === v.key ? "bg-white text-primary-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        {view === "utilization" && (
+          <select
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
           >
-            {v.label}
-          </button>
-        ))}
+            {monthOptions.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+        )}
       </div>
+
+      {view === "utilization" && data && !data.isCurrentPeriod && (
+        <div className="rounded border border-yellow-200 bg-yellow-50 px-4 py-2 text-xs text-yellow-800">
+          Viewing a past month — utilization %, bands and worked hours are historically accurate,
+          but the &quot;Assigned (h)&quot; column always reflects each staff member&apos;s current
+          assignments, not what was assigned back in {monthOptions.find((m) => m.value === month)?.label}.
+        </div>
+      )}
 
       {view === "activity" && <TeamActivityTab />}
 
