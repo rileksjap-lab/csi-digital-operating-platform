@@ -141,10 +141,13 @@ export default function WoDetailPage() {
     APPROVE_ROLES.includes(user.role as Role) &&
     wo.status === "PendingApproval";
   const TENDER_OUTCOME_TERMINAL_STATUSES = ["Won", "Lost", "Cancelled"];
+  const isTenderRfp = wo.requestType.typeName === "Tender / RFP";
+  const canLinkTender =
+    user && ASSIGN_ROLES.includes(user.role as Role) && isTenderRfp && !wo.tender;
   const canMarkTenderOutcome =
     user &&
     ASSIGN_ROLES.includes(user.role as Role) &&
-    wo.requestType.typeName === "Tender / RFP" &&
+    isTenderRfp &&
     wo.tender &&
     !TENDER_OUTCOME_TERMINAL_STATUSES.includes(wo.tender.status);
 
@@ -179,6 +182,19 @@ export default function WoDetailPage() {
     setActionLoading(true);
     try {
       await apiPost(`/api/wo/${id}/cancel`, { reason });
+      mutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleLinkTender(tenderId: string) {
+    setActionError(null);
+    setActionLoading(true);
+    try {
+      await apiPatch(`/api/wo/${id}`, { tenderId });
       mutate();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed");
@@ -264,6 +280,9 @@ export default function WoDetailPage() {
         )}
         {canAssign && wo.status !== "Closed" && wo.status !== "Cancelled" && (
           <CancelButton onCancel={handleCancel} disabled={actionLoading} />
+        )}
+        {canLinkTender && (
+          <LinkTenderButton onLink={handleLinkTender} disabled={actionLoading} />
         )}
         {canMarkTenderOutcome && (
           <TenderOutcomeButtons onMark={handleTenderOutcome} disabled={actionLoading} />
@@ -627,6 +646,76 @@ function ReturnButton({
         className="text-sm text-gray-500 hover:text-gray-700"
       >
         Cancel
+      </button>
+    </div>
+  );
+}
+
+interface TenderOption {
+  id: string;
+  tenderNo: string;
+  tenderName: string;
+  status: string;
+}
+
+function LinkTenderButton({
+  onLink,
+  disabled,
+}: {
+  onLink: (tenderId: string) => void;
+  disabled: boolean;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [tenderId, setTenderId] = useState("");
+  const { data: tenders } = useSWR<TenderOption[]>(
+    showPicker ? "/api/tender?limit=100&sortBy=tenderNo&sortDir=desc" : null,
+    apiFetcher
+  );
+
+  if (!showPicker) {
+    return (
+      <button
+        onClick={() => setShowPicker(true)}
+        disabled={disabled}
+        className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+      >
+        Link to Tender
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={tenderId}
+        onChange={(e) => setTenderId(e.target.value)}
+        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+      >
+        <option value="">Select tender...</option>
+        {(tenders ?? []).map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.tenderNo} — {t.tenderName} ({t.status})
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={() => {
+          if (tenderId) {
+            onLink(tenderId);
+            setShowPicker(false);
+            setTenderId("");
+          }
+        }}
+        disabled={disabled || !tenderId}
+        className="rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+      >
+        Confirm Link
+      </button>
+      <button
+        onClick={() => { setShowPicker(false); setTenderId(""); }}
+        className="text-sm text-gray-500 hover:text-gray-700"
+      >
+        Dismiss
       </button>
     </div>
   );

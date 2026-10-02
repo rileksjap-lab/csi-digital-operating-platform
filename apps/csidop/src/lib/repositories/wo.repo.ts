@@ -1046,6 +1046,7 @@ export interface WoPatchInput {
   slaWorkingDays?: number | null;
   status?: string;
   tenderOrProjectCode?: string | null;
+  tenderId?: string | null;
   createdAt?: string;
   amendReason?: string;
 }
@@ -1066,7 +1067,7 @@ export async function patchWorkOrder(
     const existing = await client.query(
       `SELECT w.id, w.priorityinterdepart, w.priorityinternal, w.duedate,
               w.tierid, w.requesttypeid, w.title, w.sourceofwo, w.requestername,
-              w.remark, w.slaworkingdays, w.status, w.tenderorprojectcode
+              w.remark, w.slaworkingdays, w.status, w.tenderorprojectcode, w.tenderid
        FROM csi_wo w
        LEFT JOIN staff sa ON sa.id = w.assignedto
        WHERE w.id = $1 ${sf.clause}`,
@@ -1103,6 +1104,7 @@ export async function patchWorkOrder(
     patch("slaworkingdays", "SLAWorkingDays", old.slaworkingdays, input.slaWorkingDays);
     patch("status", "Status", old.status, input.status);
     patch("tenderorprojectcode", "TenderOrProjectCode", old.tenderorprojectcode, input.tenderOrProjectCode);
+    patch("tenderid", "TenderId", old.tenderid, input.tenderId);
     if (input.createdAt !== undefined) {
       sets.push(`createdat = $${pi}`);
       params.push(input.createdAt);
