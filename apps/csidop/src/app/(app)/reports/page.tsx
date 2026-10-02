@@ -84,6 +84,13 @@ const REPORTS: ReportDef[] = [
     icon: "📋",
   },
   {
+    code: "TENDER_OO_LEADERBOARD",
+    name: "Tender OO Leaderboard",
+    description: "Tender win count and win rate per Opportunity Owner (the assignee on Tender / RFP work orders).",
+    formats: ["PDF", "Excel"],
+    icon: "🏆",
+  },
+  {
     code: "CHAIRMAN_SUMMARY",
     name: "Chairman Executive Summary",
     description: "High-level executive summary combining operations, business, and capability metrics.",

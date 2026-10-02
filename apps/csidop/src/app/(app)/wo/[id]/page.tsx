@@ -140,6 +140,13 @@ export default function WoDetailPage() {
     user &&
     APPROVE_ROLES.includes(user.role as Role) &&
     wo.status === "PendingApproval";
+  const TENDER_OUTCOME_TERMINAL_STATUSES = ["Won", "Lost", "Cancelled"];
+  const canMarkTenderOutcome =
+    user &&
+    ASSIGN_ROLES.includes(user.role as Role) &&
+    wo.requestType.typeName === "Tender / RFP" &&
+    wo.tender &&
+    !TENDER_OUTCOME_TERMINAL_STATUSES.includes(wo.tender.status);
 
   async function handleComplete() {
     setActionError(null);
@@ -172,6 +179,24 @@ export default function WoDetailPage() {
     setActionLoading(true);
     try {
       await apiPost(`/api/wo/${id}/cancel`, { reason });
+      mutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleTenderOutcome(status: "Won" | "Lost", winValue?: number) {
+    const tenderId = wo?.tender?.id;
+    if (!tenderId) return;
+    setActionError(null);
+    setActionLoading(true);
+    try {
+      await apiPatch(`/api/tender/${tenderId}`, {
+        status,
+        ...(winValue !== undefined ? { winValue } : {}),
+      });
       mutate();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed");
@@ -240,6 +265,9 @@ export default function WoDetailPage() {
         {canAssign && wo.status !== "Closed" && wo.status !== "Cancelled" && (
           <CancelButton onCancel={handleCancel} disabled={actionLoading} />
         )}
+        {canMarkTenderOutcome && (
+          <TenderOutcomeButtons onMark={handleTenderOutcome} disabled={actionLoading} />
+        )}
       </div>
 
       {actionError && (
@@ -273,7 +301,7 @@ export default function WoDetailPage() {
         <Field label="External WO" value={wo.extWoNo ?? "—"} />
         <Field
           label="Tender"
-          value={wo.tender ? wo.tender.tenderNo : "—"}
+          value={wo.tender ? `${wo.tender.tenderNo} (${wo.tender.status})` : "—"}
         />
         <Field label="Tender No / Project Code" value={wo.tenderOrProjectCode ?? "—"} />
         <Field label="Created By" value={wo.createdBy.name} />
@@ -599,6 +627,90 @@ function ReturnButton({
         className="text-sm text-gray-500 hover:text-gray-700"
       >
         Cancel
+      </button>
+    </div>
+  );
+}
+
+function TenderOutcomeButtons({
+  onMark,
+  disabled,
+}: {
+  onMark: (status: "Won" | "Lost", winValue?: number) => void;
+  disabled: boolean;
+}) {
+  const [mode, setMode] = useState<"won" | "lost" | null>(null);
+  const [winValue, setWinValue] = useState("");
+
+  if (mode === null) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setMode("won")}
+          disabled={disabled}
+          className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+        >
+          Mark Tender as Won
+        </button>
+        <button
+          onClick={() => setMode("lost")}
+          disabled={disabled}
+          className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          Mark Tender as Lost
+        </button>
+      </div>
+    );
+  }
+
+  if (mode === "lost") {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-gray-600">Confirm tender lost?</span>
+        <button
+          onClick={() => { onMark("Lost"); setMode(null); }}
+          disabled={disabled}
+          className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          Confirm Lost
+        </button>
+        <button
+          onClick={() => setMode(null)}
+          className="text-sm text-gray-500 hover:text-gray-700"
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        min={0}
+        step={1000}
+        value={winValue}
+        onChange={(e) => setWinValue(e.target.value)}
+        placeholder="Win value RM (optional)"
+        className="w-44 rounded border border-gray-300 px-2 py-1 text-sm"
+      />
+      <button
+        onClick={() => {
+          onMark("Won", winValue.trim() ? Number(winValue) : undefined);
+          setMode(null);
+          setWinValue("");
+        }}
+        disabled={disabled}
+        className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+      >
+        Confirm Won
+      </button>
+      <button
+        onClick={() => { setMode(null); setWinValue(""); }}
+        className="text-sm text-gray-500 hover:text-gray-700"
+      >
+        Dismiss
       </button>
     </div>
   );
