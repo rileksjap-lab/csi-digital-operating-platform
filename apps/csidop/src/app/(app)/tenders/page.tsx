@@ -20,6 +20,15 @@ interface TenderSummary {
   closingSoon: number;
 }
 
+interface OoLeaderboardRow {
+  staffId: string;
+  name: string;
+  subTeam: string | null;
+  wonCount: number;
+  decidedCount: number;
+  winRatePct: number;
+}
+
 function formatCurrency(val: number): string {
   if (val >= 1_000_000_000) return `RM ${(val / 1_000_000_000).toFixed(2)}B`;
   if (val >= 1_000_000) return `RM ${(val / 1_000_000).toFixed(1)}M`;
@@ -35,6 +44,8 @@ function TenderListInner() {
   const canCreate = user ? TENDER_CREATE_ROLES.includes(user.role) : false;
 
   const { data: summary } = useSWR<TenderSummary>("/api/tender/summary", apiFetcher);
+  const { data: leaderboard } = useSWR<OoLeaderboardRow[]>("/api/tender/leaderboard", apiFetcher);
+  const topOwners = (leaderboard ?? []).filter((o) => o.wonCount > 0).slice(0, 5);
 
   const { data, error, isLoading } = useSWR(apiUrl, async (url: string) => {
     const res = await fetch(url);
@@ -88,6 +99,33 @@ function TenderListInner() {
               {summary.closingSoon}
             </p>
             <p className="mt-0.5 text-xs text-gray-500">Upcoming deadlines</p>
+          </div>
+        </div>
+      )}
+
+      {/* Top Opportunity Owners — staff assigned to "Tender / RFP" WOs with the most wins */}
+      {topOwners.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-gray-700">Top Opportunity Owners</h2>
+          <p className="mt-0.5 text-xs text-gray-500">Most tenders won, by OO</p>
+          <div className="mt-3 divide-y divide-gray-100">
+            {topOwners.map((o, i) => (
+              <div key={o.staffId} className="flex items-center justify-between py-2">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{o.name}</p>
+                    {o.subTeam && <p className="text-xs text-gray-400">Pod {o.subTeam}</p>}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-green-600">{o.wonCount} won</p>
+                  <p className="text-xs text-gray-500">{o.winRatePct}% win rate</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

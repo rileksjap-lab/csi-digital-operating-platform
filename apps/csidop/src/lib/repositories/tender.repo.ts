@@ -250,6 +250,49 @@ export async function getTenderSummary(): Promise<TenderSummary> {
   };
 }
 
+// ─── OO (Opportunity Owner) leaderboard ─────────────────────────────────────
+// "OO" = whoever is assigned to a WO of request type "Tender / RFP" — the
+// staff member who carried CSI's technical participation in that tender bid.
+
+export interface OoLeaderboardRow {
+  staffId: string;
+  name: string;
+  subTeam: string | null;
+  wonCount: number;
+  decidedCount: number;
+  winRatePct: number;
+}
+
+export async function getOoLeaderboard(): Promise<OoLeaderboardRow[]> {
+  const result = await query<{
+    StaffId: string;
+    Name: string;
+    SubTeam: string | null;
+    WonCount: number;
+    DecidedCount: number;
+  }>(
+    `SELECT s.id AS "StaffId", s.name AS "Name", s.subteam AS "SubTeam",
+            COUNT(*) FILTER (WHERE t.status = 'Won')::int AS "WonCount",
+            COUNT(*) FILTER (WHERE t.status IN ('Won','Lost'))::int AS "DecidedCount"
+     FROM csi_wo w
+     JOIN tender t ON t.id = w.tenderid
+     JOIN request_type rt ON rt.id = w.requesttypeid
+     JOIN staff s ON s.id = w.assignedto
+     WHERE rt.typename = 'Tender / RFP'
+     GROUP BY s.id, s.name, s.subteam
+     ORDER BY "WonCount" DESC, "Name" ASC`
+  );
+
+  return result.rows.map((r) => ({
+    staffId: r.StaffId,
+    name: r.Name,
+    subTeam: r.SubTeam ?? null,
+    wonCount: r.WonCount,
+    decidedCount: r.DecidedCount,
+    winRatePct: r.DecidedCount > 0 ? Math.round((r.WonCount / r.DecidedCount) * 100) : 0,
+  }));
+}
+
 // ─── Detail ─────────────────────────────────────────────────────────────────
 
 export interface TenderDetail {

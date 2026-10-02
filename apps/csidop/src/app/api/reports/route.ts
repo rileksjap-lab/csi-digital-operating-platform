@@ -128,6 +128,7 @@ type ReportCode =
   | "COMPETENCY_GAP"
   | "CERT_COMPLIANCE"
   | "TENDER_PIPELINE"
+  | "TENDER_OO_LEADERBOARD"
   | "CMT_CSI_LINKAGE"
   | "GOVERNANCE_AUDIT"
   | "RESOURCE_CAPACITY"
@@ -312,6 +313,34 @@ async function generateReport(
       return {
         title: "Tender Pipeline",
         headers: ["tenderNo", "tenderName", "client", "category", "status", "closingDate", "estimatedValue", "submittedValue", "winValue", "ownerName"],
+        rows: res.rows,
+      };
+    }
+
+    case "TENDER_OO_LEADERBOARD": {
+      // "OO" (Opportunity Owner) = the staff assigned to a "Tender / RFP" WO
+      // — whoever carried CSI's technical participation in that tender bid.
+      const res = await query(
+        `SELECT s.name AS "ownerName", s.subteam AS "subTeam",
+                COUNT(*) FILTER (WHERE t.status = 'Won')::int AS "wonCount",
+                COUNT(*) FILTER (WHERE t.status IN ('Won','Lost'))::int AS "decidedCount",
+                CASE WHEN COUNT(*) FILTER (WHERE t.status IN ('Won','Lost')) > 0
+                  THEN ROUND(100.0 * COUNT(*) FILTER (WHERE t.status = 'Won')
+                       / COUNT(*) FILTER (WHERE t.status IN ('Won','Lost')), 1)
+                  ELSE 0 END AS "winRatePct"
+         FROM csi_wo w
+         JOIN tender t ON t.id = w.tenderid
+         JOIN request_type rt ON rt.id = w.requesttypeid
+         JOIN staff s ON s.id = w.assignedto
+         WHERE rt.typename = 'Tender / RFP'
+           AND t.createdat >= $1::date AND t.createdat <= $2::date
+         GROUP BY s.id, s.name, s.subteam
+         ORDER BY "wonCount" DESC, s.name`,
+        [periodFrom, periodTo]
+      );
+      return {
+        title: "Tender OO Leaderboard",
+        headers: ["ownerName", "subTeam", "wonCount", "decidedCount", "winRatePct"],
         rows: res.rows,
       };
     }
@@ -513,7 +542,7 @@ export async function GET() {
     [
       "WO_TREND", "CAPACITY_UTIL", "CMT_CSI_LINKAGE", "GOVERNANCE_AUDIT",
       "KPI_ACHIEVEMENT", "OI_COMMISSION", "RESOURCE_CAPACITY", "COMPETENCY_GAP",
-      "CERT_COMPLIANCE", "TENDER_PIPELINE", "CHAIRMAN_SUMMARY",
+      "CERT_COMPLIANCE", "TENDER_PIPELINE", "TENDER_OO_LEADERBOARD", "CHAIRMAN_SUMMARY",
     ].map((code) => ({ code, available: true }))
   );
 }
