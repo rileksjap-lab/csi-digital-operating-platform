@@ -536,6 +536,9 @@ export interface WoDetail {
   sourceOfWO: string | null;
   tenderOrProjectCode: string | null;
   tender: { id: string; tenderNo: string; tenderName: string; status: string } | null;
+  tenderOutcome: "Won" | "Lost" | null;
+  tenderOutcomeValue: number | null;
+  tenderOutcomeDate: string | null;
   requestType: { id: string; typeCode: number; typeName: string; domain: string };
   tier: { id: string; tierCode: number; tierName: string };
   priorityInterdepart: string;
@@ -623,6 +626,7 @@ export async function getWorkOrderById(
       w.title AS "Title", w.priorityinterdepart AS "PriorityInterdepart",
       w.priorityinternal AS "PriorityInternal", w.status AS "Status",
       w.sourceofwo AS "SourceOfWO", w.requestername AS "RequesterName", w.tenderorprojectcode AS "TenderOrProjectCode",
+      w.tenderoutcome AS "TenderOutcome", w.tenderoutcomevalue AS "TenderOutcomeValue", w.tenderoutcomedate AS "TenderOutcomeDate",
       w.slaworkingdays AS "SLAWorkingDays", w.remark AS "Remark",
       w.indicativevalue AS "IndicativeValue", w.complexityvalue AS "ComplexityValue", w.taskscore AS "TaskScore",
       w.duedate AS "DueDate", w.createdat AS "CreatedAt", w.updatedat AS "UpdatedAt",
@@ -744,6 +748,9 @@ export async function getWorkOrderById(
     sourceOfWO: (r.SourceOfWO as string) ?? null,
     requesterName: (r.RequesterName as string) ?? null,
     tenderOrProjectCode: (r.TenderOrProjectCode as string) ?? null,
+    tenderOutcome: (r.TenderOutcome as "Won" | "Lost") ?? null,
+    tenderOutcomeValue: r.TenderOutcomeValue != null ? parseFloat(String(r.TenderOutcomeValue)) : null,
+    tenderOutcomeDate: r.TenderOutcomeDate ? String(r.TenderOutcomeDate) : null,
     tender: r.TenderId
       ? {
           id: r.TenderId as string,
@@ -1047,6 +1054,8 @@ export interface WoPatchInput {
   status?: string;
   tenderOrProjectCode?: string | null;
   tenderId?: string | null;
+  tenderOutcome?: "Won" | "Lost" | null;
+  tenderOutcomeValue?: number | null;
   createdAt?: string;
   amendReason?: string;
 }
@@ -1067,7 +1076,8 @@ export async function patchWorkOrder(
     const existing = await client.query(
       `SELECT w.id, w.priorityinterdepart, w.priorityinternal, w.duedate,
               w.tierid, w.requesttypeid, w.title, w.sourceofwo, w.requestername,
-              w.remark, w.slaworkingdays, w.status, w.tenderorprojectcode, w.tenderid
+              w.remark, w.slaworkingdays, w.status, w.tenderorprojectcode, w.tenderid,
+              w.tenderoutcome, w.tenderoutcomevalue
        FROM csi_wo w
        LEFT JOIN staff sa ON sa.id = w.assignedto
        WHERE w.id = $1 ${sf.clause}`,
@@ -1105,6 +1115,14 @@ export async function patchWorkOrder(
     patch("status", "Status", old.status, input.status);
     patch("tenderorprojectcode", "TenderOrProjectCode", old.tenderorprojectcode, input.tenderOrProjectCode);
     patch("tenderid", "TenderId", old.tenderid, input.tenderId);
+    patch("tenderoutcome", "TenderOutcome", old.tenderoutcome, input.tenderOutcome);
+    patch("tenderoutcomevalue", "TenderOutcomeValue", old.tenderoutcomevalue, input.tenderOutcomeValue);
+    if (
+      input.tenderOutcome !== undefined &&
+      String(input.tenderOutcome ?? "") !== String(old.tenderoutcome ?? "")
+    ) {
+      sets.push(`tenderoutcomedate = now()`);
+    }
     if (input.createdAt !== undefined) {
       sets.push(`createdat = $${pi}`);
       params.push(input.createdAt);
