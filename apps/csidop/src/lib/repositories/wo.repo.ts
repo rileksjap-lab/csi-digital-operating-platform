@@ -1116,12 +1116,20 @@ export async function patchWorkOrder(
     patch("tenderorprojectcode", "TenderOrProjectCode", old.tenderorprojectcode, input.tenderOrProjectCode);
     patch("tenderid", "TenderId", old.tenderid, input.tenderId);
     patch("tenderoutcome", "TenderOutcome", old.tenderoutcome, input.tenderOutcome);
-    patch("tenderoutcomevalue", "TenderOutcomeValue", old.tenderoutcomevalue, input.tenderOutcomeValue);
+    // A win value only makes sense for Won: changing to Lost or clearing the
+    // outcome drops any stored value unless the caller supplied one.
+    const outcomeResetsValue = input.tenderOutcome === "Lost" || input.tenderOutcome === null;
+    patch(
+      "tenderoutcomevalue",
+      "TenderOutcomeValue",
+      old.tenderoutcomevalue,
+      input.tenderOutcomeValue ?? (outcomeResetsValue ? null : undefined)
+    );
     if (
       input.tenderOutcome !== undefined &&
       String(input.tenderOutcome ?? "") !== String(old.tenderoutcome ?? "")
     ) {
-      sets.push(`tenderoutcomedate = now()`);
+      sets.push(input.tenderOutcome === null ? `tenderoutcomedate = NULL` : `tenderoutcomedate = now()`);
     }
     if (input.createdAt !== undefined) {
       sets.push(`createdat = $${pi}`);
