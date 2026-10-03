@@ -320,20 +320,23 @@ async function generateReport(
     case "TENDER_OO_LEADERBOARD": {
       // "OO" (Opportunity Owner) = the staff assigned to a "Tender / RFP" WO
       // — whoever carried CSI's technical participation in that tender bid.
+      // Outcome lives on CSI_WO.TenderOutcome directly (see migration 038) —
+      // the TENDER table has no real data entered in practice, so this
+      // doesn't join to it. Period filters on TenderOutcomeDate, so only WOs
+      // actually decided within the window are counted.
       const res = await query(
         `SELECT s.name AS "ownerName", s.subteam AS "subTeam",
-                COUNT(*) FILTER (WHERE t.status = 'Won')::int AS "wonCount",
-                COUNT(*) FILTER (WHERE t.status IN ('Won','Lost'))::int AS "decidedCount",
-                CASE WHEN COUNT(*) FILTER (WHERE t.status IN ('Won','Lost')) > 0
-                  THEN ROUND(100.0 * COUNT(*) FILTER (WHERE t.status = 'Won')
-                       / COUNT(*) FILTER (WHERE t.status IN ('Won','Lost')), 1)
+                COUNT(*) FILTER (WHERE w.tenderoutcome = 'Won')::int AS "wonCount",
+                COUNT(*) FILTER (WHERE w.tenderoutcome IN ('Won','Lost'))::int AS "decidedCount",
+                CASE WHEN COUNT(*) FILTER (WHERE w.tenderoutcome IN ('Won','Lost')) > 0
+                  THEN ROUND(100.0 * COUNT(*) FILTER (WHERE w.tenderoutcome = 'Won')
+                       / COUNT(*) FILTER (WHERE w.tenderoutcome IN ('Won','Lost')), 1)
                   ELSE 0 END AS "winRatePct"
          FROM csi_wo w
-         JOIN tender t ON t.id = w.tenderid
          JOIN request_type rt ON rt.id = w.requesttypeid
          JOIN staff s ON s.id = w.assignedto
          WHERE rt.typename = 'Tender / RFP'
-           AND t.createdat >= $1::date AND t.createdat <= $2::date
+           AND w.tenderoutcomedate >= $1::date AND w.tenderoutcomedate <= $2::date
          GROUP BY s.id, s.name, s.subteam
          ORDER BY "wonCount" DESC, s.name`,
         [periodFrom, periodTo]

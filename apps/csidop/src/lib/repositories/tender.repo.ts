@@ -253,6 +253,9 @@ export async function getTenderSummary(): Promise<TenderSummary> {
 // ─── OO (Opportunity Owner) leaderboard ─────────────────────────────────────
 // "OO" = whoever is assigned to a WO of request type "Tender / RFP" — the
 // staff member who carried CSI's technical participation in that tender bid.
+// Outcome (Won/Lost) is tracked directly on CSI_WO.TenderOutcome, not via
+// the TENDER table — the Tenders module has no real data entered in
+// practice (CMT owns tender intake and doesn't have its own system yet).
 
 export interface OoLeaderboardRow {
   staffId: string;
@@ -272,10 +275,9 @@ export async function getOoLeaderboard(): Promise<OoLeaderboardRow[]> {
     DecidedCount: number;
   }>(
     `SELECT s.id AS "StaffId", s.name AS "Name", s.subteam AS "SubTeam",
-            COUNT(*) FILTER (WHERE t.status = 'Won')::int AS "WonCount",
-            COUNT(*) FILTER (WHERE t.status IN ('Won','Lost'))::int AS "DecidedCount"
+            COUNT(*) FILTER (WHERE w.tenderoutcome = 'Won')::int AS "WonCount",
+            COUNT(*) FILTER (WHERE w.tenderoutcome IN ('Won','Lost'))::int AS "DecidedCount"
      FROM csi_wo w
-     JOIN tender t ON t.id = w.tenderid
      JOIN request_type rt ON rt.id = w.requesttypeid
      JOIN staff s ON s.id = w.assignedto
      WHERE rt.typename = 'Tender / RFP'

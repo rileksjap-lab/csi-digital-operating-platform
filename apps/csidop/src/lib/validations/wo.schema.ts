@@ -97,6 +97,8 @@ export const woPatchSchema = z.object({
   status: z.enum(["Open", "Acknowledged", "InProgress", "PendingApproval", "Approved", "Closed", "Returned", "Cancelled"]).optional(),
   tenderOrProjectCode: z.string().max(100).nullable().optional(),
   tenderId: z.string().uuid().nullable().optional(),
+  tenderOutcome: z.enum(["Won", "Lost"]).nullable().optional(),
+  tenderOutcomeValue: z.number().nonnegative().nullable().optional(),
   createdAt: z.string().datetime().optional(),
   amendReason: z.string().max(500).optional(),
 });
