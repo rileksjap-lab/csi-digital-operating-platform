@@ -145,6 +145,8 @@ export default function WoDetailPage() {
   const isTenderRfp = wo.requestType.typeName === "Tender / RFP";
   const canMarkTenderOutcome =
     user && ASSIGN_ROLES.includes(user.role as Role) && isTenderRfp && !wo.tenderOutcome;
+  const canEditTenderOutcome =
+    user && ASSIGN_ROLES.includes(user.role as Role) && isTenderRfp && !!wo.tenderOutcome;
 
   async function handleComplete() {
     setActionError(null);
@@ -192,6 +194,27 @@ export default function WoDetailPage() {
       await apiPatch(`/api/wo/${id}`, {
         tenderOutcome: status,
         ...(winValue !== undefined ? { tenderOutcomeValue: winValue } : {}),
+      });
+      mutate();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleTenderOutcomeEdit(
+    status: "Won" | "Lost" | null,
+    reason: string,
+    winValue?: number
+  ) {
+    setActionError(null);
+    setActionLoading(true);
+    try {
+      await apiPatch(`/api/wo/${id}`, {
+        tenderOutcome: status,
+        ...(winValue !== undefined ? { tenderOutcomeValue: winValue } : {}),
+        amendReason: reason,
       });
       mutate();
     } catch (err) {
@@ -263,6 +286,13 @@ export default function WoDetailPage() {
         )}
         {canMarkTenderOutcome && (
           <TenderOutcomeButtons onMark={handleTenderOutcome} disabled={actionLoading} />
+        )}
+        {canEditTenderOutcome && wo.tenderOutcome && (
+          <TenderOutcomeEditor
+            current={wo.tenderOutcome}
+            onEdit={handleTenderOutcomeEdit}
+            disabled={actionLoading}
+          />
         )}
       </div>
 
@@ -633,6 +663,87 @@ function ReturnButton({
         className="text-sm text-gray-500 hover:text-gray-700"
       >
         Cancel
+      </button>
+    </div>
+  );
+}
+
+function TenderOutcomeEditor({
+  current,
+  onEdit,
+  disabled,
+}: {
+  current: "Won" | "Lost";
+  onEdit: (status: "Won" | "Lost" | null, reason: string, winValue?: number) => void;
+  disabled: boolean;
+}) {
+  const [mode, setMode] = useState<"change" | "clear" | null>(null);
+  const [reason, setReason] = useState("");
+  const [winValue, setWinValue] = useState("");
+  const other = current === "Won" ? "Lost" : "Won";
+
+  function reset() {
+    setMode(null);
+    setReason("");
+    setWinValue("");
+  }
+
+  if (mode === null) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setMode("change")}
+          disabled={disabled}
+          className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Change Outcome to {other}
+        </button>
+        <button
+          onClick={() => setMode("clear")}
+          disabled={disabled}
+          className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          Clear Outcome
+        </button>
+      </div>
+    );
+  }
+
+  const target = mode === "change" ? other : null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {target === "Won" && (
+        <input
+          type="number"
+          min={0}
+          step={1000}
+          value={winValue}
+          onChange={(e) => setWinValue(e.target.value)}
+          placeholder="Win value RM (optional)"
+          className="w-44 rounded border border-gray-300 px-2 py-1 text-sm"
+        />
+      )}
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        maxLength={500}
+        placeholder={mode === "change" ? `Reason for changing to ${other} (required)` : "Reason for clearing (required)"}
+        className="w-64 rounded border border-gray-300 px-2 py-1 text-sm"
+      />
+      <button
+        onClick={() => {
+          if (!reason.trim()) return;
+          onEdit(target, reason.trim(), target === "Won" && winValue.trim() ? Number(winValue) : undefined);
+          reset();
+        }}
+        disabled={disabled || !reason.trim()}
+        className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {mode === "change" ? `Confirm ${other}` : "Confirm Clear"}
+      </button>
+      <button onClick={reset} className="text-sm text-gray-500 hover:text-gray-700">
+        Dismiss
       </button>
     </div>
   );
