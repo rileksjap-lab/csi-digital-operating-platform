@@ -566,6 +566,7 @@ export interface WoDetail {
   evidenceItems: EvidenceItem[];
   approvalTrail: ApprovalItem[];
   activityLog: ActivityItem[];
+  projectTeam: ProjectMemberItem[];
 }
 
 interface ActivityItem {
@@ -576,6 +577,17 @@ interface ActivityItem {
   reason: string | null;
   performedAt: string;
   performedByName: string;
+}
+
+export interface ProjectMemberItem {
+  id: string;
+  staffId: string;
+  name: string;
+  roleCode: string;
+  subTeam: string | null;
+  roleNote: string | null;
+  addedByName: string;
+  addedAt: string;
 }
 
 interface AssignmentItem {
@@ -656,7 +668,7 @@ export async function getWorkOrderById(
   if (mainResult.rows.length === 0) return null;
   const r = mainResult.rows[0];
 
-  const [assignments, efforts, evidence, approvals, tasks, auditLogs] = await Promise.all([
+  const [assignments, efforts, evidence, approvals, tasks, auditLogs, projectTeam] = await Promise.all([
     query(
       `SELECT a.assignedhours AS "AssignedHours", a.assigneddate AS "AssignedDate",
               a.iscurrent AS "IsCurrent", a.reassignreason AS "ReassignReason",
@@ -719,6 +731,18 @@ export async function getWorkOrderById(
        WHERE al.entityname = 'CSI_WO' AND al.entityid = $1
        ORDER BY al.performedat DESC
        LIMIT 50`,
+      [id]
+    ),
+    query(
+      `SELECT pm.id AS "Id", pm.staffid AS "StaffId", s.name AS "Name",
+              r.rolecode AS "RoleCode", s.subteam AS "SubTeam",
+              pm.rolenote AS "RoleNote", ab.name AS "AddedByName", pm.addedat AS "AddedAt"
+       FROM wo_project_member pm
+       JOIN staff s ON s.id = pm.staffid
+       JOIN role r ON r.id = s.roleid
+       JOIN staff ab ON ab.id = pm.addedby
+       WHERE pm.csi_wo_id = $1
+       ORDER BY pm.addedat`,
       [id]
     ),
   ]);
@@ -841,6 +865,16 @@ export async function getWorkOrderById(
       reason: (al.Reason as string) ?? null,
       performedAt: String(al.PerformedAt),
       performedByName: al.PerformedByName as string,
+    })),
+    projectTeam: projectTeam.rows.map((pm) => ({
+      id: pm.Id as string,
+      staffId: pm.StaffId as string,
+      name: pm.Name as string,
+      roleCode: pm.RoleCode as string,
+      subTeam: (pm.SubTeam as string) ?? null,
+      roleNote: (pm.RoleNote as string) ?? null,
+      addedByName: pm.AddedByName as string,
+      addedAt: String(pm.AddedAt),
     })),
   };
 }
@@ -1748,6 +1782,134 @@ export async function deleteWoTask(
 
     await client.query("COMMIT");
     return (result.rowCount ?? 0) > 0;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── Project team (won Tender / RFP WOs) ────────────────────────────────────
+// When a tender is won it becomes a project; other CSI staff can be assigned
+// to look after it alongside the OO (the WO's single assignee). Informational
+// only — not wired into capacity, effort logging or My Tasks.
+
+export type ProjectTeamError = "NOT_WON_TENDER" | "INVALID_STAFF" | "ALREADY_MEMBER";
+
+export async function addProjectMember(
+  woId: string,
+  input: { staffId: string; roleNote?: string },
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<{ notFound: true } | { error: ProjectTeamError } | { memberId: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const sf = applyScopeFilter(scope, "w", 2);
+    const woRes = await client.query(
+      `SELECT w.tenderoutcome, rt.typename
+       FROM csi_wo w
+       JOIN request_type rt ON rt.id = w.requesttypeid
+       LEFT JOIN staff sa ON sa.id = w.assignedto
+       WHERE w.id = $1 ${sf.clause}`,
+      [woId, ...sf.params]
+    );
+    if (woRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { notFound: true };
+    }
+    if (woRes.rows[0].typename !== "Tender / RFP" || woRes.rows[0].tenderoutcome !== "Won") {
+      await client.query("ROLLBACK");
+      return { error: "NOT_WON_TENDER" };
+    }
+
+    const staffRes = await client.query<{ name: string }>(
+      `SELECT name FROM staff WHERE id = $1 AND status = 'Active'`,
+      [input.staffId]
+    );
+    if (staffRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { error: "INVALID_STAFF" };
+    }
+
+    const ins = await client.query<{ id: string }>(
+      `INSERT INTO wo_project_member (csi_wo_id, staffid, rolenote, addedby)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (csi_wo_id, staffid) DO NOTHING
+       RETURNING id`,
+      [woId, input.staffId, input.roleNote || null, session.staffId]
+    );
+    if (ins.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { error: "ALREADY_MEMBER" };
+    }
+
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: woId,
+        action: "Update",
+        fieldName: "ProjectTeam",
+        newValue: `Added ${staffRes.rows[0].name}${input.roleNote ? ` (${input.roleNote})` : ""}`,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+    return { memberId: ins.rows[0].id };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function removeProjectMember(
+  woId: string,
+  memberId: string,
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const sf = applyScopeFilter(scope, "w", 3);
+    const found = await client.query<{ name: string }>(
+      `SELECT s.name
+       FROM wo_project_member pm
+       JOIN csi_wo w ON w.id = pm.csi_wo_id
+       JOIN staff s ON s.id = pm.staffid
+       LEFT JOIN staff sa ON sa.id = w.assignedto
+       WHERE pm.id = $1 AND pm.csi_wo_id = $2 ${sf.clause}`,
+      [memberId, woId, ...sf.params]
+    );
+    if (found.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+
+    await client.query(`DELETE FROM wo_project_member WHERE id = $1`, [memberId]);
+
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: woId,
+        action: "Update",
+        fieldName: "ProjectTeam",
+        oldValue: found.rows[0].name,
+        newValue: `Removed ${found.rows[0].name}`,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+    return true;
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import { apiFetcher, apiPost, apiPatch } from "@/lib/api/fetcher";
+import { apiFetcher, apiPost, apiPatch, apiDelete } from "@/lib/api/fetcher";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import WoStatusBadge from "@/components/wo/wo-status-badge";
 import WoPriorityBadge from "@/components/wo/wo-priority-badge";
@@ -100,6 +100,18 @@ interface WoDetail {
     performedAt: string;
     performedByName: string;
   }[];
+  projectTeam: ProjectMember[];
+}
+
+interface ProjectMember {
+  id: string;
+  staffId: string;
+  name: string;
+  roleCode: string;
+  subTeam: string | null;
+  roleNote: string | null;
+  addedByName: string;
+  addedAt: string;
 }
 
 type Role = "HOD" | "SolutionManager" | "TeamLead" | "BIMTeamLead" | "TeamMember" | "BIMModeler";
@@ -374,6 +386,18 @@ export default function WoDetailPage() {
           <p className="text-sm text-gray-800 whitespace-pre-wrap">{wo.remark || "—"}</p>
         </div>
       </div>
+
+      {/* Project Team — a won Tender / RFP becomes a project */}
+      {isTenderRfp && wo.tenderOutcome === "Won" && (
+        <Section title="Project Team" count={wo.projectTeam.length}>
+          <ProjectTeamPanel
+            woId={id}
+            team={wo.projectTeam}
+            canEdit={!!(user && ASSIGN_ROLES.includes(user.role as Role))}
+            onChange={() => mutate()}
+          />
+        </Section>
+      )}
 
       {/* Task Checklist */}
       <Section title="Task Checklist" count={wo.tasks.length}>
@@ -892,6 +916,138 @@ function Field({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="text-xs text-gray-500">{label}</dt>
       <dd className="mt-0.5 text-sm font-medium text-gray-800">{value}</dd>
+    </div>
+  );
+}
+
+interface StaffOption {
+  Id: string;
+  Name: string;
+  SubTeam: string | null;
+  RoleCode: string;
+}
+
+function ProjectTeamPanel({
+  woId,
+  team,
+  canEdit,
+  onChange,
+}: {
+  woId: string;
+  team: ProjectMember[];
+  canEdit: boolean;
+  onChange: () => void;
+}) {
+  const { data: staffList } = useSWR<StaffOption[]>(canEdit ? "/api/staff" : null, apiFetcher);
+  const [staffId, setStaffId] = useState("");
+  const [roleNote, setRoleNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onTeam = new Set(team.map((m) => m.staffId));
+  const options = (staffList ?? []).filter((s) => !onTeam.has(s.Id));
+
+  async function add() {
+    if (!staffId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiPost(`/api/wo/${woId}/project-team`, {
+        staffId,
+        ...(roleNote.trim() ? { roleNote: roleNote.trim() } : {}),
+      });
+      setStaffId("");
+      setRoleNote("");
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(memberId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiDelete(`/api/wo/${woId}/project-team/${memberId}`);
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
+        This tender was won, so it is now a project. The OO stays the OO; people added here look after
+        the project on behalf of CSI.
+      </p>
+      {team.length === 0 ? (
+        <EmptyState text="No one assigned to the project yet" />
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {team.map((m) => (
+            <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium text-gray-800">
+                  {m.name}
+                  <span className="ml-2 text-xs font-normal text-gray-400">
+                    {m.roleCode}{m.subTeam ? ` · Pod ${m.subTeam}` : ""}
+                  </span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  {m.roleNote ? `${m.roleNote} · ` : ""}added by {m.addedByName} on{" "}
+                  {new Date(m.addedAt).toLocaleDateString("en-MY")}
+                </p>
+              </div>
+              {canEdit && (
+                <button
+                  onClick={() => remove(m.id)}
+                  disabled={busy}
+                  className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {canEdit && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50 px-4 py-3">
+          <select
+            value={staffId}
+            onChange={(e) => setStaffId(e.target.value)}
+            className="w-56 max-w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm"
+          >
+            <option value="">Add a person…</option>
+            {options.map((s) => (
+              <option key={s.Id} value={s.Id}>
+                {s.Name} ({s.RoleCode}{s.SubTeam ? ` · Pod ${s.SubTeam}` : ""})
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={roleNote}
+            onChange={(e) => setRoleNote(e.target.value)}
+            maxLength={100}
+            placeholder="Role, e.g. Project Manager (optional)"
+            className="w-64 max-w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+          />
+          <button
+            onClick={add}
+            disabled={busy || !staffId}
+            className="rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            Add to Project
+          </button>
+        </div>
+      )}
+      {error && <p className="px-4 pb-3 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
