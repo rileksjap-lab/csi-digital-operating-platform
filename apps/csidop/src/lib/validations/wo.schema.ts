@@ -71,6 +71,15 @@ export const woTaskCreateSchema = z.object({
 
 export type WoTaskCreateInput = z.infer<typeof woTaskCreateSchema>;
 
+// ─── Project team (won Tender / RFP WOs) ────────────────────────────────────
+
+export const woProjectMemberCreateSchema = z.object({
+  staffId: z.string().uuid(),
+  roleNote: z.string().trim().max(100).optional(),
+});
+
+export type WoProjectMemberCreateInput = z.infer<typeof woProjectMemberCreateSchema>;
+
 export const woTaskPatchSchema = z.object({
   description: z.string().min(1).max(200).optional(),
   assignedTo: z.string().uuid().nullable().optional(),
