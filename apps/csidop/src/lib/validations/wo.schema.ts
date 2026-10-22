@@ -86,6 +86,8 @@ export const woTaskPatchSchema = z.object({
   progress: z.number().int().min(0).max(100).optional(),
   scope: z.enum(["Internal", "External"]).optional(),
   status: z.enum(["Active", "NA"]).optional(),
+  plannedStart: z.string().date().nullable().optional(),
+  plannedEnd: z.string().date().nullable().optional(),
 });
 
 export type WoTaskPatchInput = z.infer<typeof woTaskPatchSchema>;
