@@ -1,5 +1,6 @@
 import { query } from "@/lib/db/pool";
 import type { ScopeFilter } from "@/lib/auth/guards";
+import { monthRange } from "@/lib/dates";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -91,8 +92,7 @@ export async function getUtilization(
   const [targetYear, targetMonth] = filters.month
     ? filters.month.split("-").map(Number)
     : [now.getFullYear(), now.getMonth() + 1];
-  const monthStart = new Date(targetYear, targetMonth - 1, 1).toISOString().slice(0, 10);
-  const monthEnd = new Date(targetYear, targetMonth, 0).toISOString().slice(0, 10);
+  const { start: monthStart, end: monthEnd } = monthRange(targetYear, targetMonth);
   const period = `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
   const isCurrentPeriod = targetYear === now.getFullYear() && targetMonth === now.getMonth() + 1;
 
@@ -220,8 +220,7 @@ export async function getStaffUtilizationDetail(
   }
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const { start: monthStart, end: monthEnd } = monthRange(now.getFullYear(), now.getMonth() + 1);
 
   // Effort by WO
   const effortByWoRes = await query(
