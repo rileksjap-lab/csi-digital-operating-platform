@@ -527,6 +527,8 @@ export interface WoTaskItem {
   status: string;
   dateCreated: string;
   dateCompleted: string | null;
+  plannedStart: string | null;
+  plannedEnd: string | null;
 }
 
 export interface WoDetail {
@@ -714,7 +716,8 @@ export async function getWorkOrderById(
       `SELECT wt.id AS "Id", wt.taskno AS "TaskNo", wt.description AS "Description",
               wt.assignedto AS "AssignedToId", s.name AS "AssignedToName",
               wt.progress AS "Progress", wt.scope AS "Scope", wt.status AS "Status",
-              wt.datecreated AS "DateCreated", wt.datecompleted AS "DateCompleted"
+              wt.datecreated AS "DateCreated", wt.datecompleted AS "DateCompleted",
+              wt.plannedstart::text AS "PlannedStart", wt.plannedend::text AS "PlannedEnd"
        FROM wo_task wt
        LEFT JOIN staff s ON s.id = wt.assignedto
        WHERE wt.csi_wo_id = $1
@@ -758,6 +761,8 @@ export async function getWorkOrderById(
     status: (t.Status as string) ?? "Active",
     dateCreated: String(t.DateCreated),
     dateCompleted: t.DateCompleted ? String(t.DateCompleted) : null,
+    plannedStart: (t.PlannedStart as string) ?? null,
+    plannedEnd: (t.PlannedEnd as string) ?? null,
   }));
 
   const activeTasks = taskRows.filter((t) => t.status === "Active");
@@ -1594,6 +1599,8 @@ export async function addWoTask(
       status: "Active",
       dateCreated: String(result.rows[0].DateCreated),
       dateCompleted: null,
+      plannedStart: null,
+      plannedEnd: null,
     };
   } catch (err) {
     await client.query("ROLLBACK");
@@ -1605,7 +1612,15 @@ export async function addWoTask(
 
 export async function updateWoTask(
   taskId: string,
-  input: { description?: string; assignedTo?: string | null; progress?: number; scope?: string; status?: string }
+  input: {
+    description?: string;
+    assignedTo?: string | null;
+    progress?: number;
+    scope?: string;
+    status?: string;
+    plannedStart?: string | null;
+    plannedEnd?: string | null;
+  }
 ): Promise<WoTaskItem | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -1646,6 +1661,17 @@ export async function updateWoTask(
     }
   }
 
+  if (input.plannedStart !== undefined) {
+    sets.push(`plannedstart = $${pi}`);
+    params.push(input.plannedStart);
+    pi++;
+  }
+  if (input.plannedEnd !== undefined) {
+    sets.push(`plannedend = $${pi}`);
+    params.push(input.plannedEnd);
+    pi++;
+  }
+
   if (sets.length === 0) return null;
 
   sets.push(`updatedat = now()`);
@@ -1660,7 +1686,8 @@ export async function updateWoTask(
     `SELECT wt.id AS "Id", wt.taskno AS "TaskNo", wt.description AS "Description",
             wt.assignedto AS "AssignedToId", s.name AS "AssignedToName",
             wt.progress AS "Progress", wt.scope AS "Scope",
-            wt.datecreated AS "DateCreated", wt.datecompleted AS "DateCompleted"
+            wt.datecreated AS "DateCreated", wt.datecompleted AS "DateCompleted",
+            wt.plannedstart::text AS "PlannedStart", wt.plannedend::text AS "PlannedEnd"
      FROM wo_task wt
      LEFT JOIN staff s ON s.id = wt.assignedto
      WHERE wt.id = $1`,
@@ -1680,6 +1707,8 @@ export async function updateWoTask(
     status: (t.Status as string) ?? "Active",
     dateCreated: String(t.DateCreated),
     dateCompleted: t.DateCompleted ? String(t.DateCompleted) : null,
+    plannedStart: (t.PlannedStart as string) ?? null,
+    plannedEnd: (t.PlannedEnd as string) ?? null,
   };
 }
 
@@ -1910,6 +1939,94 @@ export async function removeProjectMember(
 
     await client.query("COMMIT");
     return true;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ─── Auto-schedule tasks for the Gantt chart ────────────────────────────────
+// Spreads active, unscheduled tasks end to end across the WO's start (created
+// date) and due date. Tasks that already have planned dates are left alone.
+
+export type AutoScheduleError = "NO_DUE_DATE" | "INVALID_RANGE" | "NOTHING_TO_SCHEDULE";
+
+export async function autoScheduleTasks(
+  woId: string,
+  session: AuthSession,
+  scope: ScopeFilter
+): Promise<{ notFound: true } | { error: AutoScheduleError } | { scheduled: number }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const sf = applyScopeFilter(scope, "w", 2);
+    const woRes = await client.query<{ start: string; due: string | null }>(
+      `SELECT w.createdat::date::text AS start, w.duedate::text AS due
+       FROM csi_wo w
+       LEFT JOIN staff sa ON sa.id = w.assignedto
+       WHERE w.id = $1 ${sf.clause}`,
+      [woId, ...sf.params]
+    );
+    if (woRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { notFound: true };
+    }
+    const { start, due } = woRes.rows[0];
+    if (!due) {
+      await client.query("ROLLBACK");
+      return { error: "NO_DUE_DATE" };
+    }
+
+    const DAY = 86_400_000;
+    const startMs = Date.parse(`${start}T00:00:00Z`);
+    const dueMs = Date.parse(`${due}T00:00:00Z`);
+    if (dueMs < startMs) {
+      await client.query("ROLLBACK");
+      return { error: "INVALID_RANGE" };
+    }
+
+    const tasks = await client.query<{ id: string }>(
+      `SELECT id FROM wo_task
+       WHERE csi_wo_id = $1 AND status = 'Active'
+         AND plannedstart IS NULL AND plannedend IS NULL
+       ORDER BY taskno`,
+      [woId]
+    );
+    if (tasks.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { error: "NOTHING_TO_SCHEDULE" };
+    }
+
+    const totalDays = (dueMs - startMs) / DAY + 1;
+    const n = tasks.rows.length;
+    for (let i = 0; i < n; i++) {
+      const first = Math.floor((i * totalDays) / n);
+      const last = Math.max(first, Math.floor(((i + 1) * totalDays) / n) - 1);
+      const plannedStart = new Date(startMs + first * DAY).toISOString().slice(0, 10);
+      const plannedEnd = new Date(startMs + last * DAY).toISOString().slice(0, 10);
+      await client.query(
+        `UPDATE wo_task SET plannedstart = $1, plannedend = $2, updatedat = now() WHERE id = $3`,
+        [plannedStart, plannedEnd, tasks.rows[i].id]
+      );
+    }
+
+    await insertAuditEntry(
+      {
+        entityName: "CSI_WO",
+        entityId: woId,
+        action: "Update",
+        fieldName: "TaskSchedule",
+        newValue: `Auto-scheduled ${n} task${n === 1 ? "" : "s"} between ${start} and ${due}`,
+        performedBy: session.staffId,
+      },
+      client
+    );
+
+    await client.query("COMMIT");
+    return { scheduled: n };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

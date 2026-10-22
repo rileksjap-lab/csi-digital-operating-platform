@@ -14,6 +14,8 @@ import WoEvidencePanel from "@/components/wo/wo-evidence-panel";
 import WoSlaBadge from "@/components/wo/wo-sla-badge";
 import WoTaskChecklist from "@/components/wo/wo-task-checklist";
 import WoDiscussion from "@/components/wo/wo-discussion";
+import WoGantt from "@/components/wo/wo-gantt";
+import WoTimeline from "@/components/wo/wo-timeline";
 
 interface WoTaskItem {
   id: string;
@@ -26,6 +28,8 @@ interface WoTaskItem {
   status: string;
   dateCreated: string;
   dateCompleted: string | null;
+  plannedStart: string | null;
+  plannedEnd: string | null;
 }
 
 interface WoDetail {
@@ -127,6 +131,7 @@ export default function WoDetailPage() {
   const user = useAuthStore((s) => s.user);
 
   const [showPatch, setShowPatch] = useState(false);
+  const [scheduleTab, setScheduleTab] = useState<"gantt" | "timeline">("gantt");
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -398,6 +403,41 @@ export default function WoDetailPage() {
           />
         </Section>
       )}
+
+      {/* Schedule — Gantt chart of task plan, and a timeline of what has happened */}
+      <Section title="Schedule">
+        <div className="flex gap-1 border-b border-gray-100 px-4 py-2">
+          {([
+            { key: "gantt", label: "Gantt chart" },
+            { key: "timeline", label: "Timeline" },
+          ] as { key: "gantt" | "timeline"; label: string }[]).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setScheduleTab(t.key)}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                scheduleTab === t.key ? "bg-primary-50 text-primary-700" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {scheduleTab === "gantt" ? (
+          <WoGantt
+            woId={id}
+            tasks={wo.tasks}
+            woStart={wo.createdAt}
+            dueDate={wo.dueDate}
+            canEdit={
+              wo.status !== "Closed" && wo.status !== "Cancelled" &&
+              !!(user && (ASSIGN_ROLES.includes(user.role as Role) || user.staffId === wo.assignedTo?.id))
+            }
+            onChanged={() => mutate()}
+          />
+        ) : (
+          <WoTimeline wo={wo} />
+        )}
+      </Section>
 
       {/* Task Checklist */}
       <Section title="Task Checklist" count={wo.tasks.length}>
