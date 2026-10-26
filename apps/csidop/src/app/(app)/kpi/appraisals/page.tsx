@@ -66,6 +66,7 @@ export default function KpiAppraisalsPage() {
         <tbody>
           {rows.map((a) => {
             const turn = a.actions.some((x) => YOUR_TURN.includes(x));
+            const label = a.actions.includes("submitSelf") ? "Fill in" : a.actions.includes("submitReview") ? "Review" : a.actions.includes("finalise") ? "Finalise" : "View";
             return (
               <tr key={a.id} className="border-b border-gray-50">
                 <td className="px-4 py-2 font-medium text-gray-800">{a.staffName}</td>
@@ -78,8 +79,15 @@ export default function KpiAppraisalsPage() {
                 <td className="px-2 py-2 text-gray-600">{a.finalApproverName}</td>
                 <td className="px-2 py-2 text-right text-gray-800">{a.totalPoints !== null ? `${a.totalPoints} / 120` : "–"}</td>
                 <td className="whitespace-nowrap px-4 py-2 text-right">
-                  <Link href={`/kpi/appraisals/${a.id}`} className="text-primary-700 hover:underline">Open</Link>
-                  {(a.status === "Finalised" || a.status === "SentToHR") && <a href={`/api/kpi/appraisals/${a.id}/pdf`} className="ml-3 text-primary-700 hover:underline">PDF</a>}
+                  <Link
+                    href={`/kpi/appraisals/${a.id}`}
+                    className={turn
+                      ? "inline-block rounded bg-primary-600 px-3 py-1 text-xs font-medium text-white hover:bg-primary-700"
+                      : "inline-block rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"}
+                  >
+                    {label}
+                  </Link>
+                  {(a.status === "Finalised" || a.status === "SentToHR") && <a href={`/api/kpi/appraisals/${a.id}/pdf`} className="ml-2 inline-block rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">PDF</a>}
                 </td>
               </tr>
             );

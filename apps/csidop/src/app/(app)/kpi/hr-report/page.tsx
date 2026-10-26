@@ -153,8 +153,8 @@ export default function HrReportPage() {
                 <td className="px-2 py-2 text-right">{fmt(r.bonus)}</td><td className="px-2 py-2 text-right font-semibold">{fmt(r.total)}</td>
                 <td className="max-w-[260px] px-2 py-2 text-xs text-gray-600">{r.outcome ?? "–"}</td>
                 <td className="whitespace-nowrap px-4 py-2 text-right">
-                  <Link href={`/kpi/appraisals/${r.id}`} className="text-primary-700 hover:underline">Open</Link>
-                  {(r.status === "Finalised" || r.status === "SentToHR") && <a href={`/api/kpi/appraisals/${r.id}/pdf`} className="ml-3 text-primary-700 hover:underline">PDF</a>}
+                  <Link href={`/kpi/appraisals/${r.id}`} className="inline-block rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">View</Link>
+                  {(r.status === "Finalised" || r.status === "SentToHR") && <a href={`/api/kpi/appraisals/${r.id}/pdf`} className="ml-2 inline-block rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">PDF</a>}
                 </td>
               </tr>
             ))}
