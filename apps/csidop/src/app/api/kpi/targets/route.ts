@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import pool, { query } from "@/lib/db/pool";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireKpiAuth, requireRole } from "@/lib/auth/guards";
 import { ok, badRequest, zodError, internalError } from "@/lib/response";
 import { insertAuditEntry } from "@/lib/db/audit";
 import { KPI_METRICS, KPI_METRIC_NAMES, PERIOD_PATTERN, getCurrentPeriod } from "@/lib/kpi/metrics";
@@ -12,7 +12,7 @@ import { recomputePeriod } from "@/lib/kpi/compute";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
 
     const period = new URL(request.url).searchParams.get("period") ?? getCurrentPeriod();
@@ -77,7 +77,7 @@ const saveSchema = z.object({
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
 
     const parsed = saveSchema.safeParse(await request.json());

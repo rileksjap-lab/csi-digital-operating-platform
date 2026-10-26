@@ -5,7 +5,7 @@ import { useAuthStore } from "@/lib/stores/auth.store";
 import KpiSetup from "@/components/kpi/kpi-setup";
 
 export default function KpiSetupPage() {
-  const role = useAuthStore((s) => s.user?.role);
+  const role = useAuthStore((s) => s.user?.kpiRole);
 
   if (role && role !== "HOD" && role !== "SVP") {
     return (

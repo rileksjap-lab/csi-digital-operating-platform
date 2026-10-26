@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireKpiAuth, requireRole } from "@/lib/auth/guards";
 import { ok, notFound, conflict, badRequest, zodError, internalError } from "@/lib/response";
 import { getCycleConfig, saveTemplate } from "@/lib/repositories/kpi-config.repo";
 import { templateSaveSchema } from "@/lib/validations/kpi-config.schema";
@@ -10,7 +10,7 @@ const idSchema = z.string().uuid();
 // Replaces the KRA lines of one role template. Weights must total 100%.
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ cycleId: string; templateId: string }> }) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
     const { cycleId, templateId } = await params;
     if (!idSchema.safeParse(cycleId).success || !idSchema.safeParse(templateId).success) return badRequest("Invalid id");

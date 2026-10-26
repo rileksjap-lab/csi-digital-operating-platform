@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireKpiAuth, requireRole } from "@/lib/auth/guards";
 import { ok, notFound, badRequest, zodError, internalError } from "@/lib/response";
 import { getCycleConfig, updateCycle } from "@/lib/repositories/kpi-config.repo";
 import { cycleSaveSchema } from "@/lib/validations/kpi-config.schema";
@@ -9,7 +9,7 @@ const idSchema = z.string().uuid();
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ cycleId: string }> }) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD", "SVP");
     const { cycleId } = await params;
     if (!idSchema.safeParse(cycleId).success) return badRequest("Invalid cycle id");
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // Cycle name, dates, status and the certification points rules. HOD only.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ cycleId: string }> }) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
     const { cycleId } = await params;
     if (!idSchema.safeParse(cycleId).success) return badRequest("Invalid cycle id");

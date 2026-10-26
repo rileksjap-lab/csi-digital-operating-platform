@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireKpiAuth, requireRole } from "@/lib/auth/guards";
 import { ok, notFound, conflict, badRequest, zodError, internalError } from "@/lib/response";
 import { getCycleConfig, saveItems } from "@/lib/repositories/kpi-config.repo";
 import { itemsSaveSchema } from "@/lib/validations/kpi-config.schema";
@@ -8,7 +8,7 @@ import { itemsSaveSchema } from "@/lib/validations/kpi-config.schema";
 // Replaces the HR value items and bonus items shared by every role. HOD only.
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ cycleId: string }> }) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
     const { cycleId } = await params;
     if (!z.string().uuid().safeParse(cycleId).success) return badRequest("Invalid cycle id");

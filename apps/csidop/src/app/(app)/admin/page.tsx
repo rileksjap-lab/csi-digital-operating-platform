@@ -31,7 +31,7 @@ interface StaffAdmin {
   roleId: string; roleCode: string; roleName: string;
   deptId: string; deptCode: string; deptName: string;
   subTeam: string | null; productivityFactor: number;
-  dailyUsableHours: number; status: string; systemConfigFlag: boolean;
+  dailyUsableHours: number; status: string; systemConfigFlag: boolean; kpiRoleId: string | null; kpiRoleName: string | null;
 }
 interface BaselineTier {
   id: string; tierSize: string; baselineCSIHours: number; baselineCMTHours: number;
@@ -921,6 +921,7 @@ function StaffPanel() {
               <th className="px-3 py-2 text-left font-medium text-gray-500">Email</th>
               <th className="px-3 py-2 text-left font-medium text-gray-500">Dept</th>
               <th className="px-3 py-2 text-left font-medium text-gray-500">Role</th>
+              <th className="px-3 py-2 text-left font-medium text-gray-500" title="The role the KPI appraisal uses. Leave as the same unless the person's access role is higher than their real job.">KPI role</th>
               <th className="px-3 py-2 text-center font-medium text-gray-500">Team</th>
               <th className="px-3 py-2 text-right font-medium text-gray-500">Prod.</th>
               <th className="px-3 py-2 text-right font-medium text-gray-500">Hrs/Day</th>
@@ -944,6 +945,12 @@ function StaffPanel() {
                       {roles.map((rl: LookupOption) => <option key={rl.Id} value={rl.Id}>{rl.RoleName}</option>)}
                     </select>
                   ) : r.roleName}</td>
+                  <td className="px-3 py-2 text-gray-600">{editing === r.id ? (
+                    <select className="rounded border border-gray-300 px-1 py-0.5 text-xs" defaultValue={r.kpiRoleId ?? ""} onChange={(e) => setDraft({...draft, kpiRoleId: e.target.value || null})}>
+                      <option value="">Same as role</option>
+                      {roles.map((rl: LookupOption) => <option key={rl.Id} value={rl.Id}>{rl.RoleName}</option>)}
+                    </select>
+                  ) : (r.kpiRoleName ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">{r.kpiRoleName}</span> : <span className="text-xs text-gray-400">Same as role</span>)}</td>
                   <td className="px-3 py-2 text-center text-gray-600">{editing === r.id ? (
                     <select className="rounded border border-gray-300 px-1 py-0.5 text-xs" defaultValue={r.subTeam ?? ""} onChange={(e) => setDraft({...draft, subTeam: e.target.value || null})}>
                       <option value="">—</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
@@ -965,7 +972,7 @@ function StaffPanel() {
                   ) : <button onClick={() => { setEditing(r.id); setDraft({}); }} className="px-2 py-1 text-xs text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded">Edit</button>}</td>
                 </tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-500">No staff with status &quot;{statusFilter}&quot;</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={12} className="px-4 py-8 text-center text-sm text-gray-500">No staff with status &quot;{statusFilter}&quot;</td></tr>}
             </tbody>
           </table>
         </div>

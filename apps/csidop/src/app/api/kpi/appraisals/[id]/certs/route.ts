@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth/guards";
+import { requireKpiAuth } from "@/lib/auth/guards";
 import { ok, badRequest, zodError, internalError } from "@/lib/response";
 import { saveCerts } from "@/lib/repositories/kpi-appraisal.repo";
 import { certsSchema } from "@/lib/validations/kpi-appraisal.schema";
@@ -9,7 +9,7 @@ import { respondFail } from "@/lib/kpi/respond";
 // Replaces the certificate list behind the Employee Certifications item.
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     const { id } = await params;
     if (!z.string().uuid().safeParse(id).success) return badRequest("Invalid appraisal id");
     const parsed = certsSchema.safeParse(await request.json());

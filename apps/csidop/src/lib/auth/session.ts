@@ -20,7 +20,7 @@ export interface StaffWithRoleRow {
   SystemConfigFlag: boolean;
 }
 
-const ROLE_CODE_MAP: Record<string, Role> = {
+export const ROLE_CODE_MAP: Record<string, Role> = {
   SVP: "SVP",
   HOD: "HOD",
   SM: "SolutionManager",

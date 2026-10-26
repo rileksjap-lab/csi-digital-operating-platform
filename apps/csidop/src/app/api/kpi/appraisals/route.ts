@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireKpiAuth, requireRole } from "@/lib/auth/guards";
 import { ok, zodError, internalError } from "@/lib/response";
 import { listCycles } from "@/lib/repositories/kpi-config.repo";
 import { createAppraisals, listAppraisals } from "@/lib/repositories/kpi-appraisal.repo";
@@ -10,7 +10,7 @@ import { respondFail } from "@/lib/kpi/respond";
 // or finalise, and, for the HOD and SVP, everyone in scope.
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     const wide = session.role === "HOD" || session.role === "SVP";
     const cycles = (await listCycles()).filter((c) => wide || c.status !== "Draft");
     const asked = new URL(request.url).searchParams.get("cycleId");
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 // HOD opens appraisals for everyone in the department who is not in the cycle yet.
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
     const parsed = openSchema.safeParse(await request.json());
     if (!parsed.success) return zodError(parsed.error);

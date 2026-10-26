@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireAuth, buildScopeFilter } from "@/lib/auth/guards";
+import { requireKpiAuth, buildScopeFilter } from "@/lib/auth/guards";
 import type { ScopeFilter } from "@/lib/auth/guards";
 import { ok, badRequest, unauthorized, internalError } from "@/lib/response";
 import { query } from "@/lib/db/pool";
@@ -25,7 +25,7 @@ function buildScopeWhere(scope: ScopeFilter, staffAlias: string, paramOffset: nu
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     const scope = buildScopeFilter(session);
     const url = new URL(request.url);
     const period = url.searchParams.get("period") ?? getCurrentPeriod();

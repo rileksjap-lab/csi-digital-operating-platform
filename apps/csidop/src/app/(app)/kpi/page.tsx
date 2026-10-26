@@ -103,7 +103,7 @@ export default function KpiDashboardPage() {
   const periods = generatePeriodOptions();
   const [period, setPeriod] = useState(periods[0]);
   const [showTargets, setShowTargets] = useState(false);
-  const isHod = useAuthStore((s) => s.user?.role) === "HOD";
+  const isHod = useAuthStore((s) => s.user?.kpiRole) === "HOD";
 
   const { data, error, isLoading, mutate } = useSWR<KpiData>(
     `/api/kpi?period=${period}`,

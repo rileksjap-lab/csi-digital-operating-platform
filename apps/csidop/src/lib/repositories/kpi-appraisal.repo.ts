@@ -146,21 +146,25 @@ export async function createAppraisals(cycleId: string, session: AuthSession) {
   if (cycle.rows[0].status !== "Open") return fail(409, "Set the cycle to Open before opening appraisals");
 
   const people = await query<{ id: string; name: string; roleId: string; roleCode: string; reportsTo: string | null }>(
-    `SELECT s.id, s.name, s.roleid AS "roleId", r.rolecode AS "roleCode", s.reportsto AS "reportsTo"
-     FROM staff s JOIN role r ON r.id = s.roleid
-     WHERE s.status = 'Active' AND s.deptid = $1 AND r.rolecode <> 'SVP'
+    // The appraisal follows the KPI role when one is set (someone who coordinates
+    // work orders as a Team Lead but is really a Pre-Sales Executive).
+    `SELECT s.id, s.name, COALESCE(s.kpiroleid, s.roleid) AS "roleId", COALESCE(kr.rolecode, r.rolecode) AS "roleCode", s.reportsto AS "reportsTo"
+     FROM staff s JOIN role r ON r.id = s.roleid LEFT JOIN role kr ON kr.id = s.kpiroleid
+     WHERE s.status = 'Active' AND s.deptid = $1 AND COALESCE(kr.rolecode, r.rolecode) <> 'SVP'
        AND NOT EXISTS (SELECT 1 FROM kpi_appraisal a WHERE a.cycleid = $2 AND a.staffid = s.id)
      ORDER BY s.name`,
     [session.departmentId, cycleId]
   );
   const svp = await query<{ id: string }>(
-    `SELECT s.id FROM staff s JOIN role r ON r.id = s.roleid WHERE s.status = 'Active' AND r.rolecode = 'SVP' ORDER BY s.createdat LIMIT 1`
+    `SELECT s.id FROM staff s JOIN role r ON r.id = s.roleid LEFT JOIN role kr ON kr.id = s.kpiroleid
+     WHERE s.status = 'Active' AND COALESCE(kr.rolecode, r.rolecode) = 'SVP' ORDER BY s.createdat LIMIT 1`
   );
   const templates = await query<{ id: string; roleId: string }>(`SELECT id, roleid AS "roleId" FROM kpi_template WHERE cycleid = $1`, [cycleId]);
   const tplByRole = new Map(templates.rows.map((t) => [t.roleId, t.id]));
 
   const created: string[] = [];
   const skipped: { name: string; reason: string }[] = [];
+  let refreshed = 0;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -184,6 +188,33 @@ export async function createAppraisals(cycleId: string, session: AuthSession) {
       );
       created.push(ins.rows[0].id);
     }
+
+    // Appraisals that exist but have not been started yet (still in self-assessment,
+    // nothing rated or listed) follow the person's current KPI role and reporting
+    // line, so fixing a role or a superior and pressing the button again corrects
+    // them. Anything already started is left alone.
+    const stale = await client.query<{ id: string; staffid: string }>(
+      `UPDATE kpi_appraisal a
+          SET templateid = t.id, reviewerid = s.reportsto, updatedat = now()
+         FROM staff s
+         JOIN kpi_template t ON t.roleid = COALESCE(s.kpiroleid, s.roleid)
+        WHERE a.cycleid = $1 AND a.staffid = s.id AND t.cycleid = a.cycleid
+          AND s.deptid = $2 AND s.status = 'Active' AND s.reportsto IS NOT NULL AND s.reportsto <> s.id
+          AND a.status = 'SelfAssessment'
+          AND (a.templateid <> t.id OR a.reviewerid <> s.reportsto)
+          AND NOT EXISTS (SELECT 1 FROM kpi_appraisal_score sc WHERE sc.appraisalid = a.id)
+          AND NOT EXISTS (SELECT 1 FROM kpi_appraisal_cert c WHERE c.appraisalid = a.id)
+       RETURNING a.id, a.staffid`,
+      [cycleId, session.departmentId]
+    );
+    for (const row of stale.rows) {
+      await insertAuditEntry(
+        { entityName: "KPI_APPRAISAL", entityId: row.id, action: "Update", fieldName: "Form and reviewer",
+          newValue: "Refreshed from the current KPI role and reporting line (appraisal not started)", performedBy: session.staffId },
+        client
+      );
+    }
+    refreshed = stale.rows.length;
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -191,7 +222,7 @@ export async function createAppraisals(cycleId: string, session: AuthSession) {
   } finally {
     client.release();
   }
-  return done({ created: created.length, skipped });
+  return done({ created: created.length, refreshed, skipped });
 }
 
 // ── Lists and detail ────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireKpiAuth, requireRole } from "@/lib/auth/guards";
 import { ok, badRequest, zodError, internalError } from "@/lib/response";
 import { listReportingLines, saveReportingLines } from "@/lib/repositories/kpi-reporting.repo";
 
@@ -9,7 +9,7 @@ import { listReportingLines, saveReportingLines } from "@/lib/repositories/kpi-r
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD", "SVP");
     return ok(await listReportingLines(session.departmentId));
   } catch (err) {
@@ -28,7 +28,7 @@ const saveSchema = z.object({
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
     const parsed = saveSchema.safeParse(await request.json());
     if (!parsed.success) return zodError(parsed.error);

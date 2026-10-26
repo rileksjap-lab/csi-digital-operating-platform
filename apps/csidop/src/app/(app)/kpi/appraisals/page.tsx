@@ -33,9 +33,9 @@ export default function KpiAppraisalsPage() {
   const [cycleId, setCycleId] = useState<string | null>(null);
   const { data, error, mutate } = useSWR<Data>(`/api/kpi/appraisals${cycleId ? `?cycleId=${cycleId}` : ""}`, apiFetcher);
   const me = useAuthStore((s) => s.user);
-  const isHod = me?.role === "HOD";
+  const isHod = me?.kpiRole === "HOD";
   const [opening, setOpening] = useState(false);
-  const [openResult, setOpenResult] = useState<{ created: number; skipped: { name: string; reason: string }[] } | null>(null);
+  const [openResult, setOpenResult] = useState<{ created: number; refreshed?: number; skipped: { name: string; reason: string }[] } | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
 
   if (error) return <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error.message}</div>;
@@ -110,7 +110,7 @@ export default function KpiAppraisalsPage() {
               {data.cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
-          {(isHod || me?.role === "SVP") && (
+          {(isHod || me?.kpiRole === "SVP") && (
             <>
               <Link href="/kpi/setup" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">KPI setup</Link>
               <Link href="/kpi/hr-report" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">HR report</Link>
@@ -128,6 +128,7 @@ export default function KpiAppraisalsPage() {
       {openResult && (
         <div className="rounded border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
           Opened {openResult.created} new appraisal{openResult.created === 1 ? "" : "s"}.
+          {(openResult.refreshed ?? 0) > 0 && <> Updated {openResult.refreshed} appraisal{openResult.refreshed === 1 ? "" : "s"} that had not been started, to match the current role and reviewer.</>}
           {openResult.skipped.length > 0 && (
             <>
               <p className="mt-2 text-amber-800">Not opened:</p>
@@ -146,7 +147,7 @@ export default function KpiAppraisalsPage() {
       ) : (
         <>
           {mine.length > 0 && <div className="space-y-2"><h2 className="text-sm font-semibold text-gray-700">My appraisal</h2>{table(mine)}</div>}
-          {others.length > 0 && <div className="space-y-2"><h2 className="text-sm font-semibold text-gray-700">{isHod || me?.role === "SVP" ? "Team" : "People I review"}</h2>{table(others)}</div>}
+          {others.length > 0 && <div className="space-y-2"><h2 className="text-sm font-semibold text-gray-700">{isHod || me?.kpiRole === "SVP" ? "Team" : "People I review"}</h2>{table(others)}</div>}
         </>
       )}
     </div>
