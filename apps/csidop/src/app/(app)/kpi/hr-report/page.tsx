@@ -81,7 +81,7 @@ export default function HrReportPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/kpi/appraisals" className="text-xs text-gray-500 hover:text-gray-700">← KPI Appraisal</Link>
+          <Link href="/kpi/appraisals" className="link-action text-xs">← KPI Appraisal</Link>
           <h1 className="text-xl font-semibold text-gray-800">HR report</h1>
           <p className="text-sm text-gray-500">Final results for {d.cycle.name}, ready to send to Human Resources.</p>
         </div>

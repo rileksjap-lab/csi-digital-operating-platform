@@ -121,7 +121,7 @@ export default function TenderDataTable({ rows, meta }: Props) {
                 <td className="px-4 py-3">
                   <Link
                     href={`/tenders/${row.id}`}
-                    className="font-mono text-xs text-primary-600 hover:underline"
+                    className="font-mono text-xs text-primary-600 underline underline-offset-2"
                   >
                     {row.tenderNo}
                   </Link>

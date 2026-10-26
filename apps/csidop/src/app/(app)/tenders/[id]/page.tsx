@@ -56,7 +56,7 @@ export default function TenderDetailPage() {
   if (error || !tender) {
     return (
       <div className="space-y-4">
-        <Link href="/workloads" className="text-sm text-primary-600 hover:underline">
+        <Link href="/workloads" className="text-sm text-primary-600 underline underline-offset-2">
           &larr; Back to Tenders
         </Link>
         <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -70,7 +70,7 @@ export default function TenderDetailPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Link href="/workloads" className="text-sm text-primary-600 hover:underline">
+        <Link href="/workloads" className="text-sm text-primary-600 underline underline-offset-2">
           &larr; Back to Tenders
         </Link>
         <div className="mt-2 flex items-center gap-3">

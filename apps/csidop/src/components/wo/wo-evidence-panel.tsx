@@ -334,7 +334,7 @@ export default function WoEvidencePanel({
                   <td className="px-4 py-2 max-w-[200px]">
                     <a
                       href={`/api/evidence/${ev.id}/download`}
-                      className="truncate block text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+                      className="truncate block text-xs font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2"
                       title={displayName}
                     >
                       {displayName}

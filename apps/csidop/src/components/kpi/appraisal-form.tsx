@@ -442,7 +442,7 @@ export default function AppraisalForm({ id }: { id: string }) {
                       </select>
                     </td>
                     <td className="pr-2 pb-1 text-gray-600">{rule?.points ?? 0}</td>
-                    <td className="pb-1">{certEditable && <button onClick={() => setCerts((cs) => cs.filter((_, k) => k !== n))} className="text-xs text-red-600">Remove</button>}</td>
+                    <td className="pb-1">{certEditable && <button onClick={() => setCerts((cs) => cs.filter((_, k) => k !== n))} className="btn-quiet text-red-600">Remove</button>}</td>
                   </tr>
                 );
               })}
@@ -469,7 +469,7 @@ export default function AppraisalForm({ id }: { id: string }) {
   return (
     <div className="space-y-6 pb-28">
       <div>
-        <Link href="/kpi/appraisals" className="text-xs text-gray-500 hover:text-gray-700">← KPI Appraisal</Link>
+        <Link href="/kpi/appraisals" className="link-action text-xs">← KPI Appraisal</Link>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-gray-800">{d.staff.name}</h1>
