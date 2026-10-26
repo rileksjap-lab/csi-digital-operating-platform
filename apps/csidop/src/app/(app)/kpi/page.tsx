@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import Link from "next/link";
 import { apiFetcher } from "@/lib/api/fetcher";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import KpiTargetsPanel from "@/components/kpi/kpi-targets-panel";
@@ -137,6 +138,20 @@ export default function KpiDashboardPage() {
           <p className="text-sm text-gray-500">Performance scorecard and achievement tracking</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/kpi/appraisals"
+            className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            KPI appraisals
+          </Link>
+          {isHod && (
+            <Link
+              href="/kpi/setup"
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              KPI setup
+            </Link>
+          )}
           {isHod && (
             <button
               onClick={() => setShowTargets((v) => !v)}
