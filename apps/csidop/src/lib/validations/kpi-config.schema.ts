@@ -91,3 +91,12 @@ export const cycleSaveSchema = z.object({
   // Where the final results are emailed. An empty list switches sending off.
   hrEmails: z.array(z.string().trim().toLowerCase().email().max(150)).max(10).optional(),
 });
+
+export const cycleCreateSchema = z
+  .object({
+    name: text(100).min(1, "Give the cycle a name"),
+    periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-07-01"),
+    periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-12-31"),
+    copyFromId: z.string().uuid(),
+  })
+  .refine((v) => v.periodEnd >= v.periodStart, { message: "The end date cannot be before the start date", path: ["periodEnd"] });

@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import pool, { query } from "@/lib/db/pool";
 import { insertAuditEntry } from "@/lib/db/audit";
 import type { z } from "zod";
-import type { templateSaveSchema, itemsSaveSchema, outcomeSaveSchema, cycleSaveSchema } from "@/lib/validations/kpi-config.schema";
+import type { templateSaveSchema, itemsSaveSchema, outcomeSaveSchema, cycleSaveSchema, cycleCreateSchema } from "@/lib/validations/kpi-config.schema";
 
 // KPI appraisal configuration: cycles, role templates (KRA lines), HR/bonus
 // items and score outcome bands. All of it is data edited by the HOD; the
@@ -259,5 +259,56 @@ export async function updateCycle(cycleId: string, input: z.infer<typeof cycleSa
       client
     );
     return "saved";
+  });
+}
+
+/**
+ * Starts a new cycle as a copy of an existing one: the role templates and their
+ * lines, the HR and bonus items, the outcome bands and the cycle settings. The
+ * copy starts in Draft with no appraisals, so it can be edited freely before it
+ * is opened (the earlier cycle is not touched).
+ */
+export async function createCycleCopy(
+  input: z.infer<typeof cycleCreateSchema>,
+  staffId: string
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  return inTransaction(async (client) => {
+    const src = await client.query<{ config: Record<string, unknown> }>(`SELECT config FROM kpi_cycle WHERE id = $1`, [input.copyFromId]);
+    if (src.rows.length === 0) return { ok: false as const, message: "The cycle to copy was not found" };
+
+    // A short unique code from the start date, e.g. 2026-07, then 2026-07-2 ...
+    const base = input.periodStart.slice(0, 7);
+    let code = base;
+    for (let n = 2; (await client.query(`SELECT 1 FROM kpi_cycle WHERE cyclecode = $1`, [code])).rows.length > 0; n++) code = `${base}-${n}`;
+
+    const cycle = await client.query<{ id: string }>(
+      `INSERT INTO kpi_cycle (cyclecode, name, periodstart, periodend, status, config)
+       VALUES ($1, $2, $3, $4, 'Draft', $5::jsonb) RETURNING id`,
+      [code, input.name.trim(), input.periodStart, input.periodEnd, JSON.stringify(src.rows[0].config ?? {})]
+    );
+    const id = cycle.rows[0].id;
+
+    const templates = await client.query<{ id: string; roleid: string; displayname: string; sortorder: number }>(
+      `SELECT id, roleid, displayname, sortorder FROM kpi_template WHERE cycleid = $1`, [input.copyFromId]);
+    for (const t of templates.rows) {
+      const created = await client.query<{ id: string }>(
+        `INSERT INTO kpi_template (cycleid, roleid, displayname, sortorder) VALUES ($1, $2, $3, $4) RETURNING id`,
+        [id, t.roleid, t.displayname, t.sortorder]);
+      await client.query(
+        `INSERT INTO kpi_template_line (templateid, lineno, name, measurement, target, explanation, weight, evidencerequired, autometric, bands)
+         SELECT $1, lineno, name, measurement, target, explanation, weight, evidencerequired, autometric, bands
+         FROM kpi_template_line WHERE templateid = $2`, [created.rows[0].id, t.id]);
+    }
+    await client.query(
+      `INSERT INTO kpi_item (cycleid, itemno, section, name, description, weight, scalemax, inputmode, bands)
+       SELECT $1, itemno, section, name, description, weight, scalemax, inputmode, bands FROM kpi_item WHERE cycleid = $2`, [id, input.copyFromId]);
+    await client.query(
+      `INSERT INTO kpi_outcome_band (cycleid, minscore, outcome) SELECT $1, minscore, outcome FROM kpi_outcome_band WHERE cycleid = $2`, [id, input.copyFromId]);
+
+    await insertAuditEntry(
+      { entityName: "KPI_CYCLE", entityId: id, action: "Insert", fieldName: "Cycle created", newValue: `${input.name.trim()} (copy of ${input.copyFromId})`, performedBy: staffId },
+      client
+    );
+    return { ok: true as const, id };
   });
 }
