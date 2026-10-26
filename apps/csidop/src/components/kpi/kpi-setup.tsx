@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { apiFetcher, apiPut, apiPatch } from "@/lib/api/fetcher";
+import { apiFetcher, apiPut, apiPatch, apiPost } from "@/lib/api/fetcher";
 import { KPI_METRICS } from "@/lib/kpi/metrics";
 import KpiReportingLines from "@/components/kpi/kpi-reporting-lines";
 
@@ -459,10 +459,14 @@ const TABS = [
 ] as const;
 
 export default function KpiSetup({ canEdit }: { canEdit: boolean }) {
-  const { data: cycles, error: cyclesError } = useSWR<Cycle[]>("/api/kpi/config", apiFetcher);
+  const { data: cycles, error: cyclesError, mutate: mutateCycles } = useSWR<Cycle[]>("/api/kpi/config", apiFetcher);
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("templates");
   const [roleCode, setRoleCode] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [fresh, setFresh] = useState({ name: "", periodStart: "", periodEnd: "" });
+  const [freshBusy, setFreshBusy] = useState(false);
+  const [freshError, setFreshError] = useState<string | null>(null);
 
   const activeId = cycleId ?? cycles?.[0]?.id ?? null;
   const { data: config, error, mutate } = useSWR<Config>(activeId ? `/api/kpi/config/${activeId}` : null, apiFetcher);
@@ -485,7 +489,45 @@ export default function KpiSetup({ canEdit }: { canEdit: boolean }) {
         <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600">{config.cycle.status}</span>
         <span className="text-xs text-gray-500">{config.cycle.periodStart} to {config.cycle.periodEnd}</span>
         {!canEdit && <span className="text-xs text-gray-500">View only. Only the HOD can change the setup.</span>}
+        {canEdit && <button onClick={() => { setCreating((v) => !v); setFreshError(null); }} className={btn}>{creating ? "Cancel" : "+ New cycle (copy of this one)"}</button>}
       </div>
+
+      {creating && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="mb-3 text-xs text-gray-500">
+            Copies the role templates, weights, rating definitions, HR and bonus items, outcome bands and certification rules of the selected cycle.
+            The new cycle starts as a Draft with no appraisals, so you can edit it (for example the role titles) before opening it.
+          </p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="text-xs text-gray-500 md:col-span-3">Name
+              <input value={fresh.name} onChange={(e) => setFresh((f) => ({ ...f, name: e.target.value }))} placeholder="KPI 2026 - H2 (July-Dec)" className={`${input} mt-1`} />
+            </label>
+            <label className="text-xs text-gray-500">From
+              <input type="date" value={fresh.periodStart} onChange={(e) => setFresh((f) => ({ ...f, periodStart: e.target.value }))} className={`${input} mt-1`} />
+            </label>
+            <label className="text-xs text-gray-500">To
+              <input type="date" value={fresh.periodEnd} onChange={(e) => setFresh((f) => ({ ...f, periodEnd: e.target.value }))} className={`${input} mt-1`} />
+            </label>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              disabled={freshBusy || !fresh.name.trim() || !fresh.periodStart || !fresh.periodEnd}
+              onClick={async () => {
+                setFreshBusy(true); setFreshError(null);
+                try {
+                  const res = await apiPost<{ id: string; cycles: Cycle[] }>("/api/kpi/config", { ...fresh, copyFromId: activeId });
+                  await mutateCycles(res.cycles, false);
+                  setCycleId(res.id); setCreating(false); setFresh({ name: "", periodStart: "", periodEnd: "" }); setTab("templates");
+                } catch (e) { setFreshError(e instanceof Error ? e.message : "Could not create the cycle"); } finally { setFreshBusy(false); }
+              }}
+              className={primaryBtn}
+            >
+              {freshBusy ? "Creating…" : "Create cycle"}
+            </button>
+            {freshError && <span className="text-sm text-red-600">{freshError}</span>}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-gray-200">
         {TABS.map((t) => (
