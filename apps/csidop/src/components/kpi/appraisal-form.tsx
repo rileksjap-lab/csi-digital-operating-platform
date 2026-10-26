@@ -120,7 +120,7 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<{ o
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
-function Scoreboard({ totals, partial }: { totals: Detail["totals"]; partial: boolean }) {
+function Scoreboard({ totals, partial, showOutcome }: { totals: Detail["totals"]; partial: boolean; showOutcome: boolean }) {
   const card = (label: string, value: number, max: number, tone: string) => (
     <div className={`rounded-lg border px-4 py-3 ${tone}`}>
       <div className="text-xs text-gray-500">{label}</div>
@@ -137,7 +137,7 @@ function Scoreboard({ totals, partial }: { totals: Detail["totals"]; partial: bo
       </div>
       <p className="mt-2 text-xs text-gray-500">
         {partial ? "Running total from the ratings entered so far. " : ""}
-        {totals.outcome ? <>Outcome at this score: <span className="font-medium text-gray-700">{totals.outcome}</span></> : null}
+        {showOutcome && totals.outcome ? <>Outcome at this score: <span className="font-medium text-gray-700">{totals.outcome}</span></> : null}
       </p>
     </div>
   );
@@ -452,7 +452,7 @@ export default function AppraisalForm({ id }: { id: string }) {
         </div>
       )}
 
-      <Scoreboard totals={live} partial={d.status !== "Finalised" && d.status !== "SentToHR"} />
+      <Scoreboard totals={live} partial={d.status !== "Finalised" && d.status !== "SentToHR"} showOutcome={!d.ratingsHidden} />
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-gray-800">A. KRA, departmental (60 points)</h2>
