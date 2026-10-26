@@ -15,7 +15,7 @@ interface Report {
   rows: {
     id: string; name: string; roleName: string; subTeam: string | null; reviewerName: string; finalApproverName: string;
     status: AppraisalStatus; kra: number | null; value: number | null; bonus: number | null; total: number | null;
-    outcome: string | null; finalisedAt: string | null; sentToHrAt: string | null; ownAppraisal: boolean;
+    outcome: string | null; finalisedAt: string | null; sentToHrAt: string | null;
   }[];
   counts: { total: number; ready: number; pending: number; sent: number };
   blockers: string[];
@@ -146,7 +146,7 @@ export default function HrReportPage() {
           <tbody>
             {d.rows.map((r) => (
               <tr key={r.id} className="border-b border-gray-50 align-top">
-                <td className="px-4 py-2 font-medium text-gray-800">{r.name}{r.ownAppraisal && <span className="ml-2 text-xs font-normal text-gray-400">(sent by the SVP)</span>}</td>
+                <td className="px-4 py-2 font-medium text-gray-800">{r.name}</td>
                 <td className="px-2 py-2 text-gray-600">{r.roleName}</td>
                 <td className="px-2 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${TONE[r.status]}`}>{STATUS_LABEL[r.status]}</span></td>
                 <td className="px-2 py-2 text-right">{fmt(r.kra)}</td><td className="px-2 py-2 text-right">{fmt(r.value)}</td>
