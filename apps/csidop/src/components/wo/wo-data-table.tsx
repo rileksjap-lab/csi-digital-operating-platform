@@ -141,7 +141,7 @@ export default function WoDataTable({
                 <td className="px-4 py-3">
                   <Link
                     href={`/wo/${row.id}`}
-                    className="font-mono text-xs text-primary-600 hover:underline"
+                    className="font-mono text-xs text-primary-600 underline underline-offset-2"
                   >
                     {row.csiWoNo}
                   </Link>

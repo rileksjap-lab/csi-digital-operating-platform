@@ -107,7 +107,7 @@ export default function KpiTargetsPanel({
             Achieved values are calculated by CSIDOP from recorded work.
           </p>
         </div>
-        <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">Close</button>
+        <button onClick={onClose} className="btn-quiet">Close</button>
       </div>
 
       <div className="overflow-x-auto">

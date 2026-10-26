@@ -164,7 +164,7 @@ function MyEffortLogInner() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/wo/${e.woId}`}
-                        className="font-mono text-xs text-primary-600 hover:underline"
+                        className="font-mono text-xs text-primary-600 underline underline-offset-2"
                       >
                         {e.csiWoNo}
                       </Link>

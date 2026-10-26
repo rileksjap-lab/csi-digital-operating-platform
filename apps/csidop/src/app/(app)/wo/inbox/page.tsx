@@ -323,7 +323,7 @@ function InboxInner() {
                 {data.rows.map((row) => (
                   <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <Link href={`/wo/${row.id}`} className="font-mono text-xs text-primary-600 hover:underline">
+                      <Link href={`/wo/${row.id}`} className="font-mono text-xs text-primary-600 underline underline-offset-2">
                         {row.csiWoNo}
                       </Link>
                     </td>

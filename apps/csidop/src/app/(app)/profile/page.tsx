@@ -142,7 +142,7 @@ export default function ProfilePage() {
           <p className="mt-1 text-2xl font-bold text-gray-900">{profile.effortSummary.totalHours.toFixed(1)}h</p>
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-400">{profile.effortSummary.totalEntries} entries</p>
-            <Link href="/profile/effort-log" className="text-xs font-medium text-primary-600 hover:underline">
+            <Link href="/profile/effort-log" className="text-xs font-medium text-primary-600 underline underline-offset-2">
               View all &rarr;
             </Link>
           </div>
