@@ -4,7 +4,6 @@ import { requireAuth } from "@/lib/auth/guards";
 import { badRequest, internalError } from "@/lib/response";
 import { getAppraisal } from "@/lib/repositories/kpi-appraisal.repo";
 import { appraisalFileName, buildAppraisalPdf } from "@/lib/kpi/hr-files";
-import { query } from "@/lib/db/pool";
 import { respondFail } from "@/lib/kpi/respond";
 
 // The printable appraisal form. Only once the appraisal is finalised, and only
@@ -20,8 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (d.status !== "Finalised" && d.status !== "SentToHR") {
       return respondFail({ ok: false, status: 409, message: "The printable form is available once the appraisal is finalised" });
     }
-    const cycle = await query<{ name: string }>(`SELECT name FROM kpi_cycle WHERE id = $1`, [d.cycleId]);
-    const pdf = await buildAppraisalPdf(d, cycle.rows[0]?.name ?? "");
+    const pdf = await buildAppraisalPdf(d);
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",

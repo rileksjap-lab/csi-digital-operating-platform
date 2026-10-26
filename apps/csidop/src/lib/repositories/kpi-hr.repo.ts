@@ -106,7 +106,7 @@ export async function sendToHr(cycleId: string, session: AuthSession, opts: { re
   for (const row of batch) {
     const detail = await getAppraisalForReport(row.id);
     if (!detail) return fail(404, `Appraisal for ${row.name} could not be loaded`);
-    attachments.push({ filename: appraisalFileName(detail), content: await buildAppraisalPdf(detail, r.cycle.name), contentType: "application/pdf" });
+    attachments.push({ filename: appraisalFileName(detail), content: await buildAppraisalPdf(detail), contentType: "application/pdf" });
   }
 
   const sender = await query<{ name: string }>(`SELECT name FROM staff WHERE id = $1`, [session.staffId]);

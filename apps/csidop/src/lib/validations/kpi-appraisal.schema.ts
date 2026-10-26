@@ -35,3 +35,11 @@ export const transitionSchema = z.object({
 });
 
 export const openSchema = z.object({ cycleId: z.string().uuid() });
+
+export const signOffSchema = z.object({
+  hodTicks: z.array(text(60)).max(10).optional(),
+  svpTicks: z.array(text(60)).max(10).optional(),
+  opsName: text(150).nullable().optional(),
+  opsDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-12-20").nullable().optional(),
+  svpSign: z.boolean().optional(),
+});

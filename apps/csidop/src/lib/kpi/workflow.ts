@@ -112,6 +112,23 @@ export function editable(ctx: WorkflowContext, actor: Actor) {
 }
 
 /**
+ * The sign-off part of the form: the HOD's and the SVP's career recommendation
+ * ticks, the SVP-Operations name and date, and the SVP-Department signature.
+ * Nobody signs off their own appraisal.
+ */
+export function signOffRights(ctx: WorkflowContext, actor: Actor) {
+  const caps = capacities(ctx, actor);
+  const others = actor.staffId !== ctx.staffId;
+  const finalStep = ctx.status === "HODReview" || (ctx.status === "SuperiorReview" && reviewerIsApprover(ctx));
+  return {
+    hodTicks: others && actor.role === "HOD" && caps.has("FinalApprover") && finalStep,
+    svpTicks: others && actor.role === "SVP" && (finalStep || ctx.status === "Finalised"),
+    opsName: others && (actor.role === "HOD" || actor.role === "SVP") && (finalStep || ctx.status === "Finalised"),
+    svpSign: others && actor.role === "SVP" && ctx.status === "Finalised",
+  };
+}
+
+/**
  * Anyone in the chain may open the appraisal. The HOD of the department and
  * the SVP can open every appraisal in their scope (the repository decides
  * `inScope`: same department for the HOD, any for the SVP).

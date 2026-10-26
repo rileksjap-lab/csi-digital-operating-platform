@@ -7,7 +7,7 @@ import {
   type CertConfig, type ComponentMax, type ScoredEntry,
 } from "@/lib/kpi/scoring";
 import {
-  allowedActions, canView, checkTransition, editable, hidesOtherRatings, ratingAt, stageForStatus, stageProblems,
+  allowedActions, canView, checkTransition, editable, hidesOtherRatings, ratingAt, signOffRights, stageForStatus, stageProblems,
   type Actor, type AppraisalStatus, type ItemMeta, type LineMeta, type ScoreRow, type Stage, type WorkflowAction, type WorkflowContext,
 } from "@/lib/kpi/workflow";
 
@@ -34,6 +34,8 @@ interface AppraisalRow {
   kraPoints: number | null; valuePoints: number | null; bonusPoints: number | null; totalPoints: number | null; outcome: string | null;
   recommendations: Record<string, string[]>; svpOpsName: string | null; svpOpsDate: string | null;
   staffName: string; staffRoleCode: string; staffDeptId: string; subTeam: string | null;
+  deptName: string; cycleName: string; cycleStart: string; cycleEnd: string;
+  svpDeptSignedAt: string | null; svpDeptSignedByName: string | null;
   reviewerName: string; finalApproverName: string; templateName: string;
 }
 
@@ -46,11 +48,15 @@ const APPRAISAL_SQL = `
          a.totalpoints::float AS "totalPoints", a.outcome, a.recommendations,
          a.svpopsname AS "svpOpsName", to_char(a.svpopsdate, 'YYYY-MM-DD') AS "svpOpsDate",
          s.name AS "staffName", r.rolecode AS "staffRoleCode", s.deptid AS "staffDeptId", s.subteam AS "subTeam",
-         rv.name AS "reviewerName", fa.name AS "finalApproverName", t.displayname AS "templateName"
+         rv.name AS "reviewerName", fa.name AS "finalApproverName", t.displayname AS "templateName",
+         d.deptname AS "deptName", c.name AS "cycleName",
+         to_char(c.periodstart, 'YYYY-MM-DD') AS "cycleStart", to_char(c.periodend, 'YYYY-MM-DD') AS "cycleEnd",
+         a.svpdeptsignedat AS "svpDeptSignedAt", sv.name AS "svpDeptSignedByName"
   FROM kpi_appraisal a
-  JOIN staff s ON s.id = a.staffid JOIN role r ON r.id = s.roleid
+  JOIN staff s ON s.id = a.staffid JOIN role r ON r.id = s.roleid JOIN department d ON d.id = s.deptid
   JOIN staff rv ON rv.id = a.reviewerid JOIN staff fa ON fa.id = a.finalapproverid
-  JOIN kpi_template t ON t.id = a.templateid`;
+  JOIN kpi_template t ON t.id = a.templateid JOIN kpi_cycle c ON c.id = a.cycleid
+  LEFT JOIN staff sv ON sv.id = a.svpdeptsignedby`;
 
 async function loadAppraisal(db: Db, id: string, lock = false): Promise<AppraisalRow | null> {
   const res = await db.query<AppraisalRow>(`${APPRAISAL_SQL} WHERE a.id = $1 ${lock ? "FOR UPDATE OF a" : ""}`, [id]);
@@ -71,6 +77,8 @@ interface Meta {
   certConfig: CertConfig | null;
   componentMax: ComponentMax;
   careerOptions: string[];
+  ratingScale: Record<string, string>;
+  outcomeRemark: string;
   outcomeBands: { minScore: number; outcome: string }[];
 }
 
@@ -87,12 +95,16 @@ async function loadMeta(db: Db, a: AppraisalRow): Promise<Meta> {
     db.query(`SELECT config FROM kpi_cycle WHERE id = $1`, [a.cycleId]),
     db.query(`SELECT minscore::float AS "minScore", outcome FROM kpi_outcome_band WHERE cycleid = $1`, [a.cycleId]),
   ]);
-  const config = (cycle.rows[0]?.config ?? {}) as { certificates?: CertConfig; componentMax?: ComponentMax; careerOptions?: string[] };
+  const config = (cycle.rows[0]?.config ?? {}) as {
+    certificates?: CertConfig; componentMax?: ComponentMax; careerOptions?: string[]; ratingScale?: Record<string, string>; outcomeRemark?: string;
+  };
   return {
     lines: lines.rows as Meta["lines"], items: items.rows as Meta["items"],
     certConfig: config.certificates ?? null,
     componentMax: config.componentMax ?? DEFAULT_COMPONENT_MAX,
     careerOptions: config.careerOptions ?? [],
+    ratingScale: config.ratingScale ?? {},
+    outcomeRemark: config.outcomeRemark ?? "",
     outcomeBands: bands.rows as Meta["outcomeBands"],
   };
 }
@@ -244,7 +256,12 @@ async function buildDetail(a: AppraisalRow, actor: Actor) {
     outcomeBands: meta.outcomeBands,
     scores: rows, certs, certResult: cert,
     oneOnOne: oneRes.rows[0] ?? null,
-    recommendations: a.recommendations, svpOps: { name: a.svpOpsName, date: a.svpOpsDate },
+    deptName: a.deptName, cycle: { name: a.cycleName, periodStart: a.cycleStart, periodEnd: a.cycleEnd },
+    ratingScale: meta.ratingScale, outcomeRemark: meta.outcomeRemark,
+    recommendations: hide ? {} : a.recommendations,
+    svpOps: hide ? { name: null, date: null } : { name: a.svpOpsName, date: a.svpOpsDate },
+    svpDept: hide ? { signedAt: null, signedBy: null } : { signedAt: a.svpDeptSignedAt, signedBy: a.svpDeptSignedByName },
+    signOffRights: signOffRights(ctx, actor),
     totals, snapshot: hide ? null : { total: a.totalPoints, outcome: a.outcome },
     problems, editable: editable(ctx, actor), actions: allowedActions(ctx, actor), ratingsHidden: hide,
   };
@@ -453,6 +470,66 @@ export async function transition(
     );
     await client.query("COMMIT");
     return done({ status: check.to });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ── Sign-off: career recommendation, SVP-Operations, SVP-Department ────────
+
+export interface SignOffInput {
+  hodTicks?: string[];
+  svpTicks?: string[];
+  opsName?: string | null;
+  opsDate?: string | null;
+  svpSign?: boolean;
+}
+
+/** Saves only the parts of the sign-off the caller is allowed to touch right now. */
+export async function saveSignOff(id: string, session: AuthSession, input: SignOffInput): Promise<Result<{ saved: true }>> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const a = await loadAppraisal(client, id, true);
+    if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
+    const rights = signOffRights(ctxOf(a), actorOf(session));
+    const meta = await loadMeta(client, a);
+
+    const deny = async (msg: string) => { await client.query("ROLLBACK"); return fail(403, msg); };
+    const known = new Set(meta.careerOptions);
+    const badTick = (t?: string[]) => !!t && t.some((x) => !known.has(x));
+    if (badTick(input.hodTicks) || badTick(input.svpTicks)) { await client.query("ROLLBACK"); return fail(400, "Unknown recommendation option"); }
+    if (input.hodTicks !== undefined && !rights.hodTicks) return deny("Only the HOD who finalises this appraisal can set the HOD recommendation, while reviewing it");
+    if (input.svpTicks !== undefined && !rights.svpTicks) return deny("Only the SVP can set the SVP recommendation, and not on their own appraisal");
+    if ((input.opsName !== undefined || input.opsDate !== undefined) && !rights.opsName) return deny("The SVP-Operations name and date can be set by the HOD or SVP before the appraisal is sent");
+    if (input.svpSign && !rights.svpSign) return deny("The SVP can sign once the appraisal is finalised");
+    if (input.opsDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.opsDate)) { await client.query("ROLLBACK"); return fail(400, "Use a date like 2026-12-20"); }
+
+    const recs = { ...(a.recommendations ?? {}) } as Record<string, string[]>;
+    if (input.hodTicks !== undefined) recs.hod = input.hodTicks;
+    if (input.svpTicks !== undefined) recs.svp = input.svpTicks;
+
+    const sets = ["recommendations = $2::jsonb", "updatedat = now()"];
+    const params: unknown[] = [id, JSON.stringify(recs)];
+    const set = (frag: string, v: unknown) => { params.push(v); sets.push(frag.replace("?", `$${params.length}`)); };
+    if (input.opsName !== undefined) set("svpopsname = ?", input.opsName?.trim() || null);
+    if (input.opsDate !== undefined) set("svpopsdate = ?", input.opsDate || null);
+    if (input.svpSign) { sets.push("svpdeptsignedat = now()"); set("svpdeptsignedby = ?", session.staffId); }
+    await client.query(`UPDATE kpi_appraisal SET ${sets.join(", ")} WHERE id = $1`, params);
+
+    const what = [
+      input.hodTicks !== undefined && "HOD recommendation", input.svpTicks !== undefined && "SVP recommendation",
+      (input.opsName !== undefined || input.opsDate !== undefined) && "SVP-Operations", input.svpSign && "SVP-Department signature",
+    ].filter(Boolean).join(", ");
+    await insertAuditEntry(
+      { entityName: "KPI_APPRAISAL", entityId: id, action: "Update", fieldName: "Sign-off", newValue: what || "No change", performedBy: session.staffId },
+      client
+    );
+    await client.query("COMMIT");
+    return done({ saved: true });
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
