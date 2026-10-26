@@ -134,30 +134,16 @@ export default function KpiDashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">KPI Dashboard</h1>
-          <p className="text-sm text-gray-500">Performance scorecard and achievement tracking</p>
+          <h1 className="text-xl font-semibold text-gray-800">Work Performance</h1>
+          <p className="text-sm text-gray-500">Calculated automatically from work orders, logged effort and tender outcomes</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/kpi/appraisals"
-            className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
-            KPI appraisals
-          </Link>
-          {isHod && (
-            <Link
-              href="/kpi/setup"
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              KPI setup
-            </Link>
-          )}
           {isHod && (
             <button
               onClick={() => setShowTargets((v) => !v)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              {showTargets ? "Hide targets" : "Set targets"}
+              {showTargets ? "Hide targets" : "Set work targets"}
             </button>
           )}
           <select
@@ -172,6 +158,12 @@ export default function KpiDashboardPage() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        These numbers show how work is going (SLA, completion, utilisation, tender wins). They are{" "}
+        <span className="font-medium">not</span> the KPI appraisal score. The appraisal (self-assessment, review, 1:1 and final score out of 120) is under{" "}
+        <Link href="/kpi/appraisals" className="font-medium underline">KPI Appraisal</Link>.
+      </div>
+
       {isHod && showTargets && (
         <KpiTargetsPanel
           period={period}
@@ -182,18 +174,18 @@ export default function KpiDashboardPage() {
 
       {!hasData ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <p className="text-gray-500 text-sm font-medium">No KPI targets have been set for {period}.</p>
+          <p className="text-gray-500 text-sm font-medium">No work performance targets have been set for {period}.</p>
           <p className="text-gray-400 text-xs mt-2">
             {isHod
               ? "Set a target for each person and CSIDOP will calculate the results from their work orders, logged effort and tender outcomes."
-              : "Your HOD sets KPI targets for each quarter. Results appear here once they are set."}
+              : "Your HOD sets work performance targets for each quarter. Results appear here once they are set."}
           </p>
           {isHod && !showTargets && (
             <button
               onClick={() => setShowTargets(true)}
               className="mt-4 rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
             >
-              Set targets for {period}
+              Set work targets for {period}
             </button>
           )}
         </div>
@@ -202,7 +194,7 @@ export default function KpiDashboardPage() {
           {/* Overview KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
-              label="Overall Achievement"
+              label="Work Metrics Achieved"
               value={`${data.overallAchievement}%`}
               color={data.overallAchievement >= 80 ? "text-green-600" : data.overallAchievement >= 60 ? "text-yellow-600" : "text-red-600"}
             />
@@ -263,7 +255,7 @@ export default function KpiDashboardPage() {
                     <th className="px-5 py-2">Staff</th>
                     <th className="px-3 py-2">Role</th>
                     <th className="px-3 py-2">Pod</th>
-                    <th className="px-3 py-2 text-center">Overall</th>
+                    <th className="px-3 py-2 text-center">Work performance</th>
                     <th className="px-3 py-2 text-center">Metrics</th>
                     <th className="px-3 py-2 text-center">OI Registered</th>
                     <th className="px-3 py-2 text-center">OI Won</th>
