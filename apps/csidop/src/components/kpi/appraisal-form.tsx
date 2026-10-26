@@ -68,6 +68,42 @@ function bandText(bands: Record<string, string>, score: number | null): string |
   return null;
 }
 
+/** True when a definition key ("5", "7-8") covers the given score. */
+function keyCovers(key: string, score: number | null): boolean {
+  if (score === null) return false;
+  const m = key.match(/^(\d+)\s*-\s*(\d+)$/);
+  return m ? score >= Number(m[1]) && score <= Number(m[2]) : Number(key) === score;
+}
+
+/**
+ * The meaning of every rating, always visible next to the rating buttons, as on
+ * the paper form. KRA lines list 5 down to 1; HR and bonus items list their
+ * score ranges from low to high. The rating currently shown is highlighted.
+ */
+function Definitions({ bands, highlight }: { bands: Record<string, string>; highlight: number | null }) {
+  const keys = Object.keys(bands).filter((k) => bands[k]?.trim());
+  if (keys.length === 0) return null;
+  const single = keys.every((k) => /^\d+$/.test(k)) && keys.length <= 5 && keys.includes("5") && keys.includes("1");
+  const start = (k: string) => Number((k.match(/^\d+/) ?? ["0"])[0]);
+  const sorted = [...keys].sort((a, b) => (single ? start(b) - start(a) : start(a) - start(b)));
+  return (
+    <div className="mt-2 rounded border border-gray-100 bg-gray-50/70 px-3 py-2 text-xs">
+      <div className="mb-1 font-medium text-gray-500">What each {single ? "rating" : "score"} means</div>
+      <ul className="space-y-0.5">
+        {sorted.map((k) => {
+          const on = keyCovers(k, highlight);
+          return (
+            <li key={k} className={`flex gap-2 rounded px-1 py-0.5 ${on ? "bg-primary-50 font-medium text-primary-800" : "text-gray-600"}`}>
+              <span className="w-9 shrink-0 font-medium">{k}</span>
+              <span>{bands[k]}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function stageOf(d: Detail): Stage | null {
   return d.editable.self ? "self" : d.editable.reviewer ? "reviewer" : d.editable.final ? "final" : null;
 }
@@ -343,6 +379,14 @@ export default function AppraisalForm({ id }: { id: string }) {
   const showReviewer = !d.ratingsHidden && d.status !== "SelfAssessment";
   const showFinal = !d.ratingsHidden && (d.status === "HODReview" || d.status === "Finalised" || d.status === "SentToHR");
 
+  /** The rating to highlight in the definitions: the one being typed, or the latest saved one. */
+  const shownRating = (kind: "L" | "I", rowId: string): number | null => {
+    const k = `${kind}:${rowId}`;
+    if (stage) return drafts[k]?.rating ?? null;
+    const s = rowByKey.get(k);
+    return s ? ratingAt(s, viewStage) : null;
+  };
+
   const ratingRow = (kind: "L" | "I", rowId: string, max: number, bands: Record<string, string>, evidenceRequired: boolean) => {
     const k = `${kind}:${rowId}`;
     const s = rowByKey.get(k);
@@ -414,7 +458,10 @@ export default function AppraisalForm({ id }: { id: string }) {
           </p>
         </div>
       ) : (
-        ratingRow("I", i.id, i.scaleMax, i.bands, false)
+        <>
+          <Definitions bands={i.bands} highlight={shownRating("I", i.id)} />
+          {ratingRow("I", i.id, i.scaleMax, i.bands, false)}
+        </>
       )}
     </li>
   );
@@ -464,13 +511,8 @@ export default function AppraisalForm({ id }: { id: string }) {
                 {l.target && <span className="text-xs text-gray-500">Target: {l.target}</span>}
               </div>
               {l.explanation && <p className="text-xs text-gray-500">{l.explanation}</p>}
-              <details className="mt-1 text-xs text-gray-500">
-                <summary className="cursor-pointer text-gray-400">What each rating means</summary>
-                <ul className="mt-1 space-y-0.5">
-                  {["5", "4", "3", "2", "1"].map((r) => <li key={r}><span className="font-medium text-gray-600">{r}</span> {l.bands[r]}</li>)}
-                </ul>
-                {l.measurement && <p className="mt-1">Measured by: {l.measurement}</p>}
-              </details>
+              {l.measurement && <p className="mt-1 text-xs text-gray-500">What is measured: {l.measurement}</p>}
+              <Definitions bands={l.bands} highlight={shownRating("L", l.id)} />
               {ratingRow("L", l.id, 5, l.bands, l.evidenceRequired)}
               {stage && l.evidenceRequired && (drafts[`L:${l.id}`]?.rating ?? 0) > 3 && !drafts[`L:${l.id}`]?.evidence.trim() && !(rowByKey.get(`L:${l.id}`)?.selfEvidence) && (
                 <p className="mt-2 text-xs text-amber-700">A rating above 3 needs supporting evidence.</p>
