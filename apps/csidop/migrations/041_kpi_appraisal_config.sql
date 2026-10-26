@@ -17,8 +17,11 @@ COMMENT ON COLUMN STAFF.ReportsTo IS 'Immediate superior, used by the KPI apprai
 -- ── SVP role ────────────────────────────────────────────────────────────────
 -- The SVP appraises the HOD, so the SVP needs a login. Department scope keeps
 -- the SVP's view department-wide; module access is view-only except KPI.
+-- The role may already exist (it can be created in Admin), so an existing role
+-- and its permissions are left exactly as they are.
 INSERT INTO ROLE (RoleCode, RoleName, CapacityScope)
-VALUES ('SVP', 'Senior Vice President', 'Department');
+VALUES ('SVP', 'Senior Vice President', 'Department')
+ON CONFLICT (RoleCode) DO NOTHING;
 
 INSERT INTO ROLE_PERMISSION (RoleId, ModuleCode, AccessLevel)
 SELECT r.id, m.code, m.level
@@ -28,7 +31,8 @@ CROSS JOIN (VALUES
     ('my_tasks','none'),('workloads','view'),('capacity','view'),('kpi','full'),
     ('skills','view'),('reports','view'),('admin','none')
 ) AS m(code, level)
-WHERE r.rolecode = 'SVP';
+WHERE r.rolecode = 'SVP'
+ON CONFLICT (RoleId, ModuleCode) DO NOTHING;
 
 -- ── Cycles ──────────────────────────────────────────────────────────────────
 CREATE TABLE KPI_CYCLE (
