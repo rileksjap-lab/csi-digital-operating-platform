@@ -21,6 +21,7 @@ export interface StaffWithRoleRow {
 }
 
 const ROLE_CODE_MAP: Record<string, Role> = {
+  SVP: "SVP",
   HOD: "HOD",
   SM: "SolutionManager",
   TL: "TeamLead",

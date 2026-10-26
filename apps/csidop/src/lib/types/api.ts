@@ -45,6 +45,7 @@ export interface FieldError {
 // ─── Authenticated session (decoded JWT + STAFF lookup) ───────────────────────
 
 export type Role =
+  | "SVP"
   | "HOD"
   | "SolutionManager"
   | "TeamLead"
