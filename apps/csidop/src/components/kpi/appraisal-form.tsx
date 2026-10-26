@@ -35,6 +35,10 @@ interface Detail {
   editable: { self: boolean; reviewer: boolean; final: boolean; oneOnOne: boolean; acknowledge: boolean };
   actions: WorkflowAction[];
   ratingsHidden: boolean;
+  recommendations: { hod?: string[]; svp?: string[] };
+  svpOps: { name: string | null; date: string | null };
+  svpDept: { signedAt: string | null; signedBy: string | null };
+  signOffRights: { hodTicks: boolean; svpTicks: boolean; opsName: boolean; svpSign: boolean };
 }
 
 interface Draft { rating: number | null; comment: string; evidence: string }
@@ -215,6 +219,8 @@ export default function AppraisalForm({ id }: { id: string }) {
   const [meeting, setMeeting] = useState({ meetingDate: "", notes: "", agreedActions: "" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string; problems?: string[] } | null>(null);
+  const [rec, setRec] = useState<{ hod: string[]; svp: string[] }>({ hod: [], svp: [] });
+  const [ops, setOps] = useState({ name: "", date: "" });
   const [noteFor, setNoteFor] = useState<WorkflowAction | null>(null);
   const [note, setNote] = useState("");
 
@@ -225,6 +231,8 @@ export default function AppraisalForm({ id }: { id: string }) {
     setDrafts(initialDrafts(data, stageOf(data)));
     setCerts(data.certs);
     setMeeting({ meetingDate: data.oneOnOne?.meetingDate ?? "", notes: data.oneOnOne?.notes ?? "", agreedActions: data.oneOnOne?.agreedActions ?? "" });
+    setRec({ hod: data.recommendations?.hod ?? [], svp: data.recommendations?.svp ?? [] });
+    setOps({ name: data.svpOps?.name ?? "", date: data.svpOps?.date ?? "" });
     setNoteFor(null); setNote("");
   }, [data]);
 
@@ -268,7 +276,7 @@ export default function AppraisalForm({ id }: { id: string }) {
   const setDraft = (k: string, v: Draft) => { setDrafts((p) => ({ ...p, [k]: v })); setMessage(null); };
 
   async function save(): Promise<boolean> {
-    if (!stage) return true;
+    if (!stage) return saveSignOffOnly();
     const scores = Object.entries(drafts).map(([k, v]) => ({
       ...(k[0] === "L" ? { lineId: k.slice(2) } : { itemId: k.slice(2) }),
       rating: v.rating, comment: v.comment || null, evidence: stage === "final" ? null : v.evidence || null,
@@ -279,10 +287,32 @@ export default function AppraisalForm({ id }: { id: string }) {
       const r2 = await call("PUT", `/api/kpi/appraisals/${id}/certs`, { certs: certs.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), yearLabel: c.yearLabel, category: c.category })) });
       if (!r2.ok) { setMessage({ kind: "error", text: r2.message }); return false; }
     }
+    const r = d.signOffRights;
+    if (r.hodTicks || r.svpTicks || r.opsName) {
+      const body: Record<string, unknown> = {};
+      if (r.hodTicks) body.hodTicks = rec.hod;
+      if (r.svpTicks) body.svpTicks = rec.svp;
+      if (r.opsName) { body.opsName = ops.name || null; body.opsDate = ops.date || null; }
+      const r4 = await call("PUT", `/api/kpi/appraisals/${id}/sign-off`, body);
+      if (!r4.ok) { setMessage({ kind: "error", text: r4.message }); return false; }
+    }
     if (d.editable.oneOnOne && meeting.meetingDate) {
       const r3 = await call("PUT", `/api/kpi/appraisals/${id}/one-on-one`, meeting);
       if (!r3.ok) { setMessage({ kind: "error", text: r3.message }); return false; }
     }
+    return true;
+  }
+
+  async function saveSignOffOnly(signNow = false): Promise<boolean> {
+    const r = d.signOffRights;
+    if (!(r.hodTicks || r.svpTicks || r.opsName || signNow)) return true;
+    const body: Record<string, unknown> = {};
+    if (r.hodTicks) body.hodTicks = rec.hod;
+    if (r.svpTicks) body.svpTicks = rec.svp;
+    if (r.opsName) { body.opsName = ops.name || null; body.opsDate = ops.date || null; }
+    if (signNow) body.svpSign = true;
+    const res = await call("PUT", `/api/kpi/appraisals/${id}/sign-off`, body);
+    if (!res.ok) { setMessage({ kind: "error", text: res.message }); return false; }
     return true;
   }
 
@@ -499,7 +529,69 @@ export default function AppraisalForm({ id }: { id: string }) {
         </div>
       </section>
 
-      {(editing || d.actions.length > 0) && (
+      {!d.ratingsHidden && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-gray-800">E. Recommendation and sign-off</h2>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Career progression recommendation. More than one option can be ticked.</p>
+            <table className="mt-2 w-full max-w-md text-sm">
+              <thead><tr className="text-left text-xs text-gray-500"><th className="pb-1">Option</th><th className="pb-1 text-center">HOD</th><th className="pb-1 text-center">SVP</th></tr></thead>
+              <tbody>
+                {d.careerOptions.map((o) => (
+                  <tr key={o} className="border-t border-gray-50">
+                    <td className="py-1 pr-3 text-gray-700">{o}</td>
+                    {(["hod", "svp"] as const).map((col) => {
+                      const can = col === "hod" ? d.signOffRights.hodTicks : d.signOffRights.svpTicks;
+                      return (
+                        <td key={col} className="py-1 text-center">
+                          <input
+                            type="checkbox" checked={rec[col].includes(o)} disabled={!can}
+                            aria-label={`${o}, ${col.toUpperCase()}`}
+                            onChange={(e) => setRec((r) => ({ ...r, [col]: e.target.checked ? [...r[col], o] : r[col].filter((x) => x !== o) }))}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="mt-4 grid gap-3 border-t border-gray-100 pt-3 md:grid-cols-2">
+              <label className="text-xs text-gray-500">SVP-Operations: name
+                <input value={ops.name} disabled={!d.signOffRights.opsName} onChange={(e) => setOps((o) => ({ ...o, name: e.target.value }))} className={`${field} mt-1`} />
+              </label>
+              <label className="text-xs text-gray-500">SVP-Operations: date
+                <input type="date" value={ops.date} disabled={!d.signOffRights.opsName} onChange={(e) => setOps((o) => ({ ...o, date: e.target.value }))} className={`${field} mt-1`} />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3 text-sm">
+              <span className="text-gray-700">SVP-Department:</span>
+              {d.svpDept.signedAt ? (
+                <span className="text-green-700">✓ Signed by {d.svpDept.signedBy} on {new Date(d.svpDept.signedAt).toISOString().slice(0, 10)}</span>
+              ) : d.signOffRights.svpSign ? (
+                <button
+                  disabled={busy}
+                  onClick={async () => { setBusy(true); setMessage(null); if (await saveSignOffOnly(true)) await mutate(); setBusy(false); }}
+                  className={btn}
+                >
+                  Sign as SVP-Department
+                </button>
+              ) : (
+                <span className="text-gray-500">Not signed yet</span>
+              )}
+              {(d.signOffRights.hodTicks || d.signOffRights.svpTicks || d.signOffRights.opsName) && !editing && (
+                <button disabled={busy} onClick={async () => { setBusy(true); setMessage(null); if (await saveSignOffOnly()) { await mutate(); setMessage({ kind: "ok", text: "Sign-off saved." }); } setBusy(false); }} className={btn}>
+                  Save sign-off
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {(editing || d.actions.length > 0 || d.signOffRights.hodTicks || d.signOffRights.svpTicks || d.signOffRights.opsName) && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-6 py-3 backdrop-blur lg:left-60">
           {message && (
             <div className={`mb-2 rounded px-3 py-2 text-sm ${message.kind === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
