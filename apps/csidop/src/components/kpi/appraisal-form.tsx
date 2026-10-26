@@ -525,15 +525,15 @@ export default function AppraisalForm({ id }: { id: string }) {
 
       <Scoreboard totals={live} partial={d.status !== "Finalised" && d.status !== "SentToHR"} showOutcome={!d.ratingsHidden} />
 
-      <div role="tablist" aria-label="Appraisal sections" className="flex gap-1 overflow-x-auto border-b border-gray-200">
+      <div role="tablist" aria-label="Appraisal sections" className="flex flex-wrap gap-2">
         {tabs.map((x) => (
           <button
             key={x.key} role="tab" aria-selected={tab === x.key} onClick={() => setTab(x.key)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${tab === x.key ? "border-primary-600 text-primary-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+            className={`whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors ${tab === x.key ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50"}`}
           >
             {x.label}
             {x.progress && (
-              <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-normal ${x.progress.done === x.progress.total ? "bg-green-50 text-green-700" : "bg-amber-100 text-amber-800"}`}>
+              <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-normal ${x.progress.done === x.progress.total ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
                 {x.progress.done}/{x.progress.total}
               </span>
             )}
