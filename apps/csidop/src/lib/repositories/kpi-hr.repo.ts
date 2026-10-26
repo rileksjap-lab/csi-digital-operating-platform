@@ -7,8 +7,8 @@ import { appraisalFileName, buildAppraisalPdf, buildSummaryCsv, type SummaryRow 
 import { getAppraisalForReport, type Fail, type Result } from "@/lib/repositories/kpi-appraisal.repo";
 
 // The HR report: who is ready, who is not, and the one action that emails the
-// final results to HR. Only the HOD and the SVP use this; the sender never
-// sends their own appraisal (the SVP sends the HOD's).
+// final results to HR. Only the HOD and the SVP use this, and either of them
+// can send everyone, including the HOD's own appraisal.
 
 const fail = (status: Fail["status"], message: string, problems?: string[]): Fail => ({ ok: false, status, message, problems });
 
@@ -44,8 +44,8 @@ export async function getHrReport(cycleId: string, session: AuthSession): Promis
 
   const rows = await loadRows(cycleId, session);
   const recipients = cycle.config.hrEmails ?? [];
-  // The sender cannot send their own appraisal, so it is not part of their batch.
-  const batch = rows.filter((r) => r.staffId !== session.staffId);
+  // The HOD is the core of the process, so the HOD and the SVP each send the whole team, the HOD's own appraisal included.
+  const batch = rows;
   const ready = batch.filter((r) => r.status === "Finalised" || r.status === "SentToHR");
   const pending = batch.filter((r) => r.status === "Finalised");
   const blockers = batch.filter((r) => r.status !== "Finalised" && r.status !== "SentToHR").map((r) => `${r.name}: ${STATUS_LABEL[r.status]}`);
@@ -67,7 +67,7 @@ export async function getHrReport(cycleId: string, session: AuthSession): Promis
       recipients,
       subject: subjectFor(cycle.name, ready.length),
       attachments: [`KPI_summary.csv`, ...ready.map((r) => `KPI_${r.name.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")}.pdf`)],
-      rows: rows.map((r) => ({ ...r, ownAppraisal: r.staffId === session.staffId })),
+      rows,
       counts: { total: rows.length, ready: ready.length, pending: pending.length, sent: ready.length - pending.length },
       blockers, cannotSend,
       canSend: cannotSend === null,
@@ -94,12 +94,12 @@ export async function sendToHr(cycleId: string, session: AuthSession, opts: { re
   if (!report.ok) return report;
   const r = report.value as {
     cycle: { name: string }; recipients: string[]; subject: string; canSend: boolean; cannotSend: string | null; blockers: string[];
-    rows: (Row & { ownAppraisal: boolean })[]; counts: { pending: number };
+    rows: Row[]; counts: { pending: number };
   };
   if (!r.canSend) return fail(409, r.cannotSend ?? "Cannot send yet", r.blockers);
   if (r.counts.pending === 0 && !opts.resend) return fail(409, "Everything in this cycle has already been sent to HR. Use resend if HR needs the files again.");
 
-  const batch = r.rows.filter((x) => !x.ownAppraisal && (x.status === "Finalised" || x.status === "SentToHR"));
+  const batch = r.rows.filter((x) => x.status === "Finalised" || x.status === "SentToHR");
   const attachments: { filename: string; content: Buffer; contentType: string }[] = [
     { filename: "KPI_summary.csv", content: buildSummaryCsv(r.rows.map(toSummary)), contentType: "text/csv; charset=utf-8" },
   ];

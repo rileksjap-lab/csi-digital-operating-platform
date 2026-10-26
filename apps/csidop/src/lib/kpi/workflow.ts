@@ -51,7 +51,7 @@ const reviewerIsApprover = (ctx: WorkflowContext) => ctx.reviewerId === ctx.fina
 
 interface Transition {
   from: AppraisalStatus;
-  /** "HrSender" = any HOD or SVP who is not the person being appraised. */
+  /** "HrSender" = the HOD or the SVP (the HOD sends everyone, their own appraisal included). */
   by: Capacity | "HrSender";
   to: (ctx: WorkflowContext) => AppraisalStatus;
   noteRequired: boolean;
@@ -87,7 +87,7 @@ export function checkTransition(action: WorkflowAction, ctx: WorkflowContext, ac
   const caps = capacities(ctx, actor);
   const allowed =
     t.by === "HrSender"
-      ? (actor.role === "HOD" || actor.role === "SVP") && actor.staffId !== ctx.staffId
+      ? actor.role === "HOD" || actor.role === "SVP"
       : caps.has(t.by);
   if (!allowed) return { ok: false, reason: "You are not allowed to do this step on this appraisal" };
   return { ok: true, to: t.to(ctx), noteRequired: t.noteRequired, needs: t.needs };
