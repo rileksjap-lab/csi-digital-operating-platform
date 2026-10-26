@@ -61,6 +61,9 @@ export interface StaffAdminRow {
   dailyUsableHours: number;
   status: string;
   systemConfigFlag: boolean;
+  /** Role used by the KPI appraisal when it differs from the access role; null = same as roleId */
+  kpiRoleId: string | null;
+  kpiRoleName: string | null;
 }
 
 export interface BaselineTierRow {
@@ -333,9 +336,11 @@ export async function listStaffAdmin(
             d.deptname AS "deptName", s.subteam AS "subTeam",
             s.productivityfactor::float AS "productivityFactor",
             s.dailyusablehours::float AS "dailyUsableHours",
-            s.status AS "status", s.systemconfigflag AS "systemConfigFlag"
+            s.status AS "status", s.systemconfigflag AS "systemConfigFlag",
+            s.kpiroleid AS "kpiRoleId", kr.rolename AS "kpiRoleName"
      FROM staff s
      JOIN role r ON r.id = s.roleid
+     LEFT JOIN role kr ON kr.id = s.kpiroleid
      JOIN department d ON d.id = s.deptid
      WHERE ${conditions.join(" AND ")}
      ORDER BY s.name`,
@@ -355,6 +360,7 @@ export async function patchStaff(
     productivityFactor?: number;
     status?: string;
     systemConfigFlag?: boolean;
+    kpiRoleId?: string | null;
   },
   session: AuthSession
 ): Promise<StaffAdminRow | null> {
@@ -375,6 +381,7 @@ export async function patchStaff(
   }
   if (input.status) { params.push(input.status); sets.push(`status = $${params.length}`); }
   if (input.systemConfigFlag !== undefined) { params.push(input.systemConfigFlag); sets.push(`systemconfigflag = $${params.length}`); }
+  if (input.kpiRoleId !== undefined) { params.push(input.kpiRoleId); sets.push(`kpiroleid = $${params.length}`); }
 
   if (params.length === 0) return null;
 
@@ -396,8 +403,9 @@ export async function patchStaff(
               d.deptname AS "deptName", s.subteam AS "subTeam",
               s.productivityfactor::float AS "productivityFactor",
               s.dailyusablehours::float AS "dailyUsableHours",
-              s.status AS "status", s.systemconfigflag AS "systemConfigFlag"
-       FROM staff s JOIN role r ON r.id = s.roleid JOIN department d ON d.id = s.deptid
+              s.status AS "status", s.systemconfigflag AS "systemConfigFlag",
+            s.kpiroleid AS "kpiRoleId", kr.rolename AS "kpiRoleName"
+       FROM staff s JOIN role r ON r.id = s.roleid LEFT JOIN role kr ON kr.id = s.kpiroleid JOIN department d ON d.id = s.deptid
        WHERE s.id = $1`, [staffId]
     );
     return rows[0] ?? null;
@@ -443,8 +451,9 @@ export async function createStaff(
               d.deptname AS "deptName", s.subteam AS "subTeam",
               s.productivityfactor::float AS "productivityFactor",
               s.dailyusablehours::float AS "dailyUsableHours",
-              s.status AS "status", s.systemconfigflag AS "systemConfigFlag"
-       FROM staff s JOIN role r ON r.id = s.roleid JOIN department d ON d.id = s.deptid
+              s.status AS "status", s.systemconfigflag AS "systemConfigFlag",
+            s.kpiroleid AS "kpiRoleId", kr.rolename AS "kpiRoleName"
+       FROM staff s JOIN role r ON r.id = s.roleid LEFT JOIN role kr ON kr.id = s.kpiroleid JOIN department d ON d.id = s.deptid
        WHERE s.id = $1`, [staffId]
     );
     return result.rows[0];

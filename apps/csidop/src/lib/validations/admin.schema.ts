@@ -111,6 +111,8 @@ export const staffPatchSchema = z.object({
   productivityFactor: z.coerce.number().min(0.1).max(1.0).optional(),
   status: z.enum(["Active", "Inactive", "OnLeave"]).optional(),
   systemConfigFlag: z.boolean().optional(),
+  // Role the KPI appraisal uses when it differs from the access role; null clears it
+  kpiRoleId: z.string().uuid().nullable().optional(),
 });
 
 export const staffCreateSchema = z.object({

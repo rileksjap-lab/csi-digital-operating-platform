@@ -23,12 +23,13 @@ export interface Superior {
 
 export async function listReportingLines(departmentId: string): Promise<{ staff: ReportingRow[]; superiors: Superior[] }> {
   const res = await query<ReportingRow & { isCandidate: boolean }>(
-    `SELECT s.id AS "staffId", s.name, r.rolecode AS "roleCode", r.rolename AS "roleName",
+    // The KPI role (when set) is the person's role here: the chart follows the real job.
+    `SELECT s.id AS "staffId", s.name, COALESCE(kr.rolecode, r.rolecode) AS "roleCode", COALESCE(kr.rolename, r.rolename) AS "roleName",
             s.subteam AS "subTeam", s.reportsto AS "reportsTo",
-            (s.deptid = $1 OR r.rolecode = 'SVP') AS "isCandidate"
-     FROM staff s JOIN role r ON r.id = s.roleid
-     WHERE s.status = 'Active' AND (s.deptid = $1 OR r.rolecode = 'SVP')
-     ORDER BY r.rolename, s.name`,
+            (s.deptid = $1 OR COALESCE(kr.rolecode, r.rolecode) = 'SVP') AS "isCandidate"
+     FROM staff s JOIN role r ON r.id = s.roleid LEFT JOIN role kr ON kr.id = s.kpiroleid
+     WHERE s.status = 'Active' AND (s.deptid = $1 OR COALESCE(kr.rolecode, r.rolecode) = 'SVP')
+     ORDER BY COALESCE(kr.rolename, r.rolename), s.name`,
     [departmentId]
   );
   const rows = res.rows;
@@ -54,9 +55,9 @@ export async function saveReportingLines(
 
     // Everyone who may appear in the chart, with their current superior.
     const cur = await client.query<{ id: string; name: string; reportsto: string | null; inDept: boolean; isSvp: boolean }>(
-      `SELECT s.id, s.name, s.reportsto, (s.deptid = $1) AS "inDept", (r.rolecode = 'SVP') AS "isSvp"
-       FROM staff s JOIN role r ON r.id = s.roleid
-       WHERE s.status = 'Active' AND (s.deptid = $1 OR r.rolecode = 'SVP')`,
+      `SELECT s.id, s.name, s.reportsto, (s.deptid = $1) AS "inDept", (COALESCE(kr.rolecode, r.rolecode) = 'SVP') AS "isSvp"
+       FROM staff s JOIN role r ON r.id = s.roleid LEFT JOIN role kr ON kr.id = s.kpiroleid
+       WHERE s.status = 'Active' AND (s.deptid = $1 OR COALESCE(kr.rolecode, r.rolecode) = 'SVP')`,
       [departmentId]
     );
     const people = new Map(cur.rows.map((p) => [p.id, p]));

@@ -31,7 +31,7 @@ const TONE: Record<AppraisalStatus, string> = {
 };
 
 export default function HrReportPage() {
-  const role = useAuthStore((s) => s.user?.role);
+  const role = useAuthStore((s) => s.user?.kpiRole);
   const [cycleId, setCycleId] = useState<string | null>(null);
   const { data: cycles } = useSWR<Cycles>("/api/kpi/appraisals", apiFetcher);
   const activeId = cycleId ?? cycles?.cycleId ?? null;

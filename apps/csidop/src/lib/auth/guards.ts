@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/redis";
 import { unauthorized, forbidden } from "@/lib/response";
 import { verifySessionJwt } from "@/lib/auth/jwt";
+import { query } from "@/lib/db/pool";
+import { ROLE_CODE_MAP } from "@/lib/auth/session";
 import type { AuthSession, Role, CapacityScope } from "@/lib/types/api";
 
 export interface ScopeFilter {
@@ -26,6 +28,25 @@ export async function requireAuth(request: NextRequest): Promise<AuthSession> {
   if (!session) throw unauthorized("Session expired or revoked");
 
   return session;
+}
+
+/**
+ * Like requireAuth, for the KPI module. Some people hold a higher system role
+ * only for access (for example a Pre-Sales Executive who coordinates work orders
+ * as a Team Lead). The KPI appraisal follows their real job, so when a KPI role
+ * is set it replaces the role everywhere in the KPI module: their form, their
+ * reviewer chain and who may set up, finalise or send to HR. It is read from the
+ * database on each call, so changing it needs no new login.
+ */
+export async function requireKpiAuth(request: NextRequest): Promise<AuthSession> {
+  const session = await requireAuth(request);
+  const res = await query<{ rolecode: string | null }>(
+    `SELECT kr.rolecode FROM staff s LEFT JOIN role kr ON kr.id = s.kpiroleid WHERE s.id = $1`,
+    [session.staffId]
+  );
+  const code = res.rows[0]?.rolecode;
+  if (!code) return session;
+  return { ...session, roleCode: code, role: ROLE_CODE_MAP[code] ?? "TeamMember" };
 }
 
 export function requireRole(

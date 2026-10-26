@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireKpiAuth, requireRole } from "@/lib/auth/guards";
 import { ok, badRequest, zodError, internalError } from "@/lib/response";
 import { listCycles, createCycleCopy } from "@/lib/repositories/kpi-config.repo";
 import { cycleCreateSchema } from "@/lib/validations/kpi-config.schema";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD", "SVP");
     return ok(await listCycles());
   } catch (err) {
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 // HOD only: start a new cycle (for example the next half-year) as a copy of an existing one.
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     requireRole(session, "HOD");
     const parsed = cycleCreateSchema.safeParse(await request.json());
     if (!parsed.success) return zodError(parsed.error);

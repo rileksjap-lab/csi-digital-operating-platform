@@ -11,6 +11,8 @@ export interface MeResponse {
   roleCode: string;
   roleName: string;
   role: Role;
+  /** Role the KPI module uses for this person (same as role unless a KPI role is set) */
+  kpiRole: Role;
   deptCode: string;
   departmentId: string;
   subTeam: string | null;

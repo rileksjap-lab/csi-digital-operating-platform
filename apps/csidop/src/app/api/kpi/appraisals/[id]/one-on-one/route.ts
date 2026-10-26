@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth/guards";
+import { requireKpiAuth } from "@/lib/auth/guards";
 import { ok, badRequest, zodError, internalError } from "@/lib/response";
 import { recordOneOnOne, acknowledgeOneOnOne } from "@/lib/repositories/kpi-appraisal.repo";
 import { oneOnOneSchema } from "@/lib/validations/kpi-appraisal.schema";
@@ -9,7 +9,7 @@ import { respondFail } from "@/lib/kpi/respond";
 // The superior records the 1:1 meeting.
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     const { id } = await params;
     if (!z.string().uuid().safeParse(id).success) return badRequest("Invalid appraisal id");
     const parsed = oneOnOneSchema.safeParse(await request.json());
@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // The employee confirms the meeting took place.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireAuth(request);
+    const session = await requireKpiAuth(request);
     const { id } = await params;
     if (!z.string().uuid().safeParse(id).success) return badRequest("Invalid appraisal id");
     const result = await acknowledgeOneOnOne(id, session);
