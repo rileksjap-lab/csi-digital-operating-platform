@@ -248,6 +248,8 @@ function RatingBox(p: BoxProps) {
 
 // ── The form ────────────────────────────────────────────────────────────────
 
+type TabKey = "A" | "B" | "C" | "D" | "E";
+
 export default function AppraisalForm({ id }: { id: string }) {
   const { data, error, mutate } = useSWR<Detail>(`/api/kpi/appraisals/${id}`, apiFetcher, { revalidateOnFocus: false });
   const [drafts, setDrafts] = useState<Drafts>({});
@@ -259,6 +261,7 @@ export default function AppraisalForm({ id }: { id: string }) {
   const [ops, setOps] = useState({ name: "", date: "" });
   const [noteFor, setNoteFor] = useState<WorkflowAction | null>(null);
   const [note, setNote] = useState("");
+  const [tab, setTab] = useState<TabKey>("A");
 
   const stage = data ? stageOf(data) : null;
 
@@ -466,6 +469,27 @@ export default function AppraisalForm({ id }: { id: string }) {
     </li>
   );
 
+  // Tab bar: A to E, with "rated / total" counts on the rating tabs while someone is filling in.
+  const rated = (kind: "L" | "I", ids: string[]) => ids.filter((x) => (drafts[`${kind}:${x}`]?.rating ?? null) !== null).length;
+  const ratable = valueItems.filter((i) => i.inputMode !== "Certificates");
+  const tabs: { key: TabKey; label: string; progress?: { done: number; total: number } }[] = [
+    { key: "A", label: "A. KRA", progress: stage ? { done: rated("L", d.lines.map((l) => l.id)), total: d.lines.length } : undefined },
+    { key: "B", label: "B. HR items", progress: stage ? { done: rated("I", ratable.map((i) => i.id)), total: ratable.length } : undefined },
+    { key: "C", label: "C. Bonus", progress: stage ? { done: rated("I", bonusItems.map((i) => i.id)), total: bonusItems.length } : undefined },
+    { key: "D", label: "D. 1:1 meeting" },
+    ...(d.ratingsHidden ? [] : [{ key: "E" as const, label: "E. Recommendation" }]),
+  ];
+  const nextButton = (from: TabKey) => {
+    const i = tabs.findIndex((x) => x.key === from);
+    const next = tabs[i + 1];
+    if (!next) return null;
+    return (
+      <div className="flex justify-end pt-1">
+        <button onClick={() => { setTab(next.key); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={btn}>Next: {next.label} →</button>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 pb-28">
       <div>
@@ -501,6 +525,23 @@ export default function AppraisalForm({ id }: { id: string }) {
 
       <Scoreboard totals={live} partial={d.status !== "Finalised" && d.status !== "SentToHR"} showOutcome={!d.ratingsHidden} />
 
+      <div role="tablist" aria-label="Appraisal sections" className="flex gap-1 overflow-x-auto border-b border-gray-200">
+        {tabs.map((x) => (
+          <button
+            key={x.key} role="tab" aria-selected={tab === x.key} onClick={() => setTab(x.key)}
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${tab === x.key ? "border-primary-600 text-primary-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+          >
+            {x.label}
+            {x.progress && (
+              <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-normal ${x.progress.done === x.progress.total ? "bg-green-50 text-green-700" : "bg-amber-100 text-amber-800"}`}>
+                {x.progress.done}/{x.progress.total}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "A" && (
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-gray-800">A. KRA, departmental (60 points)</h2>
         <ul className="space-y-3">
@@ -520,18 +561,27 @@ export default function AppraisalForm({ id }: { id: string }) {
             </li>
           ))}
         </ul>
+        {nextButton("A")}
       </section>
+      )}
 
+      {tab === "B" && (
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-gray-800">B. HR items (40 points)</h2>
         <ul className="space-y-3">{valueItems.map(itemCard)}</ul>
+        {nextButton("B")}
       </section>
+      )}
 
+      {tab === "C" && (
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-gray-800">C. Bonus items (20 points)</h2>
         <ul className="space-y-3">{bonusItems.map(itemCard)}</ul>
+        {nextButton("C")}
       </section>
+      )}
 
+      {tab === "D" && (
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-gray-800">D. 1:1 meeting with the immediate superior</h2>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -569,9 +619,11 @@ export default function AppraisalForm({ id }: { id: string }) {
             </div>
           )}
         </div>
+        {nextButton("D")}
       </section>
+      )}
 
-      {!d.ratingsHidden && (
+      {tab === "E" && !d.ratingsHidden && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-gray-800">E. Recommendation and sign-off</h2>
           <div className="rounded-lg border border-gray-200 bg-white p-4">
