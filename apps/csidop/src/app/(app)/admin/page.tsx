@@ -88,7 +88,7 @@ const MODULES = [
   { code: "my_tasks", label: "My Tasks" },
   { code: "workloads", label: "Workloads" },
   { code: "capacity", label: "Capacity" },
-  { code: "kpi", label: "KPI Dashboard" },
+  { code: "kpi", label: "KPI (Appraisal and Work Performance)" },
   { code: "skills", label: "Skills" },
   { code: "reports", label: "Reports" },
   { code: "admin", label: "Admin" },

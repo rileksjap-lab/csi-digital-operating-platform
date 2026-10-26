@@ -93,9 +93,8 @@ export default function KpiAppraisalsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/kpi" className="text-xs text-gray-500 hover:text-gray-700">← KPI Dashboard</Link>
-          <h1 className="text-xl font-semibold text-gray-800">KPI Appraisals</h1>
-          <p className="text-sm text-gray-500">Fill in your own form, review your team, and track each step to HR.</p>
+          <h1 className="text-xl font-semibold text-gray-800">KPI Appraisal</h1>
+          <p className="text-sm text-gray-500">Your appraisal: fill in your own form, review your team, and track each step to HR. Work-order numbers are separate, under Work Performance.</p>
         </div>
         <div className="flex items-center gap-2">
           {data.cycles.length > 1 && (
@@ -104,7 +103,10 @@ export default function KpiAppraisalsPage() {
             </select>
           )}
           {(isHod || me?.role === "SVP") && (
-            <Link href="/kpi/hr-report" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">HR report</Link>
+            <>
+              <Link href="/kpi/setup" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">KPI setup</Link>
+              <Link href="/kpi/hr-report" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">HR report</Link>
+            </>
           )}
           {isHod && cycle?.status === "Open" && (
             <button onClick={openAppraisals} disabled={opening} className="rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-40">

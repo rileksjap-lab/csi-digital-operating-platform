@@ -101,7 +101,7 @@ export default function KpiTargetsPanel({
     <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-5 py-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-800">Set KPI targets for {period}</h3>
+          <h3 className="text-sm font-semibold text-gray-800">Set work performance targets for {period}</h3>
           <p className="text-xs text-gray-500">
             Targets are percentages (0 to 100). Leave a box empty to not measure that person on that KPI.
             Achieved values are calculated by CSIDOP from recorded work.

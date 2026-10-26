@@ -469,7 +469,7 @@ export default function AppraisalForm({ id }: { id: string }) {
   return (
     <div className="space-y-6 pb-28">
       <div>
-        <Link href="/kpi/appraisals" className="text-xs text-gray-500 hover:text-gray-700">← KPI Appraisals</Link>
+        <Link href="/kpi/appraisals" className="text-xs text-gray-500 hover:text-gray-700">← KPI Appraisal</Link>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-gray-800">{d.staff.name}</h1>

@@ -18,7 +18,7 @@ export default function KpiSetupPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/kpi" className="text-xs text-gray-500 hover:text-gray-700">← KPI Dashboard</Link>
+        <Link href="/kpi/appraisals" className="text-xs text-gray-500 hover:text-gray-700">← KPI Appraisal</Link>
         <h1 className="text-xl font-semibold text-gray-800">KPI Setup</h1>
         <p className="text-sm text-gray-500">
           The criteria, weights, targets and rating definitions used on the KPI appraisal forms. Changes are saved to the audit log.
