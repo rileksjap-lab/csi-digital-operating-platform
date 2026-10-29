@@ -26,6 +26,22 @@ interface AssigneeRow {
   effortHours: number;
 }
 
+interface TypeColumn {
+  id: string;
+  name: string;
+  active: number;
+  overdue: number;
+}
+
+interface PersonByType {
+  staffId: string;
+  staffName: string;
+  subTeam: string | null;
+  active: number;
+  overdue: number;
+  cells: Record<string, { active: number; overdue: number }>;
+}
+
 interface PriorityRow {
   priority: string;
   total: number;
@@ -63,6 +79,7 @@ interface ProgressData {
   };
   overdueItems: OverdueItem[];
   byAssignee: AssigneeRow[];
+  byAssigneeType: { types: TypeColumn[]; rows: PersonByType[] };
   byPriority: PriorityRow[];
   slaBands: SlaBand[];
   recentActivity: RecentItem[];
@@ -117,6 +134,24 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
     <div className="h-2 w-full rounded-full bg-gray-100">
       <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
     </div>
+  );
+}
+
+/** Link to the Work Orders list showing the same open and in-progress work. */
+function woLink(filters: { assignedTo?: string; requestTypeId?: string }): string {
+  const q = new URLSearchParams({ status: "Open,InProgress", ...filters });
+  return `/wo?${q.toString()}`;
+}
+
+function CountLink({ href, active, overdue, bold }: { href: string; active: number; overdue: number; bold?: boolean }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-0.5 text-primary-700 shadow-sm hover:border-primary-300 hover:bg-primary-50"
+    >
+      <span className={bold ? "font-bold" : "font-semibold"}>{active}</span>
+      {overdue > 0 && <span className="text-xs font-medium text-red-600">({overdue})</span>}
+    </Link>
   );
 }
 
@@ -351,6 +386,65 @@ export default function WoProgressPage() {
                   );
                 })}
               </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Active work by person and request type */}
+      {data.byAssigneeType.rows.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-200 bg-gray-50">
+            <h3 className="text-sm font-semibold text-gray-700">Active Work by Request Type</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Open and in-progress work orders per person. Click a number to see those work orders; red shows how many are overdue.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left text-xs text-gray-500 align-bottom">
+                  <th className="sticky left-0 z-10 bg-white px-5 py-2">Assignee</th>
+                  <th className="px-3 py-2">Pod</th>
+                  {data.byAssigneeType.types.map((t) => (
+                    <th key={t.id} className="px-3 py-2 text-center font-medium min-w-[6.5rem]">{t.name}</th>
+                  ))}
+                  <th className="px-5 py-2 text-center font-semibold text-gray-700">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.byAssigneeType.rows.map((p) => (
+                  <tr key={p.staffId} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="sticky left-0 z-10 bg-white px-5 py-2.5 font-medium text-gray-800 whitespace-nowrap">{p.staffName}</td>
+                    <td className="px-3 py-2.5 text-gray-500">{p.subTeam ?? "—"}</td>
+                    {data.byAssigneeType.types.map((t) => {
+                      const c = p.cells[t.id];
+                      return (
+                        <td key={t.id} className="px-3 py-2 text-center">
+                          {c ? <CountLink href={woLink({ assignedTo: p.staffId, requestTypeId: t.id })} active={c.active} overdue={c.overdue} /> : <span className="text-gray-300">–</span>}
+                        </td>
+                      );
+                    })}
+                    <td className="px-5 py-2 text-center">
+                      <CountLink href={woLink({ assignedTo: p.staffId })} active={p.active} overdue={p.overdue} bold />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-200 bg-gray-50">
+                  <td className="sticky left-0 z-10 bg-gray-50 px-5 py-2.5 font-semibold text-gray-700">Total</td>
+                  <td />
+                  {data.byAssigneeType.types.map((t) => (
+                    <td key={t.id} className="px-3 py-2 text-center">
+                      <CountLink href={woLink({ requestTypeId: t.id })} active={t.active} overdue={t.overdue} bold />
+                    </td>
+                  ))}
+                  <td className="px-5 py-2 text-center font-semibold text-gray-800">
+                    {data.byAssigneeType.rows.reduce((n, r) => n + r.active, 0)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
