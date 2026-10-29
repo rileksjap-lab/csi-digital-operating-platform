@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/api/fetcher";
 
@@ -16,6 +18,7 @@ interface OverdueItem {
 }
 
 interface AssigneeRow {
+  staffId: string;
   staffName: string;
   subTeam: string | null;
   total: number;
@@ -155,6 +158,52 @@ function CountLink({ href, active, overdue, bold }: { href: string; active: numb
   );
 }
 
+interface PersonOption {
+  id: string;
+  name: string;
+  subTeam: string | null;
+  roleName: string;
+}
+
+/** Type a name, pick a person, and see all of their current and past work. */
+function PersonSearch() {
+  const router = useRouter();
+  const { data: people } = useSWR<PersonOption[]>("/api/wo/progress/people", apiFetcher);
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const matches = (people ?? []).filter((p) => p.name.toLowerCase().includes(text.trim().toLowerCase())).slice(0, 8);
+  const go = (p: PersonOption) => router.push(`/wo/progress/staff/${p.id}`);
+
+  return (
+    <div className="relative w-full max-w-sm">
+      <label className="block text-xs font-medium text-gray-500">Find a person
+        <input
+          value={text}
+          onChange={(e) => { setText(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={(e) => { if (e.key === "Enter" && matches[0]) go(matches[0]); if (e.key === "Escape") setOpen(false); }}
+          placeholder="Type a name to see their tasks and history"
+          className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm placeholder:text-gray-400"
+        />
+      </label>
+      {open && (
+        <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {matches.length === 0 && <li className="px-3 py-2 text-sm text-gray-400">{people ? "No one found" : "Loading…"}</li>}
+          {matches.map((p) => (
+            <li key={p.id}>
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => go(p)} className="flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-primary-50">
+                <span className="font-medium text-gray-800">{p.name}</span>
+                <span className="text-xs text-gray-500">{p.roleName}{p.subTeam ? ` · Pod ${p.subTeam}` : ""}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function timeAgo(d: string | null): string {
   if (!d) return "—";
   const diff = Date.now() - new Date(d).getTime();
@@ -202,6 +251,8 @@ export default function WoProgressPage() {
         </div>
         <Link href="/wo" className="btn-secondary text-sm">View All WOs</Link>
       </div>
+
+      <PersonSearch />
 
       {/* Overview KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -362,7 +413,7 @@ export default function WoProgressPage() {
                   const completePct = a.total > 0 ? Math.round((a.closed / a.total) * 100) : 0;
                   return (
                     <tr key={a.staffName} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-5 py-2.5 font-medium text-gray-800">{a.staffName}</td>
+                      <td className="px-5 py-2.5 font-medium"><Link href={`/wo/progress/staff/${a.staffId}`} className="link-action">{a.staffName}</Link></td>
                       <td className="px-3 py-2.5 text-gray-500">{a.subTeam ?? "—"}</td>
                       <td className="px-3 py-2.5 text-center text-gray-700">{a.total}</td>
                       <td className="px-3 py-2.5 text-center text-blue-600">{a.open}</td>
@@ -415,7 +466,7 @@ export default function WoProgressPage() {
               <tbody>
                 {data.byAssigneeType.rows.map((p) => (
                   <tr key={p.staffId} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="sticky left-0 z-10 bg-white px-5 py-2.5 font-medium text-gray-800 whitespace-nowrap">{p.staffName}</td>
+                    <td className="sticky left-0 z-10 bg-white px-5 py-2.5 font-medium text-gray-800 whitespace-nowrap"><Link href={`/wo/progress/staff/${p.staffId}`} className="link-action">{p.staffName}</Link></td>
                     <td className="px-3 py-2.5 text-gray-500">{p.subTeam ?? "—"}</td>
                     {data.byAssigneeType.types.map((t) => {
                       const c = p.cells[t.id];
