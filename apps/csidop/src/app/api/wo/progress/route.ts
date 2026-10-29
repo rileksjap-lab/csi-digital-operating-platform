@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const scope = buildScopeFilter(session);
     const { clause: scopeClause, params: scopeParams } = buildScopeWhere(scope, 1);
 
-    const [overviewRes, overdueRes, byAssigneeRes, byPriorityRes, slaRes, recentActivityRes] =
+    const [overviewRes, overdueRes, byAssigneeRes, byPriorityRes, slaRes, recentActivityRes, byTypeRes] =
       await Promise.all([
         query(
           `SELECT
@@ -138,7 +138,38 @@ export async function GET(request: NextRequest) {
            LIMIT 15`,
           scopeParams
         ),
+
+        // Active work (open + in progress) per person and request type.
+        query(
+          `SELECT s.id AS "staffId", s.name AS "staffName", s.subteam AS "subTeam",
+                  rt.id AS "typeId", rt.typename AS "typeName",
+                  COUNT(*)::int AS "active",
+                  COUNT(*) FILTER (WHERE w.duedate < CURRENT_DATE)::int AS "overdue"
+           FROM csi_wo w
+           JOIN staff s ON s.id = w.assignedto
+           JOIN request_type rt ON rt.id = w.requesttypeid
+           WHERE w.status IN ('Open','InProgress')
+             ${scopeClause}
+           GROUP BY s.id, s.name, s.subteam, rt.id, rt.typename`,
+          scopeParams
+        ),
       ]);
+
+    // Pivot into one row per person, one column per request type that has any active work.
+    const types = new Map<string, { id: string; name: string; active: number; overdue: number }>();
+    const people = new Map<string, {
+      staffId: string; staffName: string; subTeam: string | null; active: number; overdue: number;
+      cells: Record<string, { active: number; overdue: number }>;
+    }>();
+    for (const r of byTypeRes.rows as {
+      staffId: string; staffName: string; subTeam: string | null; typeId: string; typeName: string; active: number; overdue: number;
+    }[]) {
+      const a = Number(r.active), o = Number(r.overdue);
+      const t = types.get(r.typeId) ?? { id: r.typeId, name: r.typeName, active: 0, overdue: 0 };
+      t.active += a; t.overdue += o; types.set(r.typeId, t);
+      const p = people.get(r.staffId) ?? { staffId: r.staffId, staffName: r.staffName, subTeam: r.subTeam ?? null, active: 0, overdue: 0, cells: {} };
+      p.active += a; p.overdue += o; p.cells[r.typeId] = { active: a, overdue: o }; people.set(r.staffId, p);
+    }
 
     const overview = overviewRes.rows[0];
 
@@ -181,6 +212,10 @@ export async function GET(request: NextRequest) {
         closed: Number(r.closed),
         overdue: Number(r.overdue),
       })),
+      byAssigneeType: {
+        types: [...types.values()].sort((x, y) => y.active - x.active || x.name.localeCompare(y.name)),
+        rows: [...people.values()].sort((x, y) => y.active - x.active || x.staffName.localeCompare(y.staffName)),
+      },
       slaBands: slaRes.rows.map((r) => ({
         band: r.slaBand,
         count: Number(r.count),
