@@ -1,25 +1,8 @@
 import type { NextRequest } from "next/server";
 import { requireAuth, buildScopeFilter } from "@/lib/auth/guards";
-import type { ScopeFilter } from "@/lib/auth/guards";
+import { buildScopeWhere } from "@/lib/auth/wo-scope";
 import { ok, internalError } from "@/lib/response";
 import { query } from "@/lib/db/pool";
-
-function buildScopeWhere(scope: ScopeFilter, paramOffset: number): { clause: string; params: unknown[] } {
-  switch (scope.scope) {
-    case "Self":
-      return {
-        clause: `AND (w.assignedto = $${paramOffset} OR w.createdby = $${paramOffset})`,
-        params: [scope.staffId],
-      };
-    case "Pod":
-      return {
-        clause: `AND (w.assignedto IN (SELECT s2.id FROM staff s2 WHERE s2.deptid = $${paramOffset} AND s2.subteam = $${paramOffset + 1}) OR w.createdby = $${paramOffset + 2})`,
-        params: [scope.departmentId, scope.subTeam, scope.staffId],
-      };
-    default:
-      return { clause: "", params: [] };
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,7 +51,7 @@ export async function GET(request: NextRequest) {
         ),
 
         query(
-          `SELECT s.name AS "staffName", s.subteam AS "subTeam",
+          `SELECT s.id AS "staffId", s.name AS "staffName", s.subteam AS "subTeam",
                   COUNT(*)::int AS "total",
                   COUNT(*) FILTER (WHERE w.status = 'Open')::int AS "open",
                   COUNT(*) FILTER (WHERE w.status = 'InProgress')::int AS "inProgress",
@@ -196,6 +179,7 @@ export async function GET(request: NextRequest) {
         daysOverdue: Number(r.daysOverdue),
       })),
       byAssignee: byAssigneeRes.rows.map((r) => ({
+        staffId: r.staffId,
         staffName: r.staffName,
         subTeam: r.subTeam,
         total: Number(r.total),
