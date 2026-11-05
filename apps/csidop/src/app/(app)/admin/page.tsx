@@ -91,6 +91,7 @@ const MODULES = [
   { code: "kpi", label: "KPI (Appraisal and Work Performance)" },
   { code: "skills", label: "Skills" },
   { code: "reports", label: "Reports" },
+  { code: "cmp", label: "Transformation Plan" },
   { code: "admin", label: "Admin" },
 ];
 
