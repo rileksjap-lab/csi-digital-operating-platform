@@ -18,3 +18,4 @@ yarn-error.log*
 next-env.d.ts
 ~$*.docx
 docs/unpacked_review/
+documents/
