@@ -29,6 +29,12 @@ export interface Actor {
   staffId: string;
   /** The session role, e.g. "HOD", "SVP", "TeamLead". */
   role: string;
+  /**
+   * The HODs this person is currently acting for on this appraisal (the HOD names a
+   * Solution Manager for set dates in KPI Setup). The repository fills it in; it is
+   * empty for everyone else.
+   */
+  actingFor?: string[];
 }
 
 export const STATUS_LABEL: Record<AppraisalStatus, string> = {
@@ -39,12 +45,18 @@ export const STATUS_LABEL: Record<AppraisalStatus, string> = {
   SentToHR: "Sent to HR",
 };
 
+/** An acting HOD stands in for the final approver, on anyone's appraisal but their own. */
+export function actsForApprover(ctx: WorkflowContext, actor: Actor): boolean {
+  return actor.staffId !== ctx.staffId && !!actor.actingFor?.includes(ctx.finalApproverId);
+}
+
 /** A person can be more than one of these on the same appraisal. */
 export function capacities(ctx: WorkflowContext, actor: Actor): Set<Capacity> {
   const set = new Set<Capacity>();
   if (actor.staffId === ctx.staffId) set.add("Employee");
   if (actor.staffId === ctx.reviewerId) set.add("Reviewer");
   if (actor.staffId === ctx.finalApproverId) set.add("FinalApprover");
+  if (actsForApprover(ctx, actor)) set.add("FinalApprover");
   return set;
 }
 
@@ -137,9 +149,9 @@ export function signOffRights(ctx: WorkflowContext, actor: Actor) {
   const others = actor.staffId !== ctx.staffId;
   const finalStep = ctx.status === "HODReview" || (ctx.status === "SuperiorReview" && reviewerIsApprover(ctx));
   return {
-    hodTicks: others && actor.role === "HOD" && caps.has("FinalApprover") && finalStep,
+    hodTicks: others && (actor.role === "HOD" || actsForApprover(ctx, actor)) && caps.has("FinalApprover") && finalStep,
     svpTicks: others && actor.role === "SVP" && (finalStep || ctx.status === "Finalised"),
-    opsName: others && (actor.role === "HOD" || actor.role === "SVP") && (finalStep || ctx.status === "Finalised"),
+    opsName: others && (actor.role === "HOD" || actor.role === "SVP" || actsForApprover(ctx, actor)) && (finalStep || ctx.status === "Finalised"),
     svpSign: others && actor.role === "SVP" && ctx.status === "Finalised",
   };
 }

@@ -90,6 +90,16 @@ export const cycleSaveSchema = z.object({
   certificates: certConfigSchema.optional(),
   // Where the final results are emailed. An empty list switches sending off.
   hrEmails: z.array(z.string().trim().toLowerCase().email().max(150)).max(10).optional(),
+  // A Solution Manager who finalises on the HOD's behalf between two dates. null switches it off.
+  actingHod: z
+    .object({
+      staffId: z.string().uuid(),
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    })
+    .refine((d) => d.from <= d.to, { message: "The end date must not be before the start date" })
+    .nullable()
+    .optional(),
 });
 
 export const cycleCreateSchema = z

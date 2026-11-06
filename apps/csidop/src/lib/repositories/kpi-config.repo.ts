@@ -235,13 +235,31 @@ export async function saveOutcomeBands(cycleId: string, input: z.infer<typeof ou
   });
 }
 
-export async function updateCycle(cycleId: string, input: z.infer<typeof cycleSaveSchema>, staffId: string): Promise<"saved" | "not_found"> {
+/** Solution Managers in the HOD's department who can be named as the acting HOD. */
+export async function listDelegateCandidates(departmentId: string): Promise<{ id: string; name: string }[]> {
+  const res = await query<{ id: string; name: string }>(
+    `SELECT s.id, s.name FROM staff s JOIN role r ON r.id = s.roleid LEFT JOIN role kr ON kr.id = s.kpiroleid
+     WHERE s.status = 'Active' AND s.deptid = $1 AND COALESCE(kr.rolecode, r.rolecode) = 'SM' ORDER BY s.name`,
+    [departmentId]
+  );
+  return res.rows;
+}
+
+export async function updateCycle(
+  cycleId: string, input: z.infer<typeof cycleSaveSchema>, staffId: string, departmentId: string
+): Promise<"saved" | "not_found" | "bad_delegate"> {
   return inTransaction(async (client) => {
     const cur = await client.query(`SELECT name, status, config FROM kpi_cycle WHERE id = $1 FOR UPDATE`, [cycleId]);
     if (cur.rows.length === 0) return "not_found";
     const config = { ...(cur.rows[0].config ?? {}) };
     if (input.certificates) config.certificates = input.certificates;
     if (input.hrEmails) config.hrEmails = [...new Set(input.hrEmails)];
+    if (input.actingHod === null) delete config.actingHod;
+    else if (input.actingHod) {
+      const ok = (await listDelegateCandidates(departmentId)).some((c) => c.id === input.actingHod!.staffId);
+      if (!ok) return "bad_delegate";
+      config.actingHod = { staffId: input.actingHod.staffId, hodId: staffId, from: input.actingHod.from, to: input.actingHod.to };
+    }
 
     await client.query(
       `UPDATE kpi_cycle SET name = COALESCE($2, name), status = COALESCE($3, status),
@@ -284,7 +302,8 @@ export async function createCycleCopy(
     const cycle = await client.query<{ id: string }>(
       `INSERT INTO kpi_cycle (cyclecode, name, periodstart, periodend, status, config)
        VALUES ($1, $2, $3, $4, 'Draft', $5::jsonb) RETURNING id`,
-      [code, input.name.trim(), input.periodStart, input.periodEnd, JSON.stringify(src.rows[0].config ?? {})]
+      // The acting-HOD cover belongs to one appraisal season, so a copied cycle starts without it.
+      [code, input.name.trim(), input.periodStart, input.periodEnd, JSON.stringify((({ actingHod: _drop, ...rest }) => rest)((src.rows[0].config ?? {}) as Record<string, unknown>))]
     );
     const id = cycle.rows[0].id;
 

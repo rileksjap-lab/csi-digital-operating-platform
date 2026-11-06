@@ -22,7 +22,7 @@ interface Item {
 }
 interface CertConfig { categories: { code: string; points: number; maxTotal?: number; minCount?: number }[]; scoreCap: number }
 interface Config {
-  cycle: Cycle & { config: { certificates?: CertConfig; hrEmails?: string[] } };
+  cycle: Cycle & { config: { certificates?: CertConfig; hrEmails?: string[]; actingHod?: { staffId: string; hodId: string; from: string; to: string } } };
   templates: Template[];
   items: Item[];
   outcomeBands: { minScore: number; outcome: string }[];
@@ -363,11 +363,16 @@ function CycleEditor({ config, canEdit, onSaved }: { config: Config; canEdit: bo
   const [name, setName] = useState(config.cycle.name);
   const [status, setStatus] = useState(config.cycle.status);
   const [emails, setEmails] = useState((config.cycle.config.hrEmails ?? []).join("\n"));
+  const acting = config.cycle.config.actingHod;
+  const [actStaff, setActStaff] = useState(acting?.staffId ?? "");
+  const [actFrom, setActFrom] = useState(acting?.from ?? "");
+  const [actTo, setActTo] = useState(acting?.to ?? "");
+  const { data: delegates } = useSWR<{ id: string; name: string }[]>(canEdit ? "/api/kpi/delegates" : null, apiFetcher);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  useEffect(() => { setRows(toRows()); setCap(String(cert.scoreCap)); setName(config.cycle.name); setStatus(config.cycle.status); setEmails((config.cycle.config.hrEmails ?? []).join("\n")); setDirty(false); }, [config]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setRows(toRows()); setCap(String(cert.scoreCap)); setName(config.cycle.name); setStatus(config.cycle.status); setEmails((config.cycle.config.hrEmails ?? []).join("\n")); setActStaff(config.cycle.config.actingHod?.staffId ?? ""); setActFrom(config.cycle.config.actingHod?.from ?? ""); setActTo(config.cycle.config.actingHod?.to ?? ""); setDirty(false); }, [config]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const touch = () => { setDirty(true); setDone(false); };
   const emailList = emails.split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
@@ -376,6 +381,8 @@ function CycleEditor({ config, canEdit, onSaved }: { config: Config; canEdit: bo
   if (!name.trim()) problem = "Cycle name is required";
   else if (badEmail) problem = `“${badEmail}” is not a valid email address`;
   else if (emailList.length > 10) problem = "At most 10 HR email addresses";
+  else if (actStaff && (!actFrom || !actTo)) problem = "Set the first and last day of the acting HOD cover";
+  else if (actStaff && actFrom > actTo) problem = "The acting HOD cover cannot end before it starts";
   else if (rows.length === 0) problem = "Add at least one certification category";
   else if (rows.some((r) => !r.code.trim() || !(Number(r.points) > 0))) problem = "Each category needs a name and points above 0";
   else if (!Number.isInteger(Number(cap)) || Number(cap) < 1 || Number(cap) > 10) problem = "Highest item score must be a whole number from 1 to 10";
@@ -385,6 +392,7 @@ function CycleEditor({ config, canEdit, onSaved }: { config: Config; canEdit: bo
     try {
       const body = {
         name: name.trim(), status, hrEmails: emailList,
+        actingHod: actStaff ? { staffId: actStaff, from: actFrom, to: actTo } : null,
         certificates: {
           categories: rows.map((r) => ({
             code: r.code.trim(), points: Number(r.points),
@@ -417,6 +425,28 @@ function CycleEditor({ config, canEdit, onSaved }: { config: Config; canEdit: bo
           Where the final results go when the HOD presses “Send to HR”. One address per line. Leave empty to switch sending off.
         </p>
         <textarea rows={3} value={emails} disabled={!canEdit} onChange={(e) => { setEmails(e.target.value); touch(); }} className={`${input} font-mono`} placeholder="hr@company.com" />
+      </div>
+      <div className="border-b border-gray-200 px-5 py-4">
+        <h3 className="text-sm font-semibold text-gray-800">Acting HOD (cover while you are away)</h3>
+        <p className="mb-3 text-xs text-gray-500">
+          Name a Solution Manager to finalise on your behalf between two dates. They can finalise, return to the superior,
+          withdraw and tick the HOD recommendations for staff, but never on their own appraisal. Sending to HR stays with
+          the HOD and the SVP. Everything they do is recorded as “Acting for” you. Leave empty for no cover.
+        </p>
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="text-xs text-gray-500">Acting HOD
+            <select value={actStaff} disabled={!canEdit} onChange={(e) => { setActStaff(e.target.value); touch(); }} className={`${input} mt-1`}>
+              <option value="">No cover</option>
+              {(delegates ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-gray-500">From
+            <input type="date" value={actFrom} disabled={!canEdit || !actStaff} onChange={(e) => { setActFrom(e.target.value); touch(); }} className={`${input} mt-1`} />
+          </label>
+          <label className="text-xs text-gray-500">Until (including this day)
+            <input type="date" value={actTo} disabled={!canEdit || !actStaff} onChange={(e) => { setActTo(e.target.value); touch(); }} className={`${input} mt-1`} />
+          </label>
+        </div>
       </div>
       <div className="px-5 py-4">
         <h3 className="text-sm font-semibold text-gray-800">Employee Certifications: points table</h3>

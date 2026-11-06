@@ -2,12 +2,13 @@ import type { PoolClient } from "pg";
 import pool, { query } from "@/lib/db/pool";
 import { insertAuditEntry } from "@/lib/db/audit";
 import type { AuthSession } from "@/lib/types/api";
+import { localTodayIso } from "@/lib/dates";
 import {
   appraisalTotals, certificateScore, outcomeFor, DEFAULT_COMPONENT_MAX,
   type CertConfig, type ComponentMax, type ScoredEntry,
 } from "@/lib/kpi/scoring";
 import {
-  allowedActions, canView, checkTransition, editable, hidesOtherRatings, ratingAt, reviewerHasStarted, signOffRights, stageForStatus, stageProblems,
+  actsForApprover, allowedActions, canView, checkTransition, editable, hidesOtherRatings, ratingAt, reviewerHasStarted, signOffRights, stageForStatus, stageProblems,
   type Actor, type AppraisalStatus, type ItemMeta, type LineMeta, type ScoreRow, type Stage, type WorkflowAction, type WorkflowContext,
 } from "@/lib/kpi/workflow";
 
@@ -25,7 +26,16 @@ const done = <T>(value: T): Done<T> => ({ ok: true, value });
 // Reads outside a transaction go through the shared pool.
 const poolDb = { query: (text: string, params?: unknown[]) => query(text, params) } as unknown as Db;
 
-const actorOf = (s: AuthSession): Actor => ({ staffId: s.staffId, role: s.role });
+interface ActingHod { staffId: string; hodId: string; from: string; to: string }
+const actingHodOf = (a: AppraisalRow): ActingHod | null => (a.cycleConfig?.actingHod as ActingHod | undefined) ?? null;
+
+/** Who is acting, and for whom: the Solution Manager the HOD named, on the dates the HOD set. */
+function actorOf(s: AuthSession, a?: AppraisalRow): Actor {
+  const d = a ? actingHodOf(a) : null;
+  const today = localTodayIso();
+  const acting = !!d && d.staffId === s.staffId && d.from <= today && today <= d.to;
+  return { staffId: s.staffId, role: s.role, actingFor: acting ? [d!.hodId] : [] };
+}
 
 interface AppraisalRow {
   id: string; cycleId: string; staffId: string; templateId: string; reviewerId: string; finalApproverId: string;
@@ -37,6 +47,7 @@ interface AppraisalRow {
   deptName: string; cycleName: string; cycleStart: string; cycleEnd: string;
   svpDeptSignedAt: string | null; svpDeptSignedByName: string | null;
   reviewerName: string; finalApproverName: string; templateName: string;
+  cycleConfig: Record<string, unknown> | null;
 }
 
 const APPRAISAL_SQL = `
@@ -51,7 +62,7 @@ const APPRAISAL_SQL = `
          rv.name AS "reviewerName", fa.name AS "finalApproverName", t.displayname AS "templateName",
          d.deptname AS "deptName", c.name AS "cycleName",
          to_char(c.periodstart, 'YYYY-MM-DD') AS "cycleStart", to_char(c.periodend, 'YYYY-MM-DD') AS "cycleEnd",
-         a.svpdeptsignedat AS "svpDeptSignedAt", sv.name AS "svpDeptSignedByName"
+         a.svpdeptsignedat AS "svpDeptSignedAt", sv.name AS "svpDeptSignedByName", c.config AS "cycleConfig"
   FROM kpi_appraisal a
   JOIN staff s ON s.id = a.staffid JOIN role r ON r.id = s.roleid JOIN department d ON d.id = s.deptid
   JOIN staff rv ON rv.id = a.reviewerid JOIN staff fa ON fa.id = a.finalapproverid
@@ -237,8 +248,8 @@ export async function listAppraisals(cycleId: string, session: AuthSession) {
      ORDER BY s.name`,
     [cycleId, wide, session.role, session.departmentId, session.staffId]
   );
-  const actor = actorOf(session);
   return res.rows.map((a) => {
+    const actor = actorOf(session, a);
     const ctx = ctxOf(a);
     const showResult = !hidesOtherRatings(ctx, actor);
     return {
@@ -295,6 +306,8 @@ async function buildDetail(a: AppraisalRow, actor: Actor) {
     signOffRights: signOffRights(ctx, actor),
     totals, snapshot: hide ? null : { total: a.totalPoints, outcome: a.outcome },
     problems, editable: editable(ctx, actor), ratingsHidden: hide, viewerIsEmployee: actor.staffId === a.staffId,
+    // Set when the viewer is a Solution Manager standing in for the HOD on this appraisal.
+    acting: actsForApprover(ctx, actor) && actor.staffId !== a.finalApproverId ? { forName: a.finalApproverName, until: actingHodOf(a)?.to ?? null } : null,
     // Withdrawing is only offered while the superior has not started on it.
     actions: allowedActions(ctx, actor).filter((x) => x !== "withdraw" || !reviewerHasStarted(scoreRes.rows, !!oneRes.rows[0])),
   };
@@ -304,8 +317,8 @@ export type AppraisalDetail = Awaited<ReturnType<typeof buildDetail>>;
 
 export async function getAppraisal(id: string, session: AuthSession): Promise<Result<AppraisalDetail>> {
   const a = await loadAppraisal(poolDb, id);
-  if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) return fail(404, "Appraisal not found");
-  return done(await buildDetail(a, actorOf(session)));
+  if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) return fail(404, "Appraisal not found");
+  return done(await buildDetail(a, actorOf(session, a)));
 }
 
 // Someone who is nobody on the appraisal and holds no edit rights, so every
@@ -329,8 +342,8 @@ export async function saveScores(id: string, session: AuthSession, inputs: Score
   try {
     await client.query("BEGIN");
     const a = await loadAppraisal(client, id, true);
-    if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
-    const can = editable(ctxOf(a), actorOf(session));
+    if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
+    const can = editable(ctxOf(a), actorOf(session, a));
     const stage: Stage | null = can.self ? "self" : can.reviewer ? "reviewer" : can.final ? "final" : null;
     if (!stage) { await client.query("ROLLBACK"); return fail(403, "You cannot change ratings on this appraisal right now"); }
 
@@ -385,8 +398,8 @@ export async function saveCerts(id: string, session: AuthSession, certs: { name:
   try {
     await client.query("BEGIN");
     const a = await loadAppraisal(client, id, true);
-    if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
-    const can = editable(ctxOf(a), actorOf(session));
+    if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
+    const can = editable(ctxOf(a), actorOf(session, a));
     if (!(can.self || can.reviewer || can.final)) { await client.query("ROLLBACK"); return fail(403, "You cannot change the certificate list right now"); }
 
     const meta = await loadMeta(client, a);
@@ -412,8 +425,8 @@ export async function recordOneOnOne(
   id: string, session: AuthSession, input: { meetingDate: string; notes?: string | null; agreedActions?: string | null }
 ): Promise<Result<{ recorded: true }>> {
   const a = await loadAppraisal(poolDb, id);
-  if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) return fail(404, "Appraisal not found");
-  if (!editable(ctxOf(a), actorOf(session)).oneOnOne) return fail(403, "Only the immediate superior can record the 1:1, while reviewing");
+  if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) return fail(404, "Appraisal not found");
+  if (!editable(ctxOf(a), actorOf(session, a)).oneOnOne) return fail(403, "Only the immediate superior can record the 1:1, while reviewing");
   await query(
     `INSERT INTO kpi_one_on_one (appraisalid, meetingdate, notes, agreedactions, recordedby)
      VALUES ($1, $2, $3, $4, $5)
@@ -426,8 +439,8 @@ export async function recordOneOnOne(
 
 export async function acknowledgeOneOnOne(id: string, session: AuthSession): Promise<Result<{ acknowledged: true }>> {
   const a = await loadAppraisal(poolDb, id);
-  if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) return fail(404, "Appraisal not found");
-  if (!editable(ctxOf(a), actorOf(session)).acknowledge) return fail(403, "You cannot confirm the 1:1 on this appraisal right now");
+  if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) return fail(404, "Appraisal not found");
+  if (!editable(ctxOf(a), actorOf(session, a)).acknowledge) return fail(403, "You cannot confirm the 1:1 on this appraisal right now");
   const res = await query(`UPDATE kpi_one_on_one SET employeeackat = now() WHERE appraisalid = $1 RETURNING id`, [id]);
   if (res.rows.length === 0) return fail(409, "The 1:1 has not been recorded yet");
   return done({ acknowledged: true });
@@ -442,9 +455,9 @@ export async function transition(
   try {
     await client.query("BEGIN");
     const a = await loadAppraisal(client, id, true);
-    if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
+    if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
 
-    const check = checkTransition(action, ctxOf(a), actorOf(session));
+    const check = checkTransition(action, ctxOf(a), actorOf(session, a));
     if (!check.ok) { await client.query("ROLLBACK"); return fail(403, check.reason); }
     const reason = note?.trim() || null;
     if ((check.noteRequired || (action === "withdrawAny" && a.staffId !== session.staffId)) && !reason) { await client.query("ROLLBACK"); return fail(400, "Please say why"); }
@@ -502,11 +515,16 @@ export async function transition(
     // A step can both submit and finalise, so the same column may be named twice.
     await client.query(`UPDATE kpi_appraisal SET ${[...new Set(sets)].join(", ")} WHERE id = $1`, params);
 
+    const baseReason = action === "withdraw" ? "Withdrawn by the employee" : action === "withdrawAny" ? (reason ?? "Withdrawn by the employee") : reason;
+    const delegated = actsForApprover(ctxOf(a), actorOf(session, a)) && session.staffId !== a.finalApproverId;
+    const auditReason = (delegated ? `Acting for ${a.finalApproverName}${baseReason ? `: ${baseReason}` : ""}` : baseReason) || null;
     await insertAuditEntry(
       {
         entityName: "KPI_APPRAISAL", entityId: id,
         action: action === "finalise" ? "Approve" : action === "withdraw" || action === "withdrawAny" || action === "returnToStaff" || action === "returnToReviewer" ? "Return" : "StatusChange",
-        fieldName: "Status", oldValue: a.status, newValue: check.to, reason: action === "withdraw" ? "Withdrawn by the employee" : action === "withdrawAny" ? (reason ?? "Withdrawn by the employee") : reason, performedBy: session.staffId,
+        fieldName: "Status", oldValue: a.status, newValue: check.to,
+        reason: auditReason,
+        performedBy: session.staffId,
       },
       client
     );
@@ -536,8 +554,8 @@ export async function saveSignOff(id: string, session: AuthSession, input: SignO
   try {
     await client.query("BEGIN");
     const a = await loadAppraisal(client, id, true);
-    if (!a || !canView(ctxOf(a), actorOf(session), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
-    const rights = signOffRights(ctxOf(a), actorOf(session));
+    if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
+    const rights = signOffRights(ctxOf(a), actorOf(session, a));
     const meta = await loadMeta(client, a);
 
     const deny = async (msg: string) => { await client.query("ROLLBACK"); return fail(403, msg); };
