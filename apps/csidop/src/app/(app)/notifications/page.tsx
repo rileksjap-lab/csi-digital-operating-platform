@@ -24,6 +24,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   WorkOrder: "bg-blue-100 text-blue-700",
   Approval: "bg-purple-100 text-purple-700",
   Tender: "bg-orange-100 text-orange-700",
+  KPI: "bg-emerald-100 text-emerald-700",
   System: "bg-gray-100 text-gray-600",
   General: "bg-gray-100 text-gray-600",
 };
