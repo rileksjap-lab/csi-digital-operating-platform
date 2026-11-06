@@ -12,13 +12,13 @@ const transporter = nodemailer.createTransport({
 });
 
 const FROM = process.env.SMTP_FROM ?? `CSI DOP <${smtpUser ?? "noreply@csidop.local"}>`;
-const APP_URL = process.env.APP_URL ?? "https://csidop.10creativesolutions.com";
+export const APP_URL = process.env.APP_URL ?? "https://csidop.10creativesolutions.com";
 
 function isConfigured(): boolean {
   return !!(smtpUser && smtpPass);
 }
 
-function wrap(title: string, body: string): string {
+export function wrap(title: string, body: string): string {
   return `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 0;">
       <div style="background: #1A1A2E; padding: 16px 24px; border-radius: 8px 8px 0 0;">
@@ -36,7 +36,7 @@ function wrap(title: string, body: string): string {
     </div>`;
 }
 
-function field(label: string, value: string): string {
+export function field(label: string, value: string): string {
   return `<tr><td style="color:#6b7280;font-size:13px;padding:4px 12px 4px 0;white-space:nowrap;">${label}</td><td style="color:#1e293b;font-size:13px;padding:4px 0;font-weight:500;">${value}</td></tr>`;
 }
 
@@ -51,7 +51,7 @@ function actionButton(label: string, woId: string): string {
   return `<a href="${APP_URL}/wo/${woId}" style="display:inline-block;background:#6366f1;color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;margin:8px 0;">${label}</a>`;
 }
 
-async function send(to: string, subject: string, html: string): Promise<void> {
+export async function send(to: string, subject: string, html: string): Promise<void> {
   if (!isConfigured()) {
     console.log(`[notify] SMTP not configured — skipped: ${subject} → ${to}`);
     return;
@@ -63,7 +63,7 @@ async function send(to: string, subject: string, html: string): Promise<void> {
   }
 }
 
-async function getStaffEmail(staffId: string): Promise<string | null> {
+export async function getStaffEmail(staffId: string): Promise<string | null> {
   const result = await query<{ email: string }>(
     `SELECT email FROM staff WHERE id = $1 AND status = 'Active'`,
     [staffId]
@@ -71,7 +71,7 @@ async function getStaffEmail(staffId: string): Promise<string | null> {
   return result.rows[0]?.email ?? null;
 }
 
-async function getStaffName(staffId: string): Promise<string> {
+export async function getStaffName(staffId: string): Promise<string> {
   const result = await query<{ name: string }>(
     `SELECT name FROM staff WHERE id = $1`,
     [staffId]

@@ -3,6 +3,7 @@ import pool, { query } from "@/lib/db/pool";
 import { insertAuditEntry } from "@/lib/db/audit";
 import type { AuthSession } from "@/lib/types/api";
 import { localTodayIso } from "@/lib/dates";
+import { notifyKpiStep } from "@/lib/email/kpi-notify";
 import {
   appraisalTotals, certificateScore, outcomeFor, DEFAULT_COMPONENT_MAX,
   type CertConfig, type ComponentMax, type ScoredEntry,
@@ -529,6 +530,16 @@ export async function transition(
       client
     );
     await client.query("COMMIT");
+
+    const cover = actingHodOf(a);
+    const today = localTodayIso();
+    const coverId = cover && cover.hodId === a.finalApproverId && cover.staffId !== a.staffId && cover.from <= today && today <= cover.to
+      ? cover.staffId : null;
+    notifyKpiStep({
+      appraisalId: id, action, to: check.to, actorId: session.staffId, actorName: session.displayName || "Someone",
+      staffId: a.staffId, staffName: a.staffName, reviewerId: a.reviewerId, finalApproverId: a.finalApproverId,
+      coverId, reason,
+    });
     return done({ status: check.to });
   } catch (err) {
     await client.query("ROLLBACK");
