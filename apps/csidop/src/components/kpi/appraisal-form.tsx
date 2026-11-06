@@ -34,7 +34,7 @@ interface Detail {
   snapshot: { total: number | null; outcome: string | null } | null;
   editable: { self: boolean; reviewer: boolean; final: boolean; oneOnOne: boolean; acknowledge: boolean };
   actions: WorkflowAction[];
-  ratingsHidden: boolean; viewerIsEmployee: boolean;
+  ratingsHidden: boolean; viewerIsEmployee: boolean; acting: { forName: string; until: string | null } | null;
   recommendations: { hod?: string[]; svp?: string[] };
   svpOps: { name: string | null; date: string | null };
   svpDept: { signedAt: string | null; signedBy: string | null };
@@ -505,6 +505,11 @@ export default function AppraisalForm({ id }: { id: string }) {
         </div>
       </div>
 
+      {d.acting && (
+        <div className="rounded border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+          You are acting for {d.acting.forName}{d.acting.until ? ` until ${d.acting.until}` : ""}. You can finalise, return and sign off this appraisal on their behalf; it is recorded as “Acting for {d.acting.forName}”.
+        </div>
+      )}
       {d.returnNote && (
         <div className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span className="font-medium">Sent back: </span>{d.returnNote}

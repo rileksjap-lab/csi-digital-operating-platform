@@ -32,8 +32,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!idSchema.safeParse(cycleId).success) return badRequest("Invalid cycle id");
     const parsed = cycleSaveSchema.safeParse(await request.json());
     if (!parsed.success) return zodError(parsed.error);
-    const result = await updateCycle(cycleId, parsed.data, session.staffId);
+    const result = await updateCycle(cycleId, parsed.data, session.staffId, session.departmentId);
     if (result === "not_found") return notFound("KPI cycle not found");
+    if (result === "bad_delegate") return badRequest("The acting HOD must be an active Solution Manager in your department");
     return ok(await getCycleConfig(cycleId));
   } catch (err) {
     if (err instanceof Response) return err;
