@@ -68,7 +68,7 @@ const ctxOf = (a: AppraisalRow): WorkflowContext => ({
 });
 
 function inScope(a: AppraisalRow, s: AuthSession): boolean {
-  return s.role === "SVP" || (s.role === "HOD" && s.departmentId === a.staffDeptId);
+  return s.role === "SVP" || ((s.role === "HOD" || s.role === "SolutionManager") && s.departmentId === a.staffDeptId);
 }
 
 interface Meta {
@@ -228,7 +228,7 @@ export async function createAppraisals(cycleId: string, session: AuthSession) {
 // ── Lists and detail ────────────────────────────────────────────────────────
 
 export async function listAppraisals(cycleId: string, session: AuthSession) {
-  const wide = session.role === "SVP" || session.role === "HOD";
+  const wide = session.role === "SVP" || session.role === "HOD" || session.role === "SolutionManager";
   const res = await query<AppraisalRow>(
     `${APPRAISAL_SQL}
      WHERE a.cycleid = $1
@@ -294,7 +294,7 @@ async function buildDetail(a: AppraisalRow, actor: Actor) {
     svpDept: hide ? { signedAt: null, signedBy: null } : { signedAt: a.svpDeptSignedAt, signedBy: a.svpDeptSignedByName },
     signOffRights: signOffRights(ctx, actor),
     totals, snapshot: hide ? null : { total: a.totalPoints, outcome: a.outcome },
-    problems, editable: editable(ctx, actor), ratingsHidden: hide,
+    problems, editable: editable(ctx, actor), ratingsHidden: hide, viewerIsEmployee: actor.staffId === a.staffId,
     // Withdrawing is only offered while the superior has not started on it.
     actions: allowedActions(ctx, actor).filter((x) => x !== "withdraw" || !reviewerHasStarted(scoreRes.rows, !!oneRes.rows[0])),
   };
@@ -447,7 +447,7 @@ export async function transition(
     const check = checkTransition(action, ctxOf(a), actorOf(session));
     if (!check.ok) { await client.query("ROLLBACK"); return fail(403, check.reason); }
     const reason = note?.trim() || null;
-    if (check.noteRequired && !reason) { await client.query("ROLLBACK"); return fail(400, "Please say why"); }
+    if ((check.noteRequired || (action === "withdrawAny" && a.staffId !== session.staffId)) && !reason) { await client.query("ROLLBACK"); return fail(400, "Please say why"); }
 
     const meta = await loadMeta(client, a);
     const rows = (await client.query<ScoreRow>(SCORE_SQL, [id])).rows;
@@ -486,6 +486,7 @@ export async function transition(
     switch (action) {
       case "submitSelf": sets.push("selfsubmittedat = now()", "returnnote = NULL"); break;
       case "withdraw": sets.push("selfsubmittedat = NULL", "returnnote = NULL"); break;
+      case "withdrawAny": sets.push("selfsubmittedat = NULL"); if (a.staffId === session.staffId) sets.push("returnnote = NULL"); else set("returnnote = ?", reason); break;
       case "returnToStaff": sets.push("selfsubmittedat = NULL"); set("returnnote = ?", reason); break;
       case "submitReview": sets.push("reviewsubmittedat = now()", "returnnote = NULL"); break;
       case "returnToReviewer": sets.push("reviewsubmittedat = NULL"); set("returnnote = ?", reason); break;
@@ -504,8 +505,8 @@ export async function transition(
     await insertAuditEntry(
       {
         entityName: "KPI_APPRAISAL", entityId: id,
-        action: action === "finalise" ? "Approve" : action === "withdraw" || action === "returnToStaff" || action === "returnToReviewer" ? "Return" : "StatusChange",
-        fieldName: "Status", oldValue: a.status, newValue: check.to, reason: action === "withdraw" ? "Withdrawn by the employee" : reason, performedBy: session.staffId,
+        action: action === "finalise" ? "Approve" : action === "withdraw" || action === "withdrawAny" || action === "returnToStaff" || action === "returnToReviewer" ? "Return" : "StatusChange",
+        fieldName: "Status", oldValue: a.status, newValue: check.to, reason: action === "withdraw" ? "Withdrawn by the employee" : action === "withdrawAny" ? (reason ?? "Withdrawn by the employee") : reason, performedBy: session.staffId,
       },
       client
     );

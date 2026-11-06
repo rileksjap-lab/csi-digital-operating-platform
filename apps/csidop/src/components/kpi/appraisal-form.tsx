@@ -34,7 +34,7 @@ interface Detail {
   snapshot: { total: number | null; outcome: string | null } | null;
   editable: { self: boolean; reviewer: boolean; final: boolean; oneOnOne: boolean; acknowledge: boolean };
   actions: WorkflowAction[];
-  ratingsHidden: boolean;
+  ratingsHidden: boolean; viewerIsEmployee: boolean;
   recommendations: { hod?: string[]; svp?: string[] };
   svpOps: { name: string | null; date: string | null };
   svpDept: { signedAt: string | null; signedBy: string | null };
@@ -378,7 +378,7 @@ export default function AppraisalForm({ id }: { id: string }) {
   }
 
   const has = (a: WorkflowAction) => d.actions.includes(a);
-  const needsNote: WorkflowAction[] = ["returnToStaff", "returnToReviewer", "reopen"];
+  const needsNote: WorkflowAction[] = ["returnToStaff", "returnToReviewer", "reopen", ...(d.viewerIsEmployee ? [] : (["withdrawAny"] as WorkflowAction[]))];
   const showReviewer = !d.ratingsHidden && d.status !== "SelfAssessment";
   const showFinal = !d.ratingsHidden && (d.status === "HODReview" || d.status === "Finalised" || d.status === "SentToHR");
 
@@ -518,7 +518,7 @@ export default function AppraisalForm({ id }: { id: string }) {
       {!editing && d.status !== "Finalised" && d.status !== "SentToHR" && (
         <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
           {d.status === "SelfAssessment" ? `Waiting for ${d.staff.name} to submit the self-assessment.`
-            : d.status === "SuperiorReview" ? `Waiting for ${d.reviewer.name} to review and record the 1:1.${has("withdraw") ? " You can still withdraw your submission to make changes, until they start." : ""}`
+            : d.status === "SuperiorReview" ? `Waiting for ${d.reviewer.name} to review and record the 1:1.${has("withdraw") || (has("withdrawAny") && d.viewerIsEmployee) ? " You can still withdraw your submission to make changes, until they start." : ""}`
             : `Waiting for ${d.finalApprover.name} to set the final score.`}
         </div>
       )}
@@ -709,6 +709,14 @@ export default function AppraisalForm({ id }: { id: string }) {
               {has("submitSelf") && <button onClick={() => run("submitSelf")} disabled={busy} className={primary}>Submit to my superior</button>}
               {has("submitReview") && <button onClick={() => run("submitReview")} disabled={busy} className={primary}>{reviewerIsApprover ? "Submit review and finalise" : "Submit review to HOD"}</button>}
               {has("finalise") && <button onClick={() => run("finalise")} disabled={busy} className={primary}>Finalise</button>}
+              {has("withdrawAny") && d.viewerIsEmployee && (
+                <button
+                  onClick={() => { if (window.confirm("Take your submission back so you can change it? You will need to submit it again.")) run("withdrawAny"); }}
+                  disabled={busy} className={btn}
+                >
+                  Withdraw my submission
+                </button>
+              )}
               {has("withdraw") && (
                 <button
                   onClick={() => { if (window.confirm("Take your submission back so you can change it? You will need to submit it again.")) run("withdraw"); }}
@@ -719,7 +727,7 @@ export default function AppraisalForm({ id }: { id: string }) {
               )}
               {needsNote.filter(has).map((a) => (
                 <button key={a} onClick={() => setNoteFor(a)} disabled={busy} className={btn}>
-                  {a === "returnToStaff" ? "Return to staff" : a === "returnToReviewer" ? "Return to superior" : "Reopen"}
+                  {a === "returnToStaff" ? "Return to staff" : a === "returnToReviewer" ? "Return to superior" : a === "withdrawAny" ? "Withdraw submission" : "Reopen"}
                 </button>
               ))}
               {editing && missing.length > 0 && (

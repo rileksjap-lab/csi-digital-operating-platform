@@ -147,7 +147,7 @@ export default function KpiAppraisalsPage() {
       ) : (
         <>
           {mine.length > 0 && <div className="space-y-2"><h2 className="text-sm font-semibold text-gray-700">My appraisal</h2>{table(mine)}</div>}
-          {others.length > 0 && <div className="space-y-2"><h2 className="text-sm font-semibold text-gray-700">{isHod || me?.kpiRole === "SVP" ? "Team" : "People I review"}</h2>{table(others)}</div>}
+          {others.length > 0 && <div className="space-y-2"><h2 className="text-sm font-semibold text-gray-700">{isHod || me?.kpiRole === "SVP" || me?.kpiRole === "SolutionManager" ? "Team" : "People I review"}</h2>{table(others)}</div>}
         </>
       )}
     </div>

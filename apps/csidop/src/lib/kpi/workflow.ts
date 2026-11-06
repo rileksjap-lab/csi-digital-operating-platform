@@ -14,7 +14,7 @@ import { KRA_RATING_MAX, NO_EVIDENCE_RATING_CAP } from "@/lib/kpi/scoring";
 
 export type AppraisalStatus = "SelfAssessment" | "SuperiorReview" | "HODReview" | "Finalised" | "SentToHR";
 export type WorkflowAction =
-  | "submitSelf" | "withdraw" | "returnToStaff" | "submitReview" | "returnToReviewer" | "finalise" | "reopen" | "sendToHR";
+  | "submitSelf" | "withdraw" | "withdrawAny" | "returnToStaff" | "submitReview" | "returnToReviewer" | "finalise" | "reopen" | "sendToHR";
 export type Capacity = "Employee" | "Reviewer" | "FinalApprover";
 export type Stage = "self" | "reviewer" | "final";
 
@@ -48,12 +48,16 @@ export function capacities(ctx: WorkflowContext, actor: Actor): Set<Capacity> {
   return set;
 }
 
+/** The HOD and Solution Managers act department-wide. */
+export const isManager = (actor: Actor) => actor.role === "HOD" || actor.role === "SolutionManager";
+
 const reviewerIsApprover = (ctx: WorkflowContext) => ctx.reviewerId === ctx.finalApproverId;
 
 interface Transition {
   from: AppraisalStatus;
-  /** "HrSender" = the HOD or the SVP (the HOD sends everyone, their own appraisal included). */
-  by: Capacity | "HrSender";
+  /** "HrSender" = the HOD or the SVP (the HOD sends everyone, their own appraisal included).
+   *  "Manager" = the HOD or a Solution Manager, for any appraisal in their department. */
+  by: Capacity | "HrSender" | "Manager";
   to: (ctx: WorkflowContext) => AppraisalStatus;
   noteRequired: boolean;
   /** The stage whose ratings must be complete before this step. */
@@ -65,6 +69,10 @@ const TRANSITIONS: Record<WorkflowAction, Transition> = {
   // The employee takes the submission back. The repository only allows it while the
   // superior has not started (see reviewerHasStarted), so nobody loses work.
   withdraw: { from: "SuperiorReview", by: "Employee", to: () => "SelfAssessment", noteRequired: false },
+  // The HOD and Solution Managers can take any submission back, their own included, even after
+  // the superior has started (the superior's ratings are kept). A reason is required when it is
+  // someone else's; the repository enforces that.
+  withdrawAny: { from: "SuperiorReview", by: "Manager", to: () => "SelfAssessment", noteRequired: false },
   returnToStaff: { from: "SuperiorReview", by: "Reviewer", to: () => "SelfAssessment", noteRequired: true },
   submitReview: {
     from: "SuperiorReview", by: "Reviewer", needs: "reviewer", noteRequired: false,
@@ -92,13 +100,17 @@ export function checkTransition(action: WorkflowAction, ctx: WorkflowContext, ac
   const allowed =
     t.by === "HrSender"
       ? actor.role === "HOD" || actor.role === "SVP"
-      : caps.has(t.by);
+      : t.by === "Manager"
+        ? isManager(actor)
+        : caps.has(t.by);
   if (!allowed) return { ok: false, reason: "You are not allowed to do this step on this appraisal" };
   return { ok: true, to: t.to(ctx), noteRequired: t.noteRequired, needs: t.needs };
 }
 
 export function allowedActions(ctx: WorkflowContext, actor: Actor): WorkflowAction[] {
-  return (Object.keys(TRANSITIONS) as WorkflowAction[]).filter((a) => checkTransition(a, ctx, actor).ok);
+  const all = (Object.keys(TRANSITIONS) as WorkflowAction[]).filter((a) => checkTransition(a, ctx, actor).ok);
+  // A manager who is also the employee gets the manager version only, not two withdraw buttons.
+  return all.includes("withdrawAny") ? all.filter((a) => a !== "withdraw") : all;
 }
 
 /** Which parts of the form this person may change right now. */
@@ -133,13 +145,13 @@ export function signOffRights(ctx: WorkflowContext, actor: Actor) {
 }
 
 /**
- * Anyone in the chain may open the appraisal. The HOD of the department and
- * the SVP can open every appraisal in their scope (the repository decides
- * `inScope`: same department for the HOD, any for the SVP).
+ * Anyone in the chain may open the appraisal. The HOD and Solution Managers of the
+ * department and the SVP can open every appraisal in their scope (the repository
+ * decides `inScope`: same department for the HOD and Solution Managers, any for the SVP).
  */
 export function canView(ctx: WorkflowContext, actor: Actor, inScope: boolean): boolean {
   if (capacities(ctx, actor).size > 0) return true;
-  return inScope && (actor.role === "HOD" || actor.role === "SVP");
+  return inScope && (isManager(actor) || actor.role === "SVP");
 }
 
 /**
