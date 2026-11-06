@@ -30,7 +30,7 @@ export const oneOnOneSchema = z.object({
 });
 
 export const transitionSchema = z.object({
-  action: z.enum(["submitSelf", "withdraw", "returnToStaff", "submitReview", "returnToReviewer", "finalise", "reopen", "sendToHR"]),
+  action: z.enum(["submitSelf", "withdraw", "withdrawAny", "returnToStaff", "submitReview", "returnToReviewer", "finalise", "reopen", "sendToHR"]),
   note: text(2000).nullable().optional(),
 });
 
