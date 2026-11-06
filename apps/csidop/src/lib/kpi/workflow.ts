@@ -5,6 +5,7 @@
 //   SelfAssessment ──submitSelf──▶ SuperiorReview ──submitReview──▶ HODReview ──finalise──▶ Finalised ──sendToHR──▶ SentToHR
 //        ▲                              │  ▲                            │                      │
 //        └────────returnToStaff─────────┘  └──────returnToReviewer──────┘◀──────reopen────────┘
+//        └─────withdraw (employee, only before the superior has started)─┘
 //
 // When the reviewer is also the final approver (the SVP for the HOD, or anyone
 // who reports straight to the HOD), the HODReview step is skipped.
@@ -13,7 +14,7 @@ import { KRA_RATING_MAX, NO_EVIDENCE_RATING_CAP } from "@/lib/kpi/scoring";
 
 export type AppraisalStatus = "SelfAssessment" | "SuperiorReview" | "HODReview" | "Finalised" | "SentToHR";
 export type WorkflowAction =
-  | "submitSelf" | "returnToStaff" | "submitReview" | "returnToReviewer" | "finalise" | "reopen" | "sendToHR";
+  | "submitSelf" | "withdraw" | "returnToStaff" | "submitReview" | "returnToReviewer" | "finalise" | "reopen" | "sendToHR";
 export type Capacity = "Employee" | "Reviewer" | "FinalApprover";
 export type Stage = "self" | "reviewer" | "final";
 
@@ -61,6 +62,9 @@ interface Transition {
 
 const TRANSITIONS: Record<WorkflowAction, Transition> = {
   submitSelf: { from: "SelfAssessment", by: "Employee", to: () => "SuperiorReview", noteRequired: false, needs: "self" },
+  // The employee takes the submission back. The repository only allows it while the
+  // superior has not started (see reviewerHasStarted), so nobody loses work.
+  withdraw: { from: "SuperiorReview", by: "Employee", to: () => "SelfAssessment", noteRequired: false },
   returnToStaff: { from: "SuperiorReview", by: "Reviewer", to: () => "SelfAssessment", noteRequired: true },
   submitReview: {
     from: "SuperiorReview", by: "Reviewer", needs: "reviewer", noteRequired: false,
@@ -166,6 +170,11 @@ export interface ScoreRow {
   selfRating: number | null; selfComment: string | null; selfEvidence: string | null;
   reviewerRating: number | null; reviewerComment: string | null; reviewerEvidence: string | null;
   finalRating: number | null; finalComment: string | null;
+}
+
+/** The superior has begun if they saved any rating, remark or evidence, or recorded the 1:1. */
+export function reviewerHasStarted(rows: ScoreRow[], hasOneOnOne: boolean): boolean {
+  return hasOneOnOne || rows.some((r) => r.reviewerRating !== null || filled(r.reviewerComment) || filled(r.reviewerEvidence));
 }
 
 const filled = (s: string | null | undefined) => !!s && s.trim().length > 0;

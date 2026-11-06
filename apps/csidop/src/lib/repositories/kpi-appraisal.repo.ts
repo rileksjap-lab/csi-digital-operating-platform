@@ -7,7 +7,7 @@ import {
   type CertConfig, type ComponentMax, type ScoredEntry,
 } from "@/lib/kpi/scoring";
 import {
-  allowedActions, canView, checkTransition, editable, hidesOtherRatings, ratingAt, signOffRights, stageForStatus, stageProblems,
+  allowedActions, canView, checkTransition, editable, hidesOtherRatings, ratingAt, reviewerHasStarted, signOffRights, stageForStatus, stageProblems,
   type Actor, type AppraisalStatus, type ItemMeta, type LineMeta, type ScoreRow, type Stage, type WorkflowAction, type WorkflowContext,
 } from "@/lib/kpi/workflow";
 
@@ -294,7 +294,9 @@ async function buildDetail(a: AppraisalRow, actor: Actor) {
     svpDept: hide ? { signedAt: null, signedBy: null } : { signedAt: a.svpDeptSignedAt, signedBy: a.svpDeptSignedByName },
     signOffRights: signOffRights(ctx, actor),
     totals, snapshot: hide ? null : { total: a.totalPoints, outcome: a.outcome },
-    problems, editable: editable(ctx, actor), actions: allowedActions(ctx, actor), ratingsHidden: hide,
+    problems, editable: editable(ctx, actor), ratingsHidden: hide,
+    // Withdrawing is only offered while the superior has not started on it.
+    actions: allowedActions(ctx, actor).filter((x) => x !== "withdraw" || !reviewerHasStarted(scoreRes.rows, !!oneRes.rows[0])),
   };
 }
 
@@ -453,6 +455,13 @@ export async function transition(
       const problems = stageProblems(check.needs, meta.lines, meta.items, rows);
       if (problems.length > 0) { await client.query("ROLLBACK"); return fail(409, "The form is not complete yet", problems); }
     }
+    if (action === "withdraw") {
+      const one = await client.query(`SELECT 1 FROM kpi_one_on_one WHERE appraisalid = $1`, [id]);
+      if (reviewerHasStarted(rows, one.rows.length > 0)) {
+        await client.query("ROLLBACK");
+        return fail(409, "Your superior has already started the review, so you can no longer withdraw. Ask them to return it to you.");
+      }
+    }
     if (action === "submitReview") {
       const one = await client.query(`SELECT 1 FROM kpi_one_on_one WHERE appraisalid = $1`, [id]);
       if (one.rows.length === 0) { await client.query("ROLLBACK"); return fail(409, "Record the 1:1 meeting before submitting the review"); }
@@ -476,6 +485,7 @@ export async function transition(
     const set = (frag: string, v?: unknown) => { if (v !== undefined) params.push(v); sets.push(frag.replace("?", `$${params.length}`)); };
     switch (action) {
       case "submitSelf": sets.push("selfsubmittedat = now()", "returnnote = NULL"); break;
+      case "withdraw": sets.push("selfsubmittedat = NULL", "returnnote = NULL"); break;
       case "returnToStaff": sets.push("selfsubmittedat = NULL"); set("returnnote = ?", reason); break;
       case "submitReview": sets.push("reviewsubmittedat = now()", "returnnote = NULL"); break;
       case "returnToReviewer": sets.push("reviewsubmittedat = NULL"); set("returnnote = ?", reason); break;
@@ -494,8 +504,8 @@ export async function transition(
     await insertAuditEntry(
       {
         entityName: "KPI_APPRAISAL", entityId: id,
-        action: action === "finalise" ? "Approve" : action === "returnToStaff" || action === "returnToReviewer" ? "Return" : "StatusChange",
-        fieldName: "Status", oldValue: a.status, newValue: check.to, reason, performedBy: session.staffId,
+        action: action === "finalise" ? "Approve" : action === "withdraw" || action === "returnToStaff" || action === "returnToReviewer" ? "Return" : "StatusChange",
+        fieldName: "Status", oldValue: a.status, newValue: check.to, reason: action === "withdraw" ? "Withdrawn by the employee" : reason, performedBy: session.staffId,
       },
       client
     );

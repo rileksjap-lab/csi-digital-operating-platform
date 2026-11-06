@@ -518,7 +518,7 @@ export default function AppraisalForm({ id }: { id: string }) {
       {!editing && d.status !== "Finalised" && d.status !== "SentToHR" && (
         <div className="rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
           {d.status === "SelfAssessment" ? `Waiting for ${d.staff.name} to submit the self-assessment.`
-            : d.status === "SuperiorReview" ? `Waiting for ${d.reviewer.name} to review and record the 1:1.`
+            : d.status === "SuperiorReview" ? `Waiting for ${d.reviewer.name} to review and record the 1:1.${has("withdraw") ? " You can still withdraw your submission to make changes, until they start." : ""}`
             : `Waiting for ${d.finalApprover.name} to set the final score.`}
         </div>
       )}
@@ -709,6 +709,14 @@ export default function AppraisalForm({ id }: { id: string }) {
               {has("submitSelf") && <button onClick={() => run("submitSelf")} disabled={busy} className={primary}>Submit to my superior</button>}
               {has("submitReview") && <button onClick={() => run("submitReview")} disabled={busy} className={primary}>{reviewerIsApprover ? "Submit review and finalise" : "Submit review to HOD"}</button>}
               {has("finalise") && <button onClick={() => run("finalise")} disabled={busy} className={primary}>Finalise</button>}
+              {has("withdraw") && (
+                <button
+                  onClick={() => { if (window.confirm("Take your submission back so you can change it? You will need to submit it again.")) run("withdraw"); }}
+                  disabled={busy} className={btn}
+                >
+                  Withdraw my submission
+                </button>
+              )}
               {needsNote.filter(has).map((a) => (
                 <button key={a} onClick={() => setNoteFor(a)} disabled={busy} className={btn}>
                   {a === "returnToStaff" ? "Return to staff" : a === "returnToReviewer" ? "Return to superior" : "Reopen"}
