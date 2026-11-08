@@ -14,7 +14,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!z.string().uuid().safeParse(id).success) return badRequest("Invalid appraisal id");
     const parsed = scoresSchema.safeParse(await request.json());
     if (!parsed.success) return zodError(parsed.error);
-    const result = await saveScores(id, session, parsed.data.scores);
+    const result = await saveScores(id, session, parsed.data.scores, parsed.data.stage);
     return result.ok ? ok(result.value) : respondFail(result);
   } catch (err) {
     if (err instanceof Response) return err;

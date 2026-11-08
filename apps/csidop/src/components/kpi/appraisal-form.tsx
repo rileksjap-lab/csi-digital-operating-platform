@@ -32,7 +32,7 @@ interface Detail {
   oneOnOne: { meetingDate: string; notes: string | null; agreedActions: string | null; employeeAckAt: string | null } | null;
   totals: { kra: number; value: number; bonus: number; total: number; outcome: string | null };
   snapshot: { total: number | null; outcome: string | null } | null;
-  editable: { self: boolean; reviewer: boolean; final: boolean; oneOnOne: boolean; acknowledge: boolean };
+  editable: { self: boolean; reviewer: boolean; final: boolean; manager: boolean; oneOnOne: boolean; acknowledge: boolean };
   actions: WorkflowAction[];
   ratingsHidden: boolean; viewerIsEmployee: boolean; acting: { forName: string; until: string | null } | null;
   recommendations: { hod?: string[]; svp?: string[] };
@@ -262,12 +262,18 @@ export default function AppraisalForm({ id }: { id: string }) {
   const [noteFor, setNoteFor] = useState<WorkflowAction | null>(null);
   const [note, setNote] = useState("");
   const [tab, setTab] = useState<TabKey>("A");
+  // The HOD / a Solution Manager can pick any column to edit, whatever the step. Null = only their own turn (if any).
+  const [mgrStage, setMgrStage] = useState<Stage | null>(null);
 
-  const stage = data ? stageOf(data) : null;
+  const natural = data ? stageOf(data) : null;
+  const stage = mgrStage ?? natural;
+
+  useEffect(() => {
+    if (data) setDrafts(initialDrafts(data, mgrStage ?? stageOf(data)));
+  }, [data, mgrStage]);
 
   useEffect(() => {
     if (!data) return;
-    setDrafts(initialDrafts(data, stageOf(data)));
     setCerts(data.certs);
     setMeeting({ meetingDate: data.oneOnOne?.meetingDate ?? "", notes: data.oneOnOne?.notes ?? "", agreedActions: data.oneOnOne?.agreedActions ?? "" });
     setRec({ hod: data.recommendations?.hod ?? [], svp: data.recommendations?.svp ?? [] });
@@ -276,12 +282,13 @@ export default function AppraisalForm({ id }: { id: string }) {
   }, [data]);
 
   const rows = useMemo(() => (data ? withDrafts(data, stage, drafts) : []), [data, stage, drafts]);
-  const certEditable = !!data && (data.editable.self || data.editable.reviewer || data.editable.final);
+  const certEditable = !!data && (data.editable.self || data.editable.reviewer || data.editable.final || (data.editable.manager && mgrStage !== null));
   const certResult = useMemo(
     () => (data?.certConfig ? certificateScore(certs, data.certConfig) : { totalPoints: 0, qualified: false, score: 0 }),
     [data, certs]
   );
-  const viewStage: Stage = !data ? "self" : data.ratingsHidden ? "self" : stage ?? (data.status === "SelfAssessment" ? "self" : data.status === "SuperiorReview" ? "reviewer" : "final");
+  // The scoreboard always follows the official step, even while a manager edits another column.
+  const viewStage: Stage = !data ? "self" : data.ratingsHidden ? "self" : natural ?? (data.status === "SelfAssessment" ? "self" : data.status === "SuperiorReview" ? "reviewer" : "final");
 
   const live = useMemo(() => {
     if (!data) return null;
@@ -310,7 +317,7 @@ export default function AppraisalForm({ id }: { id: string }) {
   // What is still missing, from the screen as it is now (not only what is saved).
   const missing: string[] = [];
   if (stage) missing.push(...stageProblems(stage, d.lines, d.items, rows));
-  if (stage === "reviewer" && !meeting.meetingDate) missing.push("Record the 1:1 meeting");
+  if (stage === "reviewer" && !meeting.meetingDate && natural === "reviewer") missing.push("Record the 1:1 meeting");
 
   const setDraft = (k: string, v: Draft) => { setDrafts((p) => ({ ...p, [k]: v })); setMessage(null); };
 
@@ -320,7 +327,7 @@ export default function AppraisalForm({ id }: { id: string }) {
       ...(k[0] === "L" ? { lineId: k.slice(2) } : { itemId: k.slice(2) }),
       rating: v.rating, comment: v.comment || null, evidence: stage === "final" ? null : v.evidence || null,
     }));
-    const r1 = await call("PUT", `/api/kpi/appraisals/${id}/scores`, { scores });
+    const r1 = await call("PUT", `/api/kpi/appraisals/${id}/scores`, { scores, ...(mgrStage ? { stage: mgrStage } : {}) });
     if (!r1.ok) { setMessage({ kind: "error", text: r1.message }); return false; }
     if (certEditable) {
       const r2 = await call("PUT", `/api/kpi/appraisals/${id}/certs`, { certs: certs.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), yearLabel: c.yearLabel, category: c.category })) });
@@ -353,6 +360,16 @@ export default function AppraisalForm({ id }: { id: string }) {
     const res = await call("PUT", `/api/kpi/appraisals/${id}/sign-off`, body);
     if (!res.ok) { setMessage({ kind: "error", text: res.message }); return false; }
     return true;
+  }
+
+  /** Move the manager to another column, saving what was typed in the current one first. */
+  async function switchStage(next: Stage | null) {
+    if (next === mgrStage) return;
+    setBusy(true); setMessage(null);
+    if (stage && !(await save())) { setBusy(false); return; }
+    await mutate();
+    setMgrStage(next);
+    setBusy(false);
   }
 
   async function saveDraft() {
@@ -530,6 +547,25 @@ export default function AppraisalForm({ id }: { id: string }) {
 
       <Scoreboard totals={live} partial={d.status !== "Finalised" && d.status !== "SentToHR"} showOutcome={!d.ratingsHidden} />
 
+      {d.editable.manager && (
+        <div className="rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">Edit this form as</span>
+            {([[null, natural ? "My step" : "View only"], ["self", "Employee (self)"], ["reviewer", "Superior"], ["final", "Final (HOD)"]] as [Stage | null, string][]).map(([k, label]) => (
+              <button
+                key={label} type="button" disabled={busy} onClick={() => switchStage(k)} aria-pressed={mgrStage === k}
+                className={`rounded border px-3 py-1 text-xs font-medium disabled:opacity-40 ${mgrStage === k ? "border-slate-700 bg-slate-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-slate-600">
+            As HOD or Solution Manager you can change any part of this form until it is sent to HR. Pick a column to edit it; every change is recorded in the audit log{d.status === "Finalised" ? ", and the score is recalculated" : ""}.
+          </p>
+        </div>
+      )}
+
       <div role="tablist" aria-label="Appraisal sections" className="flex flex-wrap gap-2">
         {tabs.map((x) => (
           <button
@@ -590,7 +626,7 @@ export default function AppraisalForm({ id }: { id: string }) {
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-gray-800">D. 1:1 meeting with the immediate superior</h2>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
-          {d.editable.oneOnOne ? (
+          {d.editable.oneOnOne && editing ? (
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-xs text-gray-500">Date of meeting
                 <input type="date" value={meeting.meetingDate} onChange={(e) => setMeeting((m) => ({ ...m, meetingDate: e.target.value }))} className={`${field} mt-1`} />
@@ -710,7 +746,7 @@ export default function AppraisalForm({ id }: { id: string }) {
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              {editing && <button onClick={saveDraft} disabled={busy} className={btn}>Save draft</button>}
+              {editing && <button onClick={saveDraft} disabled={busy} className={btn}>{mgrStage ? "Save changes" : "Save draft"}</button>}
               {has("submitSelf") && <button onClick={() => run("submitSelf")} disabled={busy} className={primary}>Submit to my superior</button>}
               {has("submitReview") && <button onClick={() => run("submitReview")} disabled={busy} className={primary}>{reviewerIsApprover ? "Submit review and finalise" : "Submit review to HOD"}</button>}
               {has("finalise") && <button onClick={() => run("finalise")} disabled={busy} className={primary}>Finalise</button>}
@@ -736,7 +772,7 @@ export default function AppraisalForm({ id }: { id: string }) {
                 </button>
               ))}
               {editing && missing.length > 0 && (
-                <span className="text-xs text-amber-700">{missing.length} item{missing.length === 1 ? "" : "s"} to complete before submitting: {missing[0]}{missing.length > 1 ? "…" : ""}</span>
+                <span className="text-xs text-amber-700">{missing.length} item{missing.length === 1 ? "" : "s"} to complete {natural ? "before submitting" : "in this column"}: {missing[0]}{missing.length > 1 ? "…" : ""}</span>
               )}
               {(d.status === "Finalised" || d.status === "SentToHR") && (
                 <a href={`/api/kpi/appraisals/${d.id}/pdf`} className={btn}>Download PDF</a>

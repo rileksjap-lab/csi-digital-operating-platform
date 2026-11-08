@@ -76,7 +76,7 @@ async function loadAppraisal(db: Db, id: string, lock = false): Promise<Appraisa
 }
 
 const ctxOf = (a: AppraisalRow): WorkflowContext => ({
-  status: a.status, staffId: a.staffId, reviewerId: a.reviewerId, finalApproverId: a.finalApproverId,
+  status: a.status, staffId: a.staffId, reviewerId: a.reviewerId, finalApproverId: a.finalApproverId, staffRole: a.staffRoleCode,
 });
 
 function inScope(a: AppraisalRow, s: AuthSession): boolean {
@@ -331,6 +331,25 @@ export async function getAppraisalForReport(id: string): Promise<AppraisalDetail
   return a ? buildDetail(a, REPORT_ACTOR) : null;
 }
 
+/** Audit text for an edit made by the HOD or a Solution Manager on someone else's turn. */
+function managerReason(a: AppraisalRow, session: AuthSession): string {
+  const delegated = actsForApprover(ctxOf(a), actorOf(session, a)) && session.staffId !== a.finalApproverId;
+  return delegated ? `Edited by ${session.displayName || "manager"}, acting for ${a.finalApproverName}` : `Edited by ${session.role === "HOD" ? "the HOD" : "a Solution Manager"} (${session.displayName || "manager"})`;
+}
+
+/** A finalised appraisal keeps its points on the row; when the final scores or certificates change, recalculate them. */
+async function refreshSnapshotIfFinalised(client: Db, a: AppraisalRow, meta: Meta): Promise<void> {
+  if (a.status !== "Finalised") return;
+  const rows = (await client.query<ScoreRow>(SCORE_SQL, [a.id])).rows;
+  const certs = await loadCerts(client, a.id);
+  const certScore = meta.certConfig ? certificateScore(certs, meta.certConfig).score : 0;
+  const snap = totalsAt(meta, rows, certScore, "final");
+  await client.query(
+    `UPDATE kpi_appraisal SET krapoints = $2, valuepoints = $3, bonuspoints = $4, totalpoints = $5, outcome = $6, updatedat = now() WHERE id = $1`,
+    [a.id, snap.kra, snap.value, snap.bonus, snap.total, snap.outcome]
+  );
+}
+
 // ── Filling in the form ─────────────────────────────────────────────────────
 
 export interface ScoreInput {
@@ -338,15 +357,18 @@ export interface ScoreInput {
   rating: number | null; comment?: string | null; evidence?: string | null;
 }
 
-export async function saveScores(id: string, session: AuthSession, inputs: ScoreInput[]): Promise<Result<{ saved: number }>> {
+export async function saveScores(id: string, session: AuthSession, inputs: ScoreInput[], wanted?: Stage): Promise<Result<{ saved: number }>> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const a = await loadAppraisal(client, id, true);
     if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
     const can = editable(ctxOf(a), actorOf(session, a));
-    const stage: Stage | null = can.self ? "self" : can.reviewer ? "reviewer" : can.final ? "final" : null;
-    if (!stage) { await client.query("ROLLBACK"); return fail(403, "You cannot change ratings on this appraisal right now"); }
+    const natural: Stage | null = can.self ? "self" : can.reviewer ? "reviewer" : can.final ? "final" : null;
+    const stage: Stage | null = wanted ?? natural;
+    // Your own turn is always allowed; the HOD and Solution Managers may also edit any other column until it is sent to HR.
+    const mine = !!stage && ((stage === "self" && can.self) || (stage === "reviewer" && can.reviewer) || (stage === "final" && can.final));
+    if (!stage || !(mine || can.manager)) { await client.query("ROLLBACK"); return fail(403, "You cannot change ratings on this appraisal right now"); }
 
     const meta = await loadMeta(client, a);
     const lineIds = new Set(meta.lines.map((l) => l.id));
@@ -384,6 +406,18 @@ export async function saveScores(id: string, session: AuthSession, inputs: Score
       );
     }
     await client.query(`UPDATE kpi_appraisal SET updatedat = now() WHERE id = $1`, [id]);
+    if (!mine) {
+      await insertAuditEntry(
+        { entityName: "KPI_APPRAISAL", entityId: id, action: "Update", fieldName: `Ratings (${stage})`, newValue: `${inputs.length} line(s) edited`, reason: managerReason(a, session), performedBy: session.staffId },
+        client
+      );
+    }
+    if (a.status === "Finalised" && stage === "final") {
+      const rows = (await client.query<ScoreRow>(SCORE_SQL, [id])).rows;
+      const problems = stageProblems("final", meta.lines, meta.items, rows);
+      if (problems.length > 0) { await client.query("ROLLBACK"); return fail(409, "A finalised appraisal must keep a complete final score", problems); }
+    }
+    await refreshSnapshotIfFinalised(client, a, meta);
     await client.query("COMMIT");
     return done({ saved: inputs.length });
   } catch (err) {
@@ -401,7 +435,7 @@ export async function saveCerts(id: string, session: AuthSession, certs: { name:
     const a = await loadAppraisal(client, id, true);
     if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) { await client.query("ROLLBACK"); return fail(404, "Appraisal not found"); }
     const can = editable(ctxOf(a), actorOf(session, a));
-    if (!(can.self || can.reviewer || can.final)) { await client.query("ROLLBACK"); return fail(403, "You cannot change the certificate list right now"); }
+    if (!(can.self || can.reviewer || can.final || can.manager)) { await client.query("ROLLBACK"); return fail(403, "You cannot change the certificate list right now"); }
 
     const meta = await loadMeta(client, a);
     const known = new Set((meta.certConfig?.categories ?? []).map((c) => c.code));
@@ -412,6 +446,13 @@ export async function saveCerts(id: string, session: AuthSession, certs: { name:
       await client.query(`INSERT INTO kpi_appraisal_cert (appraisalid, name, yearlabel, category) VALUES ($1, $2, $3, $4)`,
         [id, c.name.trim(), c.yearLabel?.trim() || null, c.category]);
     }
+    if (can.manager && !(can.self || can.reviewer || can.final)) {
+      await insertAuditEntry(
+        { entityName: "KPI_APPRAISAL", entityId: id, action: "Update", fieldName: "Certificates", newValue: `${certs.length} certificate(s)`, reason: managerReason(a, session), performedBy: session.staffId },
+        client
+      );
+    }
+    await refreshSnapshotIfFinalised(client, a, meta);
     await client.query("COMMIT");
     return done({ saved: certs.length });
   } catch (err) {
@@ -428,6 +469,7 @@ export async function recordOneOnOne(
   const a = await loadAppraisal(poolDb, id);
   if (!a || !canView(ctxOf(a), actorOf(session, a), inScope(a, session))) return fail(404, "Appraisal not found");
   if (!editable(ctxOf(a), actorOf(session, a)).oneOnOne) return fail(403, "Only the immediate superior can record the 1:1, while reviewing");
+  const byManager = !(a.status === "SuperiorReview" && actorOf(session, a).staffId === a.reviewerId);
   await query(
     `INSERT INTO kpi_one_on_one (appraisalid, meetingdate, notes, agreedactions, recordedby)
      VALUES ($1, $2, $3, $4, $5)
@@ -435,6 +477,9 @@ export async function recordOneOnOne(
        agreedactions = EXCLUDED.agreedactions, recordedby = EXCLUDED.recordedby, recordedat = now()`,
     [id, input.meetingDate, input.notes?.trim() || null, input.agreedActions?.trim() || null, session.staffId]
   );
+  if (byManager) {
+    await insertAuditEntry({ entityName: "KPI_APPRAISAL", entityId: id, action: "Update", fieldName: "1:1 meeting", newValue: input.meetingDate, reason: managerReason(a, session), performedBy: session.staffId });
+  }
   return done({ recorded: true });
 }
 
