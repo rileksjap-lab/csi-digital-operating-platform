@@ -15,6 +15,8 @@ export const scoresSchema = z.object({
     )
     .min(1)
     .max(100),
+  /** Which column to save into. Only needed when the HOD / a Solution Manager edits a column that is not theirs by turn. */
+  stage: z.enum(["self", "reviewer", "final"]).optional(),
 });
 
 export const certsSchema = z.object({

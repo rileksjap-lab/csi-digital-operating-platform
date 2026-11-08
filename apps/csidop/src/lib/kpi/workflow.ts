@@ -23,6 +23,8 @@ export interface WorkflowContext {
   staffId: string;
   reviewerId: string;
   finalApproverId: string;
+  /** Role code of the person being appraised (the HOD's own appraisal is not for a Solution Manager to edit). */
+  staffRole?: string;
 }
 
 export interface Actor {
@@ -62,6 +64,16 @@ export function capacities(ctx: WorkflowContext, actor: Actor): Set<Capacity> {
 
 /** The HOD and Solution Managers act department-wide. */
 export const isManager = (actor: Actor) => actor.role === "HOD" || actor.role === "SolutionManager";
+
+/**
+ * The HOD and Solution Managers may change any part of any appraisal in their department
+ * until it is sent to HR, whatever step it is at. Not their own, and a Solution Manager
+ * leaves the HOD's appraisal alone.
+ */
+export function managerMayEdit(ctx: WorkflowContext, actor: Actor): boolean {
+  if (!isManager(actor) || actor.staffId === ctx.staffId || ctx.status === "SentToHR") return false;
+  return actor.role === "HOD" || ctx.staffRole !== "HOD";
+}
 
 const reviewerIsApprover = (ctx: WorkflowContext) => ctx.reviewerId === ctx.finalApproverId;
 
@@ -128,11 +140,14 @@ export function allowedActions(ctx: WorkflowContext, actor: Actor): WorkflowActi
 /** Which parts of the form this person may change right now. */
 export function editable(ctx: WorkflowContext, actor: Actor) {
   const caps = capacities(ctx, actor);
+  const manager = managerMayEdit(ctx, actor);
   return {
     self: ctx.status === "SelfAssessment" && caps.has("Employee"),
     reviewer: ctx.status === "SuperiorReview" && caps.has("Reviewer"),
     final: ctx.status === "HODReview" && caps.has("FinalApprover"),
-    oneOnOne: ctx.status === "SuperiorReview" && caps.has("Reviewer"),
+    /** HOD / Solution Manager override: may edit every column, the certificates and the 1:1 until sent to HR. */
+    manager,
+    oneOnOne: (ctx.status === "SuperiorReview" && caps.has("Reviewer")) || manager,
     /** The employee confirms the 1:1 took place once it has been recorded. */
     acknowledge:
       caps.has("Employee") && (ctx.status === "SuperiorReview" || ctx.status === "HODReview"),
@@ -148,10 +163,11 @@ export function signOffRights(ctx: WorkflowContext, actor: Actor) {
   const caps = capacities(ctx, actor);
   const others = actor.staffId !== ctx.staffId;
   const finalStep = ctx.status === "HODReview" || (ctx.status === "SuperiorReview" && reviewerIsApprover(ctx));
+  const manager = managerMayEdit(ctx, actor);
   return {
-    hodTicks: others && (actor.role === "HOD" || actsForApprover(ctx, actor)) && caps.has("FinalApprover") && finalStep,
+    hodTicks: others && (manager || ((actor.role === "HOD" || actsForApprover(ctx, actor)) && caps.has("FinalApprover") && finalStep)),
     svpTicks: others && actor.role === "SVP" && (finalStep || ctx.status === "Finalised"),
-    opsName: others && (actor.role === "HOD" || actor.role === "SVP" || actsForApprover(ctx, actor)) && (finalStep || ctx.status === "Finalised"),
+    opsName: others && (manager || ((actor.role === "HOD" || actor.role === "SVP" || actsForApprover(ctx, actor)) && (finalStep || ctx.status === "Finalised"))),
     svpSign: others && actor.role === "SVP" && ctx.status === "Finalised",
   };
 }
