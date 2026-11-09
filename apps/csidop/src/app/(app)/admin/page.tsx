@@ -92,6 +92,7 @@ const MODULES = [
   { code: "skills", label: "Skills" },
   { code: "reports", label: "Reports" },
   { code: "cmp", label: "Transformation Plan" },
+  { code: "leave", label: "Leave" },
   { code: "admin", label: "Admin" },
 ];
 
