@@ -9,7 +9,7 @@ interface CalendarEvent {
   id: string;
   title: string;
   date: string;
-  type: "wo_deadline" | "tender_closing" | "cert_expiry";
+  type: "wo_deadline" | "tender_closing" | "cert_expiry" | "leave";
   meta?: string;
 }
 
@@ -17,6 +17,7 @@ const EVENT_CONFIG = {
   wo_deadline: { label: "WO Deadline", color: "bg-red-500", dotColor: "bg-red-400", textColor: "text-red-700", bgColor: "bg-red-50", borderColor: "border-red-200" },
   tender_closing: { label: "Tender Closing", color: "bg-blue-500", dotColor: "bg-blue-400", textColor: "text-blue-700", bgColor: "bg-blue-50", borderColor: "border-blue-200" },
   cert_expiry: { label: "Cert Expiry", color: "bg-amber-500", dotColor: "bg-amber-400", textColor: "text-amber-700", bgColor: "bg-amber-50", borderColor: "border-amber-200" },
+  leave: { label: "On Leave", color: "bg-teal-500", dotColor: "bg-teal-400", textColor: "text-teal-700", bgColor: "bg-teal-50", borderColor: "border-teal-200" },
 } as const;
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -34,6 +35,7 @@ export default function CalendarPage() {
     wo_deadline: true,
     tender_closing: true,
     cert_expiry: true,
+    leave: true,
   });
 
   const { data: events } = useSWR<CalendarEvent[]>(
@@ -211,6 +213,7 @@ export default function CalendarPage() {
                   const href =
                     e.type === "wo_deadline" ? `/wo/${e.id}` :
                     e.type === "tender_closing" ? `/tenders/${e.id}` :
+                    e.type === "leave" ? `/leave?tab=team` :
                     `/skills`;
 
                   return (
