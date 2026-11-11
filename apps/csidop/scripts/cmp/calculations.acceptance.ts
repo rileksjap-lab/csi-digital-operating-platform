@@ -27,6 +27,12 @@ import {
   canApproveBaseline,
   rollupReadiness,
   classifySubsidiaryStage,
+  planQuarters,
+  quarterForDate,
+  quarterAxisPosition,
+  computeForecastScoreAt,
+  computeCurveValue,
+  YEAR3_GATE_PERIOD,
 } from "../../src/lib/cmp/calculations.ts";
 
 let failures = 0;
@@ -230,6 +236,94 @@ function check(id: string, scenario: string, expected: string, actual: unknown, 
     { viaFlattenedOverallWeight, viaNestedRollup },
     Math.abs(viaFlattenedOverallWeight - viaNestedRollup) < 1e-9,
   );
+}
+
+// ── S-Curve (04_DASHBOARD_SCURVE): quarterly axis, Forecast, curve sums ──
+
+// SC01: Y1Q1 = Q3 2026 ... Y3Q4 = Q2 2029 (the Year 3 gate) ... Y5Q4 = Q2 2031.
+{
+  const qs = planQuarters();
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const y1q1 = qs[0];
+  const gate = qs.find((q) => q.code === YEAR3_GATE_PERIOD)!;
+  const last = qs[qs.length - 1];
+  check(
+    "SC01",
+    "Quarterly axis Y1Q1..Y5Q4 with the Year 3 gate at Y3Q4",
+    "20 quarters; Y1Q1 = Q3 2026 (2026-07-01..2026-09-30); Y3Q4 = Q2 2029 ends 2029-06-30; Y5Q4 = Q2 2031 ends 2031-06-30",
+    { n: qs.length, y1q1: [y1q1.calendarLabel, ymd(y1q1.startDate), ymd(y1q1.endDate)], gate: [gate.code, gate.calendarLabel, ymd(gate.endDate)], last: [last.code, last.calendarLabel, ymd(last.endDate)] },
+    qs.length === 20 && y1q1.code === "Y1Q1" && y1q1.calendarLabel === "Q3 2026" && ymd(y1q1.startDate) === "2026-07-01" && ymd(y1q1.endDate) === "2026-09-30" &&
+      gate.code === "Y3Q4" && gate.calendarLabel === "Q2 2029" && ymd(gate.endDate) === "2029-06-30" &&
+      last.code === "Y5Q4" && last.calendarLabel === "Q2 2031" && ymd(last.endDate) === "2031-06-30" &&
+      qs.every((q, i) => q.code === `Y${Math.floor(i / 4) + 1}Q${(i % 4) + 1}`),
+  );
+}
+
+// SC02: which quarter a date falls in; outside the plan = no quarter.
+{
+  const inNov = quarterForDate(new Date(2026, 10, 11));
+  const before = quarterForDate(new Date(2026, 5, 30));
+  const after = quarterForDate(new Date(2031, 6, 1));
+  const lastDay = quarterForDate(new Date(2026, 11, 31, 23, 59));
+  check("SC02", "Date to quarter", "11 Nov 2026 = Y1Q2; 30 Jun 2026 and 1 Jul 2031 = none; 31 Dec 2026 = Y1Q2",
+    { inNov: inNov?.code, before: before?.code ?? null, after: after?.code ?? null, lastDay: lastDay?.code },
+    inNov?.code === "Y1Q2" && before === null && after === null && lastDay?.code === "Y1Q2");
+}
+
+// SC03: a quarter-end date sits exactly on its tick; the axis is clamped to 0..20.
+{
+  const q1End = quarterAxisPosition(new Date(2026, 8, 30));
+  const q2End = quarterAxisPosition(new Date(2026, 11, 31));
+  const planEnd = quarterAxisPosition(new Date(2031, 5, 30));
+  const early = quarterAxisPosition(new Date(2025, 0, 1));
+  const late = quarterAxisPosition(new Date(2040, 0, 1));
+  const mid = quarterAxisPosition(new Date(2026, 10, 11));
+  check("SC03", "Axis position", "Y1Q1 end = 1, Y1Q2 end = 2, Y5Q4 end = 20, clamped to [0,20], 11 Nov 2026 between 1 and 2",
+    { q1End, q2End, planEnd, early, late, mid },
+    q1End === 1 && q2End === 2 && planEnd === 20 && early === 0 && late === 20 && mid > 1 && mid < 2);
+}
+
+// SC04: Forecast with no forecast date = Baseline (falls back to target date).
+{
+  const start = new Date(2026, 6, 1), target = new Date(2027, 5, 30), asOf = new Date(2027, 0, 15);
+  const base = computePlannedScoreToday(start, target, asOf);
+  const noForecast = computeForecastScoreAt(start, target, null, asOf);
+  const undef = computeForecastScoreAt(start, target, undefined, asOf);
+  check("SC04", "Forecast falls back to target date", "same as baseline", { base, noForecast, undef }, noForecast === base && undef === base);
+}
+
+// SC05: a later forecast date lowers the Forecast; an earlier one raises it; Baseline never moves (TC06).
+{
+  const start = new Date(2026, 6, 1), target = new Date(2027, 5, 30), asOf = new Date(2027, 0, 15);
+  const base = computePlannedScoreToday(start, target, asOf);
+  const slipped = computeForecastScoreAt(start, target, new Date(2027, 8, 30), asOf);
+  const early = computeForecastScoreAt(start, target, new Date(2027, 2, 31), asOf);
+  const items = [{ overallWeight: 1, startDate: start, targetDate: target, forecastDate: new Date(2027, 8, 30) }];
+  const baselineWithForecastSet = computeCurveValue(items, "baseline", asOf);
+  check("SC05", "Forecast slip / pull-in, Baseline untouched",
+    "slipped < baseline < early; baseline curve identical with or without a forecast date",
+    { base, slipped, early, baselineWithForecastSet },
+    slipped < base && base < early && baselineWithForecastSet === base);
+}
+
+// SC06: curve value = sum(item score x overall weight); undated items add nothing; reconciles with the nested rollup.
+{
+  const asOf = new Date(2027, 0, 1);
+  const s = new Date(2026, 6, 1), t = new Date(2027, 5, 30), t2 = new Date(2026, 11, 31);
+  const w = (ws: number, it: number) => computeOverallWeight({ workstreamWeight: ws, initiativeWeight: 1, factorWeight: 1, itemWeight: it });
+  const items = [
+    { overallWeight: w(0.6, 0.5), startDate: s, targetDate: t, forecastDate: null },
+    { overallWeight: w(0.6, 0.5), startDate: s, targetDate: t2, forecastDate: null }, // fully planned by asOf
+    { overallWeight: w(0.4, 1), startDate: null, targetDate: null, forecastDate: null }, // undated
+  ];
+  const viaCurve = computeCurveValue(items, "baseline", asOf);
+  const p1 = computePlannedScoreToday(s, t, asOf);
+  const p2 = computePlannedScoreToday(s, t2, asOf);
+  const nestedWs1 = rollupReadiness([{ value: p1, weight: 0.5 }, { value: p2, weight: 0.5 }]) * 0.6;
+  const forecastCurve = computeCurveValue(items, "forecast", asOf);
+  check("SC06", "Curve value reconciles with the nested rollup; undated items add 0; no forecasts = Forecast equals Baseline",
+    "identical", { viaCurve, nestedWs1, forecastCurve },
+    Math.abs(viaCurve - nestedWs1) < 1e-12 && forecastCurve === viaCurve);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);

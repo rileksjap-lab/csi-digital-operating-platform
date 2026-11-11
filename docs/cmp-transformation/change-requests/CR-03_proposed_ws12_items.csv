@@ -1,0 +1,17 @@
+﻿Workstream,Factor code,Factor,Factor weight,Item,Scoring method,Critical gate,Item weight,Overall weight,Start,Target
+WS12 Sustain & Expand (Year 4-5),FAC-12-REC,Recurring revenue,0.2,Recurring-revenue share of total revenue reaches target,KPI,No,0.5,0.01,2029-07-01,2031-06-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-REC,Recurring revenue,0.2,Managed-service / subscription run-rate in place,Stage,No,0.5,0.01,2029-07-01,2030-06-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-REN,Renewals and retention,0.15,Contract renewal rate meets target,KPI,No,0.5,0.0075,2029-10-01,2031-06-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-REN,Renewals and retention,0.15,Renewal and retention review cycle operating,Stage,No,0.5,0.0075,2029-07-01,2030-03-31
+WS12 Sustain & Expand (Year 4-5),FAC-12-MAR,Margin,0.15,Gross margin meets target in each subsidiary,KPI,No,0.5,0.0075,2029-10-01,2031-06-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-MAR,Margin,0.15,Cost-to-serve review and pricing refresh completed,Stage,No,0.5,0.0075,2029-07-01,2030-06-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-XSL,Cross-sell,0.1,Cross-sell playbook live across subsidiaries,Stage,No,0.5,0.005,2029-07-01,2030-03-31
+WS12 Sustain & Expand (Year 4-5),FAC-12-XSL,Cross-sell,0.1,Cross-sell revenue meets target,KPI,No,0.5,0.005,2030-01-01,2031-06-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-MKT,Market expansion,0.15,New market / segment entry decision approved,Approval,Yes,0.5,0.0075,2029-10-01,2030-09-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-MKT,Market expansion,0.15,New-market pipeline meets target,KPI,No,0.5,0.0075,2030-07-01,2031-06-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-IPR,Intellectual property,0.1,IP inventory and protection plan approved,Approval,No,0.5,0.005,2029-07-01,2030-03-31
+WS12 Sustain & Expand (Year 4-5),FAC-12-IPR,Intellectual property,0.1,Reusable IP productised and registered,Stage,No,0.5,0.005,2030-01-01,2031-03-31
+WS12 Sustain & Expand (Year 4-5),FAC-12-SUB,Subsidiary decisions,0.1,"Year 4 review of each subsidiary: continue, scale or merge",Approval,Yes,0.5,0.005,2030-04-01,2030-09-30
+WS12 Sustain & Expand (Year 4-5),FAC-12-SUB,Subsidiary decisions,0.1,Decision on any further subsidiary approved,Approval,Yes,0.5,0.005,2030-07-01,2031-03-31
+WS12 Sustain & Expand (Year 4-5),FAC-12-NXT,Next growth plan,0.05,Next growth plan drafted,Stage,No,0.5,0.0025,2030-07-01,2031-03-31
+WS12 Sustain & Expand (Year 4-5),FAC-12-NXT,Next growth plan,0.05,Next growth plan approved,Approval,Yes,0.5,0.0025,2031-01-01,2031-06-30

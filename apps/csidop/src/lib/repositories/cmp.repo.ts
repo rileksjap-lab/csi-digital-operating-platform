@@ -9,7 +9,14 @@ import {
   computePlannedScoreToday,
   computeVariance,
   computeRAG,
+  computeOverallWeight,
+  computeCurveValue,
+  planQuarters,
+  quarterForDate,
+  quarterAxisPosition,
+  YEAR3_GATE_PERIOD,
   rollupReadiness,
+  type CurveItem,
   type RAG,
   type EvidenceStatus,
 } from "@/lib/cmp/calculations";
@@ -998,31 +1005,58 @@ export async function getPlanDashboard(planId: string): Promise<PlanDashboard> {
   };
 }
 
-// ─── S-Curve (Baseline vs Actual) — master deck slide 37 ──────────────────
-// "Baseline plan, actual evidence and current forecast must be separated"
-// (slide 37). No cmp_snapshots history exists yet (schema only, migration
-// 035 -- no repo/route layer), so there is no real historical Actual data
-// to plot; a fabricated multi-point Actual line would violate "AI must
-// not invent readiness/progress." What IS real and computable without any
-// snapshot history: the full Baseline curve, because computePlannedScoreToday
-// already takes an arbitrary `asOf` date -- sampling it across the whole
-// plan's date range produces a true deterministic baseline S-curve
-// straight from real item weights/dates. Actual is reported honestly as a
-// single point at today's real overall readiness, not a fabricated line.
+// ─── S-Curve: Baseline vs Forecast vs Actual, by quarter — master deck slide 37 ──
+// "Baseline plan, actual evidence and current forecast must be separated."
+//   Baseline = each item's straight line from its start date to its baseline
+//              target date, weighted up to the whole plan (calculations.ts).
+//   Forecast = the same calculation, ending on each item's forecast date
+//              (falls back to the target date when none is entered).
+//   Actual   = real history only: one point per cmp_snapshots row (taken by
+//              the HOD, or by the quarter-end job) plus today's live value.
+//              Nothing between snapshots is drawn or invented.
+// X-axis is the 20 plan quarters Y1Q1 (Q3 2026) .. Y5Q4 (Q2 2031), with the
+// Year 3 gate at the end of Y3Q4 (Q2 2029). Every number comes from
+// calculations.ts; this function only loads rows and assembles points.
 
-export interface SCurvePoint {
+export interface SCurveQuarter {
+  code: string;
+  label: string;
+  calendarLabel: string;
+  /** Axis position of the quarter end (1..20) */
+  x: number;
+  endDate: string; // YYYY-MM-DD
+  baseline: number;
+  forecast: number;
+}
+
+export interface SCurveActualPoint {
   date: string; // YYYY-MM-DD
-  plannedReadiness: number;
+  x: number;
+  readiness: number;
+  /** Snapshot = stored history; Today = the live value now */
+  source: "Snapshot" | "Today";
+  periodCode: string | null;
+  captureSource: "Manual" | "QuarterEnd" | null;
 }
 
 export interface PlanSCurve {
-  planned: SCurvePoint[];
-  actualToday: { date: string; readiness: number } | null;
+  quarters: SCurveQuarter[];
+  actual: SCurveActualPoint[];
+  today: { date: string; x: number; baseline: number; forecast: number; readiness: number } | null;
+  gate: { periodCode: string; label: string; calendarLabel: string; x: number; date: string; baseline: number; forecast: number } | null;
+  /** Every stored snapshot, oldest first (a snapshot taken today is plotted as the live "Today" point, but is still listed here) */
+  snapshots: { periodCode: string; date: string; captureSource: "Manual" | "QuarterEnd" }[];
+  /** The plan quarter that contains today, or null outside Y1Q1..Y5Q4 */
+  currentPeriodCode: string | null;
 }
 
-const SCURVE_SAMPLE_COUNT = 24; // ~monthly across a 2-year span, coarser for longer spans
+/** Local-calendar YYYY-MM-DD (never toISOString(), which shifts the day in UTC+8). */
+function localDateString(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
-export async function getPlanSCurve(planId: string): Promise<PlanSCurve> {
+async function loadCurveItems(planId: string): Promise<CurveItem[]> {
   const rows = (
     await query<{
       workstreamWeight: number;
@@ -1031,45 +1065,212 @@ export async function getPlanSCurve(planId: string): Promise<PlanSCurve> {
       itemWeight: number;
       startDate: string | null;
       targetDate: string | null;
+      forecastDate: string | null;
     }>(
       `SELECT w.weight::float8 AS "workstreamWeight", i.weight::float8 AS "initiativeWeight",
               f.weight::float8 AS "factorWeight", it.weight::float8 AS "itemWeight",
-              it.start_date AS "startDate", it.target_date AS "targetDate"
+              it.start_date AS "startDate", it.target_date AS "targetDate",
+              u.forecast_date AS "forecastDate"
        FROM cmp_workstreams w
        JOIN cmp_initiatives i ON i.workstream_id = w.id
        JOIN cmp_factors f ON f.initiative_id = i.id
        JOIN cmp_items it ON it.factor_id = f.id
+       LEFT JOIN cmp_item_updates u ON u.item_id = it.id
        WHERE w.plan_id = $1`,
       [planId]
     )
   ).rows;
 
-  const dated = rows.filter((r) => r.startDate && r.targetDate);
-  if (dated.length === 0) return { planned: [], actualToday: null };
+  return rows.map((r) => ({
+    overallWeight: computeOverallWeight({
+      workstreamWeight: r.workstreamWeight,
+      initiativeWeight: r.initiativeWeight,
+      factorWeight: r.factorWeight,
+      itemWeight: r.itemWeight,
+    }),
+    startDate: r.startDate ? new Date(r.startDate) : null,
+    targetDate: r.targetDate ? new Date(r.targetDate) : null,
+    forecastDate: r.forecastDate ? new Date(r.forecastDate) : null,
+  }));
+}
 
-  const minStart = Math.min(...dated.map((r) => new Date(r.startDate!).getTime()));
-  const maxTarget = Math.max(...dated.map((r) => new Date(r.targetDate!).getTime()));
+export async function getPlanSCurve(planId: string): Promise<PlanSCurve> {
+  const [items, snapshotRows, dashboard] = await Promise.all([
+    loadCurveItems(planId),
+    query<{ periodCode: string; snapshotDate: string; actualProgress: number | null; captureSource: "Manual" | "QuarterEnd" }>(
+      `SELECT period_code AS "periodCode", snapshot_date AS "snapshotDate",
+              actual_progress::float8 AS "actualProgress", capture_source AS "captureSource"
+       FROM cmp_snapshots
+       WHERE plan_id = $1 AND workstream_id IS NULL
+       ORDER BY snapshot_date`,
+      [planId]
+    ),
+    getPlanDashboard(planId),
+  ]);
 
-  const planned: SCurvePoint[] = [];
-  const overallWeight = rows.reduce((sum, r) => sum + r.workstreamWeight * r.initiativeWeight * r.factorWeight * r.itemWeight, 0);
-  for (let i = 0; i <= SCURVE_SAMPLE_COUNT; i++) {
-    const sampleTime = minStart + ((maxTarget - minStart) * i) / SCURVE_SAMPLE_COUNT;
-    const sampleDate = new Date(sampleTime);
-    const value = rows.reduce((sum, r) => {
-      const plannedToday =
-        r.startDate && r.targetDate
-          ? computePlannedScoreToday(new Date(r.startDate), new Date(r.targetDate), sampleDate)
-          : 0;
-      return sum + plannedToday * r.workstreamWeight * r.initiativeWeight * r.factorWeight * r.itemWeight;
-    }, 0);
-    planned.push({ date: sampleDate.toISOString().slice(0, 10), plannedReadiness: overallWeight > 0 ? value / overallWeight : 0 });
+  if (!items.some((i) => i.startDate && i.targetDate)) {
+    return { quarters: [], actual: [], today: null, gate: null, snapshots: [], currentPeriodCode: null };
   }
 
-  const dashboard = await getPlanDashboard(planId);
-  return {
-    planned,
-    actualToday: { date: new Date().toISOString().slice(0, 10), readiness: dashboard.overallReadiness },
+  const calendar = planQuarters();
+  const quarters: SCurveQuarter[] = calendar.map((q) => ({
+    code: q.code,
+    label: q.label,
+    calendarLabel: q.calendarLabel,
+    x: q.index + 1,
+    endDate: localDateString(q.endDate),
+    baseline: computeCurveValue(items, "baseline", q.endDate),
+    forecast: computeCurveValue(items, "forecast", q.endDate),
+  }));
+
+  const actual: SCurveActualPoint[] = snapshotRows.rows
+    .filter((s) => s.actualProgress != null)
+    .map((s) => {
+      const date = new Date(s.snapshotDate);
+      return {
+        date: localDateString(date),
+        x: quarterAxisPosition(date, calendar),
+        readiness: s.actualProgress as number,
+        source: "Snapshot" as const,
+        periodCode: s.periodCode,
+        captureSource: s.captureSource,
+      };
+    });
+
+  const now = new Date();
+  const today = {
+    date: localDateString(now),
+    x: quarterAxisPosition(now, calendar),
+    baseline: computeCurveValue(items, "baseline", now),
+    forecast: computeCurveValue(items, "forecast", now),
+    readiness: dashboard.overallReadiness,
   };
+  // Today's live value is always the last Actual point. If a snapshot was
+  // already taken today it sits on the same spot, so keep just the live one.
+  const history = actual.filter((a) => a.date !== today.date);
+  history.push({
+    date: today.date,
+    x: today.x,
+    readiness: today.readiness,
+    source: "Today",
+    periodCode: quarterForDate(now, calendar)?.code ?? null,
+    captureSource: null,
+  });
+  history.sort((a, b) => a.x - b.x); // the Actual line must run left to right
+
+  const gateQuarter = quarters.find((q) => q.code === YEAR3_GATE_PERIOD);
+  return {
+    quarters,
+    actual: history,
+    snapshots: snapshotRows.rows.map((s) => ({
+      periodCode: s.periodCode,
+      date: localDateString(new Date(s.snapshotDate)),
+      captureSource: s.captureSource,
+    })),
+    today,
+    gate: gateQuarter
+      ? {
+          periodCode: gateQuarter.code,
+          label: "Year 3 gate",
+          calendarLabel: gateQuarter.calendarLabel,
+          x: gateQuarter.x,
+          date: gateQuarter.endDate,
+          baseline: gateQuarter.baseline,
+          forecast: gateQuarter.forecast,
+        }
+      : null,
+    currentPeriodCode: quarterForDate(now, calendar)?.code ?? null,
+  };
+}
+
+// ─── Snapshots (cmp_snapshots, migrations 049 + 057) ────────────────────────
+// One plan-level row per quarter. While a quarter is still running its row
+// may be refreshed (latest reading wins); once the quarter has ended the row
+// is frozen and is never overwritten. A quarter that ended with no snapshot
+// stays empty -- it cannot be reconstructed honestly after the fact.
+
+export interface CmpSnapshot {
+  id: string;
+  periodCode: string;
+  snapshotDate: string;
+  baselinePct: number;
+  actualProgress: number;
+  forecastPct: number;
+  captureSource: "Manual" | "QuarterEnd";
+  replaced: boolean;
+}
+
+export async function takePlanSnapshot(
+  planId: string,
+  by: { source: "Manual"; session: AuthSession } | { source: "QuarterEnd" },
+  now: Date = new Date()
+): Promise<CmpSnapshot> {
+  const plan = await getPlanById(planId);
+  if (!plan) throw notFound("Plan not found");
+  if (plan.baselineStatus === "Draft") {
+    throw conflict("Snapshots are taken once the baseline is Locked or Approved; a Draft baseline can still change.");
+  }
+
+  const quarter = quarterForDate(now);
+  if (!quarter) throw conflict("Today is outside the plan's quarters (Y1 Q1 to Y5 Q4), so there is no period to snapshot.");
+
+  const [items, dashboard, existing] = await Promise.all([
+    loadCurveItems(planId),
+    getPlanDashboard(planId),
+    query<{ id: string }>(
+      `SELECT id FROM cmp_snapshots
+       WHERE plan_id = $1 AND workstream_id IS NULL AND period_code = $2`,
+      [planId, quarter.code]
+    ),
+  ]);
+  // Only the quarter that contains today is ever written, so a quarter that has
+  // ended is frozen by construction: no caller can pick an older period.
+  const previous = existing.rows[0];
+
+  const baselinePct = computeCurveValue(items, "baseline", now);
+  const forecastPct = computeCurveValue(items, "forecast", now);
+  const capturedBy = by.source === "Manual" ? by.session.staffId : null;
+
+  const result = await query<{ id: string }>(
+    `INSERT INTO cmp_snapshots
+       (plan_id, workstream_id, period_code, snapshot_date, baseline_pct, actual_progress, forecast_pct,
+        captured_by, captured_at, capture_source)
+     VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, now(), $8)
+     ON CONFLICT (plan_id, period_code) WHERE workstream_id IS NULL
+     DO UPDATE SET snapshot_date = EXCLUDED.snapshot_date, baseline_pct = EXCLUDED.baseline_pct,
+                   actual_progress = EXCLUDED.actual_progress, forecast_pct = EXCLUDED.forecast_pct,
+                   captured_by = EXCLUDED.captured_by, captured_at = now(), capture_source = EXCLUDED.capture_source
+     RETURNING id`,
+    [planId, quarter.code, localDateString(now), baselinePct, dashboard.overallReadiness, forecastPct, capturedBy, by.source]
+  );
+
+  const snapshot: CmpSnapshot = {
+    id: result.rows[0].id,
+    periodCode: quarter.code,
+    snapshotDate: localDateString(now),
+    baselinePct,
+    actualProgress: dashboard.overallReadiness,
+    forecastPct,
+    captureSource: by.source,
+    replaced: !!previous,
+  };
+
+  if (by.source === "Manual") {
+    await insertAuditEntry({
+      entityName: "cmp_snapshots", entityId: snapshot.id, action: previous ? "Update" : "Insert",
+      newValue: `${quarter.code} actual ${(snapshot.actualProgress * 100).toFixed(2)}% / baseline ${(baselinePct * 100).toFixed(2)}% / forecast ${(forecastPct * 100).toFixed(2)}%`,
+      performedBy: by.session.staffId,
+    });
+  }
+  return snapshot;
+}
+
+/** Plans that should get a quarter-end snapshot today: baseline Locked/Approved and today is the last day of a plan quarter. */
+export async function listPlansDueForQuarterEndSnapshot(now: Date = new Date()): Promise<{ planId: string; periodCode: string }[]> {
+  const quarter = quarterForDate(now);
+  if (!quarter || localDateString(now) !== localDateString(quarter.endDate)) return [];
+  const plans = await query<{ id: string }>(`SELECT id FROM cmp_plans WHERE baseline_status IN ('Locked', 'Approved')`);
+  return plans.rows.map((p) => ({ planId: p.id, periodCode: quarter.code }));
 }
 
 // ─── Flat item list with progress (CMP-02 Progress Update) ────────────────

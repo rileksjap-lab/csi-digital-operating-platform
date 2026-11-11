@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import "@/components/charts/chart-setup";
-import { Doughnut, Line } from "react-chartjs-2";
-import type { Plugin } from "chart.js";
+import { Doughnut } from "react-chartjs-2";
 import { apiFetcher } from "@/lib/api/fetcher";
+import { useAuthStore } from "@/lib/stores/auth.store";
+import SCurvePanel, { type SCurveData } from "@/components/cmp/scurve-panel";
 
 const RED = "#ef4444";
 const AMBER = "#f59e0b";
 const GREEN = "#16a34a";
 const BLUE = "#2563eb";
 const TRACK = "#F3F4F6";
-const CHART_GRID = { color: "#F3F4F6" };
-const CHART_NO_GRID = { display: false };
 
 type Rag = "Red" | "Amber" | "Green";
 const RAG_COLOR: Record<Rag, string> = { Red: RED, Amber: AMBER, Green: GREEN };
@@ -58,11 +57,6 @@ interface PlanDashboard {
   workstreams: DashboardWorkstream[];
   redItems: DashboardItem[];
   amberItems: DashboardItem[];
-}
-
-interface SCurve {
-  planned: { date: string; plannedReadiness: number }[];
-  actualToday: { date: string; readiness: number } | null;
 }
 
 interface Issue {
@@ -175,14 +169,23 @@ export default function CmpDashboardPage() {
   const params = useParams();
   const planId = params.id as string;
   const [dashboard, setDashboard] = useState<PlanDashboard | null>(null);
-  const [scurve, setScurve] = useState<SCurve | null>(null);
+  const [scurve, setScurve] = useState<SCurveData | null>(null);
   const [issues, setIssues] = useState<Issue[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const user = useAuthStore((st) => st.user);
+  // Mirrors requireCmpCapability(session, "take_snapshot"), held by HOD only (migration 057).
+  // The API is the real enforcement point; this just hides a button that would 403.
+  const canSnapshot = user?.role === "HOD";
+
+  const loadScurve = useCallback(() => {
+    apiFetcher<SCurveData>(`/api/cmp/plans/${planId}/scurve`).then(setScurve).catch(() => {});
+  }, [planId]);
 
   useEffect(() => {
     Promise.all([
       apiFetcher<PlanDashboard>(`/api/cmp/plans/${planId}/dashboard`),
-      apiFetcher<SCurve>(`/api/cmp/plans/${planId}/scurve`),
+      apiFetcher<SCurveData>(`/api/cmp/plans/${planId}/scurve`),
       apiFetcher<Issue[]>(`/api/cmp/plans/${planId}/issues`),
     ])
       .then(([d, s, i]) => {
@@ -223,8 +226,8 @@ export default function CmpDashboardPage() {
             </p>
           </div>
 
-          {/* Row 1: Scorecard | KPI Gauges | S-Curve */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* Row 1: Scorecard | KPI Gauges */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="CMP Scorecard" subtitle="Readiness by workstream">
               <ul className="space-y-2.5">
                 {dashboard.workstreams.map((ws) => (
@@ -255,132 +258,14 @@ export default function CmpDashboardPage() {
                 />
               </div>
             </Panel>
-
-            <Panel title="S-Curve" subtitle="Where we are vs. where the plan says we should be">
-              {scurve && scurve.planned.length > 0 ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">Overall Progress</span>
-                    <RagBadge rag={ragForVariance(dashboard.overallVariance)} />
-                  </div>
-
-                  {/* Plan / Actual / Gap read out as numbers, not just a legend --
-                      the same three figures the headline banner states in prose,
-                      restated here so the chart doesn't need to be "read" to get them. */}
-                  <div className="mt-3 grid grid-cols-3 divide-x divide-gray-100 text-center">
-                    <div className="px-1">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Plan (today)</p>
-                      <p className="mt-0.5 text-lg font-bold text-gray-500">{(dashboard.overallPlannedReadiness * 100).toFixed(0)}%</p>
-                    </div>
-                    <div className="px-1">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Actual (today)</p>
-                      <p className="mt-0.5 text-lg font-bold" style={{ color: BLUE }}>{(dashboard.overallReadiness * 100).toFixed(0)}%</p>
-                    </div>
-                    <div className="px-1">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Gap</p>
-                      <p className={`mt-0.5 text-lg font-bold ${varianceColor(dashboard.overallVariance)}`}>
-                        {dashboard.overallVariance < 0 ? "−" : dashboard.overallVariance > 0 ? "+" : ""}
-                        {Math.round(Math.abs(dashboard.overallVariance) * 100)}
-                        <span className="text-xs font-medium"> pts</span>
-                      </p>
-                      {/* Sign alone reads as ambiguous at a glance (a bare "-1" or "+1"
-                          still needs the reader to know which direction is good) --
-                          spell out behind/ahead/on schedule too, same words the
-                          headline banner and every other variance figure use. */}
-                      <p className={`text-[10px] font-medium ${varianceColor(dashboard.overallVariance)}`}>
-                        {scheduleWords(dashboard.overallVariance)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 h-[160px]">
-                    {(() => {
-                      // Place the single real Actual point at the sample date closest to
-                      // today -- the first sample on/after today, or the last sample if
-                      // today is past the whole plan range (target dates all in the past).
-                      // Reused for both the Actual point and the "Today" reference line
-                      // below, so both land on the same x position.
-                      const idx = scurve.actualToday
-                        ? scurve.planned.findIndex((p) => p.date >= scurve.actualToday!.date)
-                        : -1;
-                      const markerIdx = idx === -1 ? scurve.planned.length - 1 : idx;
-
-                      const todayLinePlugin: Plugin<"line"> = {
-                        id: "todayLine",
-                        afterDraw(chart) {
-                          const xScale = chart.scales.x;
-                          const yScale = chart.scales.y;
-                          if (!scurve.actualToday || !xScale || !yScale) return;
-                          const x = xScale.getPixelForValue(markerIdx);
-                          const { top, bottom } = yScale;
-                          const ctx = chart.ctx;
-                          ctx.save();
-                          ctx.beginPath();
-                          ctx.setLineDash([3, 3]);
-                          ctx.moveTo(x, top);
-                          ctx.lineTo(x, bottom);
-                          ctx.strokeStyle = "#9CA3AF";
-                          ctx.lineWidth = 1;
-                          ctx.stroke();
-                          ctx.setLineDash([]);
-                          ctx.fillStyle = "#6B7280";
-                          ctx.font = "9px sans-serif";
-                          ctx.textAlign = "center";
-                          ctx.fillText("Today", x, top - 3);
-                          ctx.restore();
-                        },
-                      };
-
-                      return (
-                        <Line
-                          data={{
-                            labels: scurve.planned.map((p) => p.date),
-                            datasets: [
-                              {
-                                label: "Plan",
-                                data: scurve.planned.map((p) => p.plannedReadiness * 100),
-                                borderColor: "#9CA3AF",
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                tension: 0.2,
-                              },
-                              {
-                                label: "Actual",
-                                data: scurve.actualToday
-                                  ? scurve.planned.map((_, i) => (i === markerIdx ? scurve.actualToday!.readiness * 100 : null))
-                                  : scurve.planned.map(() => null),
-                                borderColor: BLUE,
-                                backgroundColor: BLUE,
-                                borderWidth: 0,
-                                pointRadius: 6,
-                                showLine: false,
-                              },
-                            ],
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: true, position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } } },
-                            scales: {
-                              x: { grid: CHART_NO_GRID, ticks: { maxTicksLimit: 6, font: { size: 9 } } },
-                              y: { min: 0, max: 100, grid: CHART_GRID, ticks: { font: { size: 9 } } },
-                            },
-                          }}
-                          plugins={[todayLinePlugin]}
-                        />
-                      );
-                    })()}
-                  </div>
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Grey line = Plan, the real baseline computed from every item&apos;s own weight and dates. Blue dot = Actual, today&apos;s real reported value.
-                    No history is stored yet, so Actual is one honest point, not a full line — it will grow into a real trend as more check-ins happen.
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-gray-400">No baseline dates set on any item yet.</p>
-              )}
-            </Panel>
           </div>
+
+          {/* S-Curve: Baseline vs Forecast vs Actual, by quarter */}
+          {scurve && scurve.quarters.length > 0 ? (
+            <SCurvePanel planId={planId} scurve={scurve} canSnapshot={canSnapshot} onSnapshotTaken={loadScurve} />
+          ) : (
+            <Panel title="S-Curve"><p className="text-sm text-gray-400">No baseline dates set on any item yet.</p></Panel>
+          )}
 
           {/* Row 2: Business Unit Tracker */}
           <Panel title="Business Unit Tracker" subtitle="Actual vs planned readiness per workstream">

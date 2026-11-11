@@ -5,11 +5,10 @@ import { getPlanById, getPlanSCurve } from "@/lib/repositories/cmp.repo";
 
 /**
  * S-Curve data (master deck slide 37, "Overall CMP S-Curve: Baseline vs
- * Actual vs Forecast"). The Baseline/Planned line is a real deterministic
- * curve computed from item weights/dates, sampled across the plan's date
- * range -- see getPlanSCurve's doc comment for why Actual is reported as
- * a single point at today, not a fabricated historical line (no
- * cmp_snapshots history exists yet to plot one honestly).
+ * Forecast vs Actual"), by plan quarter Y1Q1..Y5Q4 with the Year 3 gate.
+ * Baseline and Forecast are computed from item weights/dates/forecast dates;
+ * Actual is the stored quarterly snapshot history plus today's live value --
+ * see getPlanSCurve's doc comment.
  */
 export async function GET(
   request: NextRequest,
