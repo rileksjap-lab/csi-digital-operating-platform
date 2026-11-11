@@ -47,9 +47,10 @@ interface Pt {
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 function gapWords(gap: number): string {
-  const points = Math.round(Math.abs(gap) * 100);
-  if (points === 0) return "on the baseline";
-  return gap < 0 ? `${points} pts behind` : `${points} pts ahead`;
+  // Signed, one decimal, same convention as the rest of the dashboard ("−10 pts"): −2.5 pts behind, +1.2 pts ahead.
+  const points = Math.abs(gap) * 100;
+  if (points < 0.05) return "on the plan";
+  return gap < 0 ? `−${points.toFixed(1)} pts behind` : `+${points.toFixed(1)} pts ahead`;
 }
 
 function gapColor(gap: number): string {
