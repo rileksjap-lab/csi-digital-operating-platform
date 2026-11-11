@@ -310,6 +310,131 @@ export function rollupReadiness(children: WeightedNode[]): number {
   return children.reduce((sum, c) => sum + c.value * c.weight, 0);
 }
 
+// ── S-Curve: quarterly Baseline / Forecast / Actual (04_DASHBOARD_SCURVE) ──
+//
+// Every point on the S-Curve is a pure function of the item rows, so the
+// chart can never drift from the dashboard's own numbers: the Baseline value
+// "today" is the same sum the dashboard calls overallPlannedReadiness, just
+// evaluated at a chosen date. Forecast is the identical calculation with each
+// item's own forecast date standing in for its baseline target date.
+
+/** Y1Q1 = Q3 2026 (July–September 2026), so Y3Q4 = Q2 2029 and Y5Q4 = Q2 2031. */
+export const PLAN_FIRST_QUARTER = { year: 2026, quarter: 3 } as const;
+
+/** The Year 3 decision gate sits at the end of Y3Q4 (Q2 2029). */
+export const YEAR3_GATE_PERIOD = "Y3Q4";
+
+export interface PlanQuarter {
+  /** cmp_periods.code, e.g. "Y1Q1" */
+  code: string;
+  /** cmp_periods.label, e.g. "Y1 Q1" */
+  label: string;
+  /** Calendar wording, e.g. "Q3 2026" */
+  calendarLabel: string;
+  /** 0-based position, 0 = Y1Q1 */
+  index: number;
+  /** First day of the quarter, local midnight (same convention as DATE columns read via pg) */
+  startDate: Date;
+  /** Last day of the quarter, local midnight */
+  endDate: Date;
+}
+
+/** The 20 plan quarters Y1Q1..Y5Q4 (matches the codes seeded into cmp_periods). */
+export function planQuarters(first: { year: number; quarter: number } = PLAN_FIRST_QUARTER, count = 20): PlanQuarter[] {
+  const quarters: PlanQuarter[] = [];
+  for (let i = 0; i < count; i++) {
+    const absolute = first.quarter - 1 + i;
+    const year = first.year + Math.floor(absolute / 4);
+    const q = absolute % 4; // 0..3 calendar quarter
+    const planYear = Math.floor(i / 4) + 1;
+    const planQuarter = (i % 4) + 1;
+    quarters.push({
+      code: `Y${planYear}Q${planQuarter}`,
+      label: `Y${planYear} Q${planQuarter}`,
+      calendarLabel: `Q${q + 1} ${year}`,
+      index: i,
+      startDate: new Date(year, q * 3, 1),
+      endDate: new Date(year, q * 3 + 3, 0),
+    });
+  }
+  return quarters;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** The plan quarter that contains `date` (whole calendar days), or null before Y1Q1 / after Y5Q4. */
+export function quarterForDate(date: Date, quarters: PlanQuarter[] = planQuarters()): PlanQuarter | null {
+  const day = startOfDay(date).getTime();
+  return quarters.find((q) => day >= q.startDate.getTime() && day <= q.endDate.getTime()) ?? null;
+}
+
+/**
+ * Horizontal position of a date on the quarterly axis: 0 = start of Y1Q1,
+ * 1 = end of Y1Q1, ... 20 = end of Y5Q4. The end date of a quarter lands
+ * exactly on its whole number, so a quarter-end snapshot sits on its tick and
+ * a mid-quarter reading sits part-way between two ticks. Clamped to [0, 20].
+ */
+export function quarterAxisPosition(date: Date, quarters: PlanQuarter[] = planQuarters()): number {
+  const day = startOfDay(date).getTime();
+  const first = quarters[0];
+  if (day < first.startDate.getTime()) return 0;
+  for (const q of quarters) {
+    const start = q.startDate.getTime();
+    const endExclusive = q.endDate.getTime() + DAY_MS;
+    if (day >= start && day < endExclusive) {
+      // days elapsed including today, so the last day of the quarter = 1.0
+      return q.index + (day + DAY_MS - start) / (endExclusive - start);
+    }
+  }
+  return quarters.length;
+}
+
+/**
+ * Forecast score of one item at `asOf`: the baseline straight line, but
+ * ending on the owner's forecast date instead of the baseline target date.
+ * No forecast date entered = the item is still forecast to land on its
+ * baseline target date (falls back to it). The baseline itself never moves
+ * (TC06): this only reads the forecast, it never writes it.
+ */
+export function computeForecastScoreAt(
+  startDate: Date,
+  targetDate: Date,
+  forecastDate: Date | null | undefined,
+  asOf: Date = new Date()
+): number {
+  return computePlannedScoreToday(startDate, forecastDate ?? targetDate, asOf);
+}
+
+export interface CurveItem {
+  /** computeOverallWeight() of the item's workstream x initiative x factor x item weights */
+  overallWeight: number;
+  startDate: Date | null;
+  targetDate: Date | null;
+  forecastDate: Date | null;
+}
+
+export type CurveSeries = "baseline" | "forecast";
+
+/**
+ * Overall plan value of a curve at `asOf` = sum(item score x overall weight),
+ * the same flattened sum calculations.acceptance.ts proves equal to the
+ * nested rollup. Items with no start/target date contribute nothing, exactly
+ * like the dashboard's planned readiness.
+ */
+export function computeCurveValue(items: CurveItem[], series: CurveSeries, asOf: Date = new Date()): number {
+  let total = 0;
+  for (const it of items) {
+    if (!it.startDate || !it.targetDate) continue;
+    const score =
+      series === "baseline"
+        ? computePlannedScoreToday(it.startDate, it.targetDate, asOf)
+        : computeForecastScoreAt(it.startDate, it.targetDate, it.forecastDate, asOf);
+    total += computeWeightedContribution(score, it.overallWeight);
+  }
+  return total;
+}
+
 // ── Subsidiary / gate classification (TC07) ────────────────────────────
 
 export type SubsidiaryStage = "Practice" | "Business Unit / Shadow P&L" | "Subsidiary Candidate" | "Legal Subsidiary";

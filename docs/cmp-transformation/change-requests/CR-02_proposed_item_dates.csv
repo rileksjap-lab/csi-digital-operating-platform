@@ -1,0 +1,199 @@
+﻿Workstream,Workstream name,Item code,Factor,Item,Phase,Current start,Current target,Proposed start,Proposed target
+WS01,New Co Establishment,IT001,Strategy,Business case / mandate approved,Foundation,2026-07-01,2027-06-30,2026-07-01,2026-12-31
+WS01,New Co Establishment,IT002,Strategy,Scope and success criteria defined,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS01,New Co Establishment,IT003,Commercial,Service catalogue defined,Design,2026-07-01,2027-06-30,2026-09-01,2026-12-31
+WS01,New Co Establishment,IT004,Commercial,Pricing and revenue model approved,Design,2026-07-01,2027-06-30,2026-11-01,2027-01-31
+WS01,New Co Establishment,IT005,Commercial,Qualified pipeline established,Build,2026-07-01,2027-06-30,2027-01-01,2027-05-31
+WS01,New Co Establishment,IT006,Commercial,Anchor customer / pilot identified,Build,2026-07-01,2027-06-30,2026-12-01,2027-04-30
+WS01,New Co Establishment,IT007,Financial,Three-year P&L and break-even model validated,Design,2026-07-01,2027-06-30,2026-10-01,2027-01-31
+WS01,New Co Establishment,IT008,Financial,Investment / budget envelope agreed,Design,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS01,New Co Establishment,IT009,People,Business / practice lead appointed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS01,New Co Establishment,IT010,People,Critical capability plan approved,Design,2026-07-01,2027-06-30,2026-10-01,2026-12-31
+WS01,New Co Establishment,IT011,Process,SOP and governance workflow defined,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS01,New Co Establishment,IT012,Process,Delivery responsibility matrix agreed,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS01,New Co Establishment,IT013,Technology,"Required platform, tools and architecture confirmed",Build,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS01,New Co Establishment,IT014,Technology,CSIDOP tracking configuration prepared,Build,2026-07-01,2027-06-30,2027-01-01,2027-03-31
+WS01,New Co Establishment,IT015,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS01,New Co Establishment,IT016,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-07-01,2027-06-30,2027-02-01,2027-04-30
+WS01,New Co Establishment,IT017,Operational,Operating model activated,Activate,2026-07-01,2027-06-30,2027-03-01,2027-06-30
+WS01,New Co Establishment,IT018,Operational,Management reporting cadence operational,Activate,2026-07-01,2027-06-30,2027-05-01,2027-06-30
+WS02,Cloud Subsidiary,IT019,Strategy,Business case / mandate approved,Foundation,2027-01-01,2028-06-30,2027-01-01,2027-03-31
+WS02,Cloud Subsidiary,IT020,Strategy,Scope and success criteria defined,Foundation,2027-01-01,2028-06-30,2027-02-01,2027-05-31
+WS02,Cloud Subsidiary,IT021,Commercial,Service catalogue defined,Design,2027-01-01,2028-06-30,2027-05-01,2027-09-30
+WS02,Cloud Subsidiary,IT022,Commercial,Pricing and revenue model approved,Design,2027-01-01,2028-06-30,2027-06-01,2027-10-31
+WS02,Cloud Subsidiary,IT023,Commercial,Qualified pipeline established,Build,2027-01-01,2028-06-30,2027-10-01,2028-05-31
+WS02,Cloud Subsidiary,IT024,Commercial,Anchor customer / pilot identified,Build,2027-01-01,2028-06-30,2027-09-01,2028-03-31
+WS02,Cloud Subsidiary,IT025,Financial,Three-year P&L and break-even model validated,Design,2027-01-01,2028-06-30,2027-06-01,2027-10-31
+WS02,Cloud Subsidiary,IT026,Financial,Investment / budget envelope agreed,Design,2027-01-01,2028-06-30,2027-07-01,2027-11-30
+WS02,Cloud Subsidiary,IT027,People,Business / practice lead appointed,Foundation,2027-01-01,2028-06-30,2027-03-01,2027-06-30
+WS02,Cloud Subsidiary,IT028,People,Critical capability plan approved,Design,2027-01-01,2028-06-30,2027-06-01,2027-09-30
+WS02,Cloud Subsidiary,IT029,Process,SOP and governance workflow defined,Build,2027-01-01,2028-06-30,2027-08-01,2028-01-31
+WS02,Cloud Subsidiary,IT030,Process,Delivery responsibility matrix agreed,Build,2027-01-01,2028-06-30,2027-09-01,2028-01-31
+WS02,Cloud Subsidiary,IT031,Technology,"Required platform, tools and architecture confirmed",Build,2027-01-01,2028-06-30,2027-07-01,2027-12-31
+WS02,Cloud Subsidiary,IT032,Technology,CSIDOP tracking configuration prepared,Build,2027-01-01,2028-06-30,2027-10-01,2028-02-29
+WS02,Cloud Subsidiary,IT033,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2027-01-01,2028-06-30,2027-03-01,2027-07-31
+WS02,Cloud Subsidiary,IT034,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2027-01-01,2028-06-30,2027-11-01,2028-03-31
+WS02,Cloud Subsidiary,IT035,Operational,Operating model activated,Activate,2027-01-01,2028-06-30,2028-02-01,2028-06-30
+WS02,Cloud Subsidiary,IT036,Operational,Management reporting cadence operational,Activate,2027-01-01,2028-06-30,2028-04-01,2028-06-30
+WS03,BIM Subsidiary,IT037,Strategy,Business case / mandate approved,Foundation,2027-01-01,2028-06-30,2027-01-01,2027-03-31
+WS03,BIM Subsidiary,IT038,Strategy,Scope and success criteria defined,Foundation,2027-01-01,2028-06-30,2027-02-01,2027-05-31
+WS03,BIM Subsidiary,IT039,Commercial,Service catalogue defined,Design,2027-01-01,2028-06-30,2027-05-01,2027-09-30
+WS03,BIM Subsidiary,IT040,Commercial,Pricing and revenue model approved,Design,2027-01-01,2028-06-30,2027-06-01,2027-10-31
+WS03,BIM Subsidiary,IT041,Commercial,Qualified pipeline established,Build,2027-01-01,2028-06-30,2027-10-01,2028-05-31
+WS03,BIM Subsidiary,IT042,Commercial,Anchor customer / pilot identified,Build,2027-01-01,2028-06-30,2027-09-01,2028-03-31
+WS03,BIM Subsidiary,IT043,Financial,Three-year P&L and break-even model validated,Design,2027-01-01,2028-06-30,2027-06-01,2027-10-31
+WS03,BIM Subsidiary,IT044,Financial,Investment / budget envelope agreed,Design,2027-01-01,2028-06-30,2027-07-01,2027-11-30
+WS03,BIM Subsidiary,IT045,People,Business / practice lead appointed,Foundation,2027-01-01,2028-06-30,2027-03-01,2027-06-30
+WS03,BIM Subsidiary,IT046,People,Critical capability plan approved,Design,2027-01-01,2028-06-30,2027-06-01,2027-09-30
+WS03,BIM Subsidiary,IT047,Process,SOP and governance workflow defined,Build,2027-01-01,2028-06-30,2027-08-01,2028-01-31
+WS03,BIM Subsidiary,IT048,Process,Delivery responsibility matrix agreed,Build,2027-01-01,2028-06-30,2027-09-01,2028-01-31
+WS03,BIM Subsidiary,IT049,Technology,"Required platform, tools and architecture confirmed",Build,2027-01-01,2028-06-30,2027-07-01,2027-12-31
+WS03,BIM Subsidiary,IT050,Technology,CSIDOP tracking configuration prepared,Build,2027-01-01,2028-06-30,2027-10-01,2028-02-29
+WS03,BIM Subsidiary,IT051,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2027-01-01,2028-06-30,2027-03-01,2027-07-31
+WS03,BIM Subsidiary,IT052,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2027-01-01,2028-06-30,2027-11-01,2028-03-31
+WS03,BIM Subsidiary,IT053,Operational,Operating model activated,Activate,2027-01-01,2028-06-30,2028-02-01,2028-06-30
+WS03,BIM Subsidiary,IT054,Operational,Management reporting cadence operational,Activate,2027-01-01,2028-06-30,2028-04-01,2028-06-30
+WS04,Cybersecurity Subsidiary,IT055,Strategy,Business case / mandate approved,Foundation,2027-01-01,2028-06-30,2027-01-01,2027-03-31
+WS04,Cybersecurity Subsidiary,IT056,Strategy,Scope and success criteria defined,Foundation,2027-01-01,2028-06-30,2027-02-01,2027-05-31
+WS04,Cybersecurity Subsidiary,IT057,Commercial,Service catalogue defined,Design,2027-01-01,2028-06-30,2027-05-01,2027-09-30
+WS04,Cybersecurity Subsidiary,IT058,Commercial,Pricing and revenue model approved,Design,2027-01-01,2028-06-30,2027-06-01,2027-10-31
+WS04,Cybersecurity Subsidiary,IT059,Commercial,Qualified pipeline established,Build,2027-01-01,2028-06-30,2027-10-01,2028-05-31
+WS04,Cybersecurity Subsidiary,IT060,Commercial,Anchor customer / pilot identified,Build,2027-01-01,2028-06-30,2027-09-01,2028-03-31
+WS04,Cybersecurity Subsidiary,IT061,Financial,Three-year P&L and break-even model validated,Design,2027-01-01,2028-06-30,2027-06-01,2027-10-31
+WS04,Cybersecurity Subsidiary,IT062,Financial,Investment / budget envelope agreed,Design,2027-01-01,2028-06-30,2027-07-01,2027-11-30
+WS04,Cybersecurity Subsidiary,IT063,People,Business / practice lead appointed,Foundation,2027-01-01,2028-06-30,2027-03-01,2027-06-30
+WS04,Cybersecurity Subsidiary,IT064,People,Critical capability plan approved,Design,2027-01-01,2028-06-30,2027-06-01,2027-09-30
+WS04,Cybersecurity Subsidiary,IT065,Process,SOP and governance workflow defined,Build,2027-01-01,2028-06-30,2027-08-01,2028-01-31
+WS04,Cybersecurity Subsidiary,IT066,Process,Delivery responsibility matrix agreed,Build,2027-01-01,2028-06-30,2027-09-01,2028-01-31
+WS04,Cybersecurity Subsidiary,IT067,Technology,"Required platform, tools and architecture confirmed",Build,2027-01-01,2028-06-30,2027-07-01,2027-12-31
+WS04,Cybersecurity Subsidiary,IT068,Technology,CSIDOP tracking configuration prepared,Build,2027-01-01,2028-06-30,2027-10-01,2028-02-29
+WS04,Cybersecurity Subsidiary,IT069,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2027-01-01,2028-06-30,2027-03-01,2027-07-31
+WS04,Cybersecurity Subsidiary,IT070,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2027-01-01,2028-06-30,2027-11-01,2028-03-31
+WS04,Cybersecurity Subsidiary,IT071,Operational,Operating model activated,Activate,2027-01-01,2028-06-30,2028-02-01,2028-06-30
+WS04,Cybersecurity Subsidiary,IT072,Operational,Management reporting cadence operational,Activate,2027-01-01,2028-06-30,2028-04-01,2028-06-30
+WS05,Healthcare Technology & Digital Health,IT073,Strategy,Business case / mandate approved,Foundation,2026-10-01,2028-12-31,2026-10-01,2027-02-28
+WS05,Healthcare Technology & Digital Health,IT074,Strategy,Scope and success criteria defined,Foundation,2026-10-01,2028-12-31,2026-11-01,2027-04-30
+WS05,Healthcare Technology & Digital Health,IT075,Commercial,Service catalogue defined,Design,2026-10-01,2028-12-31,2027-03-01,2027-10-31
+WS05,Healthcare Technology & Digital Health,IT076,Commercial,Pricing and revenue model approved,Design,2026-10-01,2028-12-31,2027-06-01,2027-12-31
+WS05,Healthcare Technology & Digital Health,IT077,Commercial,Qualified pipeline established,Build,2026-10-01,2028-12-31,2027-12-01,2028-10-31
+WS05,Healthcare Technology & Digital Health,IT078,Commercial,Anchor customer / pilot identified,Build,2026-10-01,2028-12-31,2027-10-01,2028-07-31
+WS05,Healthcare Technology & Digital Health,IT079,Financial,Three-year P&L and break-even model validated,Design,2026-10-01,2028-12-31,2027-05-01,2027-12-31
+WS05,Healthcare Technology & Digital Health,IT080,Financial,Investment / budget envelope agreed,Design,2026-10-01,2028-12-31,2027-07-01,2028-02-29
+WS05,Healthcare Technology & Digital Health,IT081,People,Business / practice lead appointed,Foundation,2026-10-01,2028-12-31,2027-01-01,2027-06-30
+WS05,Healthcare Technology & Digital Health,IT082,People,Critical capability plan approved,Design,2026-10-01,2028-12-31,2027-05-01,2027-11-30
+WS05,Healthcare Technology & Digital Health,IT083,Process,SOP and governance workflow defined,Build,2026-10-01,2028-12-31,2027-09-01,2028-04-30
+WS05,Healthcare Technology & Digital Health,IT084,Process,Delivery responsibility matrix agreed,Build,2026-10-01,2028-12-31,2027-10-01,2028-04-30
+WS05,Healthcare Technology & Digital Health,IT085,Technology,"Required platform, tools and architecture confirmed",Build,2026-10-01,2028-12-31,2027-07-01,2028-03-31
+WS05,Healthcare Technology & Digital Health,IT086,Technology,CSIDOP tracking configuration prepared,Build,2026-10-01,2028-12-31,2027-12-01,2028-06-30
+WS05,Healthcare Technology & Digital Health,IT087,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-10-01,2028-12-31,2027-01-01,2027-07-31
+WS05,Healthcare Technology & Digital Health,IT088,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-10-01,2028-12-31,2028-01-01,2028-07-31
+WS05,Healthcare Technology & Digital Health,IT089,Operational,Operating model activated,Activate,2026-10-01,2028-12-31,2028-05-01,2028-11-30
+WS05,Healthcare Technology & Digital Health,IT090,Operational,Management reporting cadence operational,Activate,2026-10-01,2028-12-31,2028-09-01,2028-12-31
+WS06,Core Commercial Practices,IT091,Strategy,Business case / mandate approved,Foundation,2026-10-01,2027-12-31,2026-10-01,2026-12-31
+WS06,Core Commercial Practices,IT092,Strategy,Scope and success criteria defined,Foundation,2026-10-01,2027-12-31,2026-11-01,2027-01-31
+WS06,Core Commercial Practices,IT093,Commercial,Service catalogue defined,Design,2026-10-01,2027-12-31,2027-01-01,2027-04-30
+WS06,Core Commercial Practices,IT094,Commercial,Pricing and revenue model approved,Design,2026-10-01,2027-12-31,2027-03-01,2027-06-30
+WS06,Core Commercial Practices,IT095,Commercial,Qualified pipeline established,Build,2026-10-01,2027-12-31,2027-06-01,2027-11-30
+WS06,Core Commercial Practices,IT096,Commercial,Anchor customer / pilot identified,Build,2026-10-01,2027-12-31,2027-05-01,2027-09-30
+WS06,Core Commercial Practices,IT097,Financial,Three-year P&L and break-even model validated,Design,2026-10-01,2027-12-31,2027-02-01,2027-06-30
+WS06,Core Commercial Practices,IT098,Financial,Investment / budget envelope agreed,Design,2026-10-01,2027-12-31,2027-03-01,2027-06-30
+WS06,Core Commercial Practices,IT099,People,Business / practice lead appointed,Foundation,2026-10-01,2027-12-31,2026-12-01,2027-02-28
+WS06,Core Commercial Practices,IT100,People,Critical capability plan approved,Design,2026-10-01,2027-12-31,2027-02-01,2027-05-31
+WS06,Core Commercial Practices,IT101,Process,SOP and governance workflow defined,Build,2026-10-01,2027-12-31,2027-04-01,2027-08-31
+WS06,Core Commercial Practices,IT102,Process,Delivery responsibility matrix agreed,Build,2026-10-01,2027-12-31,2027-05-01,2027-08-31
+WS06,Core Commercial Practices,IT103,Technology,"Required platform, tools and architecture confirmed",Build,2026-10-01,2027-12-31,2027-03-01,2027-07-31
+WS06,Core Commercial Practices,IT104,Technology,CSIDOP tracking configuration prepared,Build,2026-10-01,2027-12-31,2027-06-01,2027-09-30
+WS06,Core Commercial Practices,IT105,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-10-01,2027-12-31,2026-12-01,2027-03-31
+WS06,Core Commercial Practices,IT106,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-10-01,2027-12-31,2027-06-01,2027-09-30
+WS06,Core Commercial Practices,IT107,Operational,Operating model activated,Activate,2026-10-01,2027-12-31,2027-09-01,2027-12-31
+WS06,Core Commercial Practices,IT108,Operational,Management reporting cadence operational,Activate,2026-10-01,2027-12-31,2027-11-01,2027-12-31
+WS07,Commercial & Revenue Architecture,IT109,Strategy,Business case / mandate approved,Foundation,2026-07-01,2027-06-30,2026-07-01,2026-12-31
+WS07,Commercial & Revenue Architecture,IT110,Strategy,Scope and success criteria defined,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS07,Commercial & Revenue Architecture,IT111,Commercial,Service catalogue defined,Design,2026-07-01,2027-06-30,2026-09-01,2026-12-31
+WS07,Commercial & Revenue Architecture,IT112,Commercial,Pricing and revenue model approved,Design,2026-07-01,2027-06-30,2026-11-01,2027-01-31
+WS07,Commercial & Revenue Architecture,IT113,Commercial,Qualified pipeline established,Build,2026-07-01,2027-06-30,2027-01-01,2027-05-31
+WS07,Commercial & Revenue Architecture,IT114,Commercial,Anchor customer / pilot identified,Build,2026-07-01,2027-06-30,2026-12-01,2027-04-30
+WS07,Commercial & Revenue Architecture,IT115,Financial,Three-year P&L and break-even model validated,Design,2026-07-01,2027-06-30,2026-10-01,2027-01-31
+WS07,Commercial & Revenue Architecture,IT116,Financial,Investment / budget envelope agreed,Design,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS07,Commercial & Revenue Architecture,IT117,People,Business / practice lead appointed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS07,Commercial & Revenue Architecture,IT118,People,Critical capability plan approved,Design,2026-07-01,2027-06-30,2026-10-01,2026-12-31
+WS07,Commercial & Revenue Architecture,IT119,Process,SOP and governance workflow defined,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS07,Commercial & Revenue Architecture,IT120,Process,Delivery responsibility matrix agreed,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS07,Commercial & Revenue Architecture,IT121,Technology,"Required platform, tools and architecture confirmed",Build,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS07,Commercial & Revenue Architecture,IT122,Technology,CSIDOP tracking configuration prepared,Build,2026-07-01,2027-06-30,2027-01-01,2027-03-31
+WS07,Commercial & Revenue Architecture,IT123,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS07,Commercial & Revenue Architecture,IT124,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-07-01,2027-06-30,2027-02-01,2027-04-30
+WS07,Commercial & Revenue Architecture,IT125,Operational,Operating model activated,Activate,2026-07-01,2027-06-30,2027-03-01,2027-06-30
+WS07,Commercial & Revenue Architecture,IT126,Operational,Management reporting cadence operational,Activate,2026-07-01,2027-06-30,2027-05-01,2027-06-30
+WS08,Financial & Break-Even,IT127,Strategy,Business case / mandate approved,Foundation,2026-07-01,2027-06-30,2026-07-01,2026-12-31
+WS08,Financial & Break-Even,IT128,Strategy,Scope and success criteria defined,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS08,Financial & Break-Even,IT129,Commercial,Service catalogue defined,Design,2026-07-01,2027-06-30,2026-09-01,2026-12-31
+WS08,Financial & Break-Even,IT130,Commercial,Pricing and revenue model approved,Design,2026-07-01,2027-06-30,2026-11-01,2027-01-31
+WS08,Financial & Break-Even,IT131,Commercial,Qualified pipeline established,Build,2026-07-01,2027-06-30,2027-01-01,2027-05-31
+WS08,Financial & Break-Even,IT132,Commercial,Anchor customer / pilot identified,Build,2026-07-01,2027-06-30,2026-12-01,2027-04-30
+WS08,Financial & Break-Even,IT133,Financial,Three-year P&L and break-even model validated,Design,2026-07-01,2027-06-30,2026-10-01,2027-01-31
+WS08,Financial & Break-Even,IT134,Financial,Investment / budget envelope agreed,Design,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS08,Financial & Break-Even,IT135,People,Business / practice lead appointed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS08,Financial & Break-Even,IT136,People,Critical capability plan approved,Design,2026-07-01,2027-06-30,2026-10-01,2026-12-31
+WS08,Financial & Break-Even,IT137,Process,SOP and governance workflow defined,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS08,Financial & Break-Even,IT138,Process,Delivery responsibility matrix agreed,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS08,Financial & Break-Even,IT139,Technology,"Required platform, tools and architecture confirmed",Build,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS08,Financial & Break-Even,IT140,Technology,CSIDOP tracking configuration prepared,Build,2026-07-01,2027-06-30,2027-01-01,2027-03-31
+WS08,Financial & Break-Even,IT141,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS08,Financial & Break-Even,IT142,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-07-01,2027-06-30,2027-02-01,2027-04-30
+WS08,Financial & Break-Even,IT143,Operational,Operating model activated,Activate,2026-07-01,2027-06-30,2027-03-01,2027-06-30
+WS08,Financial & Break-Even,IT144,Operational,Management reporting cadence operational,Activate,2026-07-01,2027-06-30,2027-05-01,2027-06-30
+WS09,Organisation & Capability,IT145,Strategy,Business case / mandate approved,Foundation,2026-07-01,2027-09-30,2026-07-01,2026-12-31
+WS09,Organisation & Capability,IT146,Strategy,Scope and success criteria defined,Foundation,2026-07-01,2027-09-30,2026-08-01,2026-12-31
+WS09,Organisation & Capability,IT147,Commercial,Service catalogue defined,Design,2026-07-01,2027-09-30,2026-10-01,2027-01-31
+WS09,Organisation & Capability,IT148,Commercial,Pricing and revenue model approved,Design,2026-07-01,2027-09-30,2026-12-01,2027-03-31
+WS09,Organisation & Capability,IT149,Commercial,Qualified pipeline established,Build,2026-07-01,2027-09-30,2027-03-01,2027-08-31
+WS09,Organisation & Capability,IT150,Commercial,Anchor customer / pilot identified,Build,2026-07-01,2027-09-30,2027-02-01,2027-06-30
+WS09,Organisation & Capability,IT151,Financial,Three-year P&L and break-even model validated,Design,2026-07-01,2027-09-30,2026-11-01,2027-03-31
+WS09,Organisation & Capability,IT152,Financial,Investment / budget envelope agreed,Design,2026-07-01,2027-09-30,2026-12-01,2027-03-31
+WS09,Organisation & Capability,IT153,People,Business / practice lead appointed,Foundation,2026-07-01,2027-09-30,2026-09-01,2026-12-31
+WS09,Organisation & Capability,IT154,People,Critical capability plan approved,Design,2026-07-01,2027-09-30,2026-11-01,2027-02-28
+WS09,Organisation & Capability,IT155,Process,SOP and governance workflow defined,Build,2026-07-01,2027-09-30,2027-01-01,2027-05-31
+WS09,Organisation & Capability,IT156,Process,Delivery responsibility matrix agreed,Build,2026-07-01,2027-09-30,2027-02-01,2027-05-31
+WS09,Organisation & Capability,IT157,Technology,"Required platform, tools and architecture confirmed",Build,2026-07-01,2027-09-30,2026-12-01,2027-04-30
+WS09,Organisation & Capability,IT158,Technology,CSIDOP tracking configuration prepared,Build,2026-07-01,2027-09-30,2027-03-01,2027-06-30
+WS09,Organisation & Capability,IT159,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-07-01,2027-09-30,2026-09-01,2026-12-31
+WS09,Organisation & Capability,IT160,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-07-01,2027-09-30,2027-03-01,2027-06-30
+WS09,Organisation & Capability,IT161,Operational,Operating model activated,Activate,2026-07-01,2027-09-30,2027-06-01,2027-09-30
+WS09,Organisation & Capability,IT162,Operational,Management reporting cadence operational,Activate,2026-07-01,2027-09-30,2027-08-01,2027-09-30
+WS10,CSIDOP CMP Engine,IT163,Strategy,Business case / mandate approved,Foundation,2026-10-01,2028-06-30,2026-10-01,2027-01-31
+WS10,CSIDOP CMP Engine,IT164,Strategy,Scope and success criteria defined,Foundation,2026-10-01,2028-06-30,2026-11-01,2027-03-31
+WS10,CSIDOP CMP Engine,IT165,Commercial,Service catalogue defined,Design,2026-10-01,2028-06-30,2027-02-01,2027-07-31
+WS10,CSIDOP CMP Engine,IT166,Commercial,Pricing and revenue model approved,Design,2026-10-01,2028-06-30,2027-04-01,2027-09-30
+WS10,CSIDOP CMP Engine,IT167,Commercial,Qualified pipeline established,Build,2026-10-01,2028-06-30,2027-09-01,2028-04-30
+WS10,CSIDOP CMP Engine,IT168,Commercial,Anchor customer / pilot identified,Build,2026-10-01,2028-06-30,2027-07-01,2028-02-29
+WS10,CSIDOP CMP Engine,IT169,Financial,Three-year P&L and break-even model validated,Design,2026-10-01,2028-06-30,2027-03-01,2027-09-30
+WS10,CSIDOP CMP Engine,IT170,Financial,Investment / budget envelope agreed,Design,2026-10-01,2028-06-30,2027-05-01,2027-10-31
+WS10,CSIDOP CMP Engine,IT171,People,Business / practice lead appointed,Foundation,2026-10-01,2028-06-30,2026-12-01,2027-04-30
+WS10,CSIDOP CMP Engine,IT172,People,Critical capability plan approved,Design,2026-10-01,2028-06-30,2027-03-01,2027-08-31
+WS10,CSIDOP CMP Engine,IT173,Process,SOP and governance workflow defined,Build,2026-10-01,2028-06-30,2027-06-01,2027-12-31
+WS10,CSIDOP CMP Engine,IT174,Process,Delivery responsibility matrix agreed,Build,2026-10-01,2028-06-30,2027-07-01,2027-12-31
+WS10,CSIDOP CMP Engine,IT175,Technology,"Required platform, tools and architecture confirmed",Build,2026-10-01,2028-06-30,2027-05-01,2027-11-30
+WS10,CSIDOP CMP Engine,IT176,Technology,CSIDOP tracking configuration prepared,Build,2026-10-01,2028-06-30,2027-09-01,2028-01-31
+WS10,CSIDOP CMP Engine,IT177,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-10-01,2028-06-30,2026-12-01,2027-05-31
+WS10,CSIDOP CMP Engine,IT178,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-10-01,2028-06-30,2027-10-01,2028-02-29
+WS10,CSIDOP CMP Engine,IT179,Operational,Operating model activated,Activate,2026-10-01,2028-06-30,2028-01-01,2028-05-31
+WS10,CSIDOP CMP Engine,IT180,Operational,Management reporting cadence operational,Activate,2026-10-01,2028-06-30,2028-04-01,2028-06-30
+WS11,"Governance, Risk & Decisions",IT181,Strategy,Business case / mandate approved,Foundation,2026-07-01,2027-06-30,2026-07-01,2026-12-31
+WS11,"Governance, Risk & Decisions",IT182,Strategy,Scope and success criteria defined,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS11,"Governance, Risk & Decisions",IT183,Commercial,Service catalogue defined,Design,2026-07-01,2027-06-30,2026-09-01,2026-12-31
+WS11,"Governance, Risk & Decisions",IT184,Commercial,Pricing and revenue model approved,Design,2026-07-01,2027-06-30,2026-11-01,2027-01-31
+WS11,"Governance, Risk & Decisions",IT185,Commercial,Qualified pipeline established,Build,2026-07-01,2027-06-30,2027-01-01,2027-05-31
+WS11,"Governance, Risk & Decisions",IT186,Commercial,Anchor customer / pilot identified,Build,2026-07-01,2027-06-30,2026-12-01,2027-04-30
+WS11,"Governance, Risk & Decisions",IT187,Financial,Three-year P&L and break-even model validated,Design,2026-07-01,2027-06-30,2026-10-01,2027-01-31
+WS11,"Governance, Risk & Decisions",IT188,Financial,Investment / budget envelope agreed,Design,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS11,"Governance, Risk & Decisions",IT189,People,Business / practice lead appointed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS11,"Governance, Risk & Decisions",IT190,People,Critical capability plan approved,Design,2026-07-01,2027-06-30,2026-10-01,2026-12-31
+WS11,"Governance, Risk & Decisions",IT191,Process,SOP and governance workflow defined,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS11,"Governance, Risk & Decisions",IT192,Process,Delivery responsibility matrix agreed,Build,2026-07-01,2027-06-30,2026-12-01,2027-03-31
+WS11,"Governance, Risk & Decisions",IT193,Technology,"Required platform, tools and architecture confirmed",Build,2026-07-01,2027-06-30,2026-11-01,2027-02-28
+WS11,"Governance, Risk & Decisions",IT194,Technology,CSIDOP tracking configuration prepared,Build,2026-07-01,2027-06-30,2027-01-01,2027-03-31
+WS11,"Governance, Risk & Decisions",IT195,Legal/Compliance,Legal / compliance requirements assessed,Foundation,2026-07-01,2027-06-30,2026-08-01,2026-12-31
+WS11,"Governance, Risk & Decisions",IT196,Legal/Compliance,"Contract, ownership or incorporation decision approved",Build,2026-07-01,2027-06-30,2027-02-01,2027-04-30
+WS11,"Governance, Risk & Decisions",IT197,Operational,Operating model activated,Activate,2026-07-01,2027-06-30,2027-03-01,2027-06-30
+WS11,"Governance, Risk & Decisions",IT198,Operational,Management reporting cadence operational,Activate,2026-07-01,2027-06-30,2027-05-01,2027-06-30
