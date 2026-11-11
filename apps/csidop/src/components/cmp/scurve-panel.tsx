@@ -54,9 +54,8 @@ function gapWords(gap: number): string {
 }
 
 function gapColor(gap: number): string {
-  if (gap < -0.1) return "text-red-600";
-  if (gap < -0.05) return "text-amber-600";
-  return "text-green-600";
+  // Direction of the gap: red when behind plan, green when on or ahead (same rule as the dashboard headline).
+  return gap <= -0.0005 ? "text-red-600" : "text-green-600";
 }
 
 export default function SCurvePanel({

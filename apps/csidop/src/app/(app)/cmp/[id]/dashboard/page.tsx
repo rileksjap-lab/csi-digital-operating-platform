@@ -78,19 +78,21 @@ function scheduleWords(varianceFraction: number): string {
   const raw = Math.abs(varianceFraction) * 100;
   if (raw < 0.05) return "on schedule";
   const points = Number(raw.toFixed(1));
-  return varianceFraction < 0 ? `${points} points behind schedule` : `${points} points ahead of schedule`;
+  return varianceFraction < 0 ? `−${points} points behind schedule` : `+${points} points ahead of schedule`;
 }
 
+/** Behind plan by at least 0.05 points (the smallest gap that still shows as a number). */
+function isBehindPlan(varianceFraction: number): boolean {
+  return varianceFraction <= -0.0005;
+}
+
+/**
+ * Colour of a schedule gap's wording: red whenever progress is behind plan, green when on or ahead.
+ * This is the direction of the gap only. The Red / Amber / Green attention flags (dots, counts, the
+ * Red and Amber item lists) still follow the tracker's thresholds (Red below -10 points, Amber below -5).
+ */
 function varianceColor(varianceFraction: number): string {
-  if (varianceFraction < -0.1) return "text-red-600";
-  if (varianceFraction < -0.05) return "text-amber-600";
-  return "text-green-600";
-}
-
-function ragForVariance(v: number): Rag {
-  if (v < -0.1) return "Red";
-  if (v < -0.05) return "Amber";
-  return "Green";
+  return isBehindPlan(varianceFraction) ? "text-red-600" : "text-green-600";
 }
 
 function severityRag(severity: Issue["severity"]): Rag {
@@ -219,7 +221,7 @@ export default function CmpDashboardPage() {
       {dashboard && (
         <>
           {/* Headline */}
-          <div className={`rounded-lg border px-5 py-4 ${dashboard.overallVariance < -0.1 ? "border-red-200 bg-red-50" : dashboard.overallVariance < -0.05 ? "border-amber-200 bg-amber-50" : "border-green-200 bg-green-50"}`}>
+          <div className={`rounded-lg border px-5 py-4 ${isBehindPlan(dashboard.overallVariance) ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}>
             <p className="text-base text-gray-800">
               The transformation program is <span className="font-bold">{(dashboard.overallReadiness * 100).toFixed(1)}% complete</span>,
               against a planned <span className="font-bold">{(dashboard.overallPlannedReadiness * 100).toFixed(1)}%</span> for this point in the 5-year timeline —
@@ -249,7 +251,7 @@ export default function CmpDashboardPage() {
                 <GaugeChart
                   value={dashboard.overallReadiness}
                   label="Transformation Progress"
-                  color={RAG_COLOR[ragForVariance(dashboard.overallVariance)]}
+                  color={isBehindPlan(dashboard.overallVariance) ? RED : GREEN}
                   sublabel={`% of the plan actually done — ${scheduleWords(dashboard.overallVariance)}`}
                 />
                 <GaugeChart
