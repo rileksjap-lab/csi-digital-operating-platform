@@ -1,8 +1,8 @@
 # CMP baseline change pack: CR-2026-01
 
 **Plan:** CSI-5 Year Transformation Plan (`71878149-378d-477a-a916-6cc4ef01b5c8`), baseline Approved / Locked 11 Nov 2026
-**Status: PROPOSED. Nothing in this pack has been applied to any database.**
-**Needs:** HOD decision on each change request below, and answers to the open questions at the end.
+**Status: DECIDED by the HOD on 11 Nov 2026 (all recommendations accepted). SQL written and tested on a copy. NOT yet applied to any real database.**
+**Needs:** the HOD to run the scripts in `sql/` on the VM when ready (see "How to apply" at the end).
 
 None of these changes touch an item status, score, evidence record or forecast date. They change plan data only: who owns a workstream, when items are planned, and what the plan contains for Years 4–5.
 
@@ -10,9 +10,9 @@ None of these changes touch an item status, score, evidence record or forecast d
 
 | CR | What changes | Rows touched | Effect on headline numbers | Decision needed |
 |---|---|---|---|---|
-| CR-01 | Workstream owner and sponsor titles | 11 workstreams (7 filled in, 4 waiting for you) | None | Approve the 7; answer the 4 |
-| CR-02 | Staggered start and target dates per item | 198 items | **Planned-today falls from about 16.5% to about 10.7%** (see below) | Approve the method and the date floor |
-| CR-03 | New workstream WS12 for Years 4–5, other 11 weights rescaled | 1 new workstream, 8 factors, 16 items, 11 weight edits | Readiness and planned both scale by 0.90 until WS12 items start | Approve the structure and the weight |
+| CR-01 | Workstream owner and sponsor titles | 11 workstreams | None | **Approved** |
+| CR-02 | Staggered start and target dates per item | 198 items | **Planned-today falls from about 16.5% to about 10.7%** (see below) | **Approved**, option A: change the baseline, 31 Dec 2026 date floor |
+| CR-03 | New workstream WS12 for Years 4–5, other 11 weights rescaled | 1 new workstream, 8 factors, 16 items, 11 weight edits | Readiness and planned both scale by 0.90 until WS12 items start | **Approved**: 10% weight, structure as below |
 
 ## CR-01: workstream owner and sponsor
 
@@ -25,14 +25,14 @@ I read each line as *owner / sponsor(s)*: the first role is the owner, everythin
 | WS03 | BIM Subsidiary | BIM Lead | Management / Project Governance |
 | WS04 | Cybersecurity Subsidiary | Cybersecurity Lead | Management / Security Sponsor |
 | WS05 | Healthcare Technology & Digital Health | Healthcare Lead | Management / Healthcare Sponsor |
-| WS06 | Core Commercial Practices | *not in the deck, please tell me* | *please tell me* |
-| WS07 | Commercial & Revenue Architecture | *please tell me* | *please tell me* |
+| WS06 | Core Commercial Practices | Practice Leads | Management |
+| WS07 | Commercial & Revenue Architecture | Commercial Lead | Management |
 | WS08 | Financial & Break-Even | Finance Representative | Finance Management |
-| WS09 | Organisation & Capability | *please tell me* | *please tell me* |
+| WS09 | Organisation & Capability | CSI HOD / HR | Management |
 | WS10 | CSIDOP CMP Engine | Product Owner / Tech Lead | CSI HOD |
-| WS11 | Governance, Risk & Decisions | *please tell me* | *please tell me* |
+| WS11 | Governance, Risk & Decisions | CSI HOD / Management | Management |
 
-**WS10 needs your confirmation.** Your line was "Product Owner / Tech Lead / CSI HOD". I read Product Owner and Tech Lead as the delivery owners and CSI HOD as the sponsor. The other reading is owner "Product Owner" and sponsor "Tech Lead / CSI HOD".
+**How the values were chosen.** WS01–05 and WS08 are from the deck. For WS06, WS07, WS09 and WS11 the HOD said to reuse the roles the items already carry as the owner, so the owner is the existing item role. The sponsor "Management" for those four is my suggestion, which the HOD accepted by taking the recommendations; it can be edited in the app at any time. WS10 follows my reading of the deck line: Product Owner and Tech Lead own it, CSI HOD sponsors it. WS08 and WS10 keep their deck values.
 
 Today these fields are empty on all 11 workstreams. Item-level owners already exist (for example "New Co Lead" on WS01) and are not changed by this pack.
 
@@ -75,7 +75,11 @@ The current baseline is front-loaded: every item in a workstream starts on day o
 
 The dashboard headline would change from "behind schedule" to "ahead of schedule" without any work being done. That is a real consequence of moving the baseline, and anyone reading the S-Curve before and after will see it. I recommend recording the reason in the approval ("original dates assumed all items in a workstream run in parallel") so the change cannot be read as a way to improve the picture. If you would rather not change the picture, the alternative is to keep the current dates and add the staggering only as a forecast (forecast dates per item), which leaves the baseline untouched.
 
-Figures for the CR-02 row were computed outside the application on the dev data copy, so allow ±0.2 points.
+With CR-03 applied as well, everything is scaled by 0.90: planned today about 9.8%, actual about 12.7% (14.15% × 0.9), so the gap is about **+2.9 points (ahead)**.
+
+**Item-level colours also change.** On the dev data copy, the count of Red / Amber / Green items goes from 80 / 45 / 73 before the change requests to 38 / 11 / 165 after them, because items that are not due yet stop being flagged as behind. The fewer Reds are the same effect, not an improvement in the work.
+
+Planned and actual figures for the "CR-02 only" row were computed outside the application on the dev data copy, so allow ±0.2 points. The combined figures (9.8% planned, 6.0% actual on the copy's own data) and the Red / Amber / Green counts come from the application itself, running on the copy after the scripts.
 
 ## CR-03: Years 4–5 "Sustain & Expand" (new workstream WS12)
 
@@ -152,18 +156,52 @@ Baseline % at the end of each quarter (the grey line on the S-Curve). Computed o
 | Y5Q3 | 31 Mar 2031 | 100.0% | 100.0% | 99.3% |
 | Y5Q4 | 30 Jun 2031 | 100.0% | 100.0% | 100.0% |
 
-## How these would be applied, once you approve
+## Decisions (HOD, 11 Nov 2026)
 
-- **Data only, no deploy.** Each CR becomes one SQL script, run on the VM as `postgres` inside a single transaction (same sequence as the migrations), with an audit-log entry per change citing the CR number. I will write the scripts only after you approve, and test them on a copy first.
-- **Record-keeping gap.** The existing `cmp_change_requests` table records one field change per row against an existing record, so it cannot describe adding WS12. Choices: (A) record each CR in the audit log with this pack attached, or (B) also insert field-level rows for CR-01 (14 rows) and CR-02 (396 rows). I recommend A.
-- **Order.** The S-Curve change (this PR) goes first, so the before and after curves can be compared on the real dashboard.
+| # | Question | Decision |
+|---|---|---|
+| 1 | Owner and sponsor for WS06, WS07, WS09, WS11 | Reuse the existing item roles as owner; sponsor "Management" (see CR-01) |
+| 2 | WS10 reading | Owner "Product Owner / Tech Lead", sponsor "CSI HOD" |
+| 3 | CR-02 approach | Option A: change the baseline, inside existing windows, 31 Dec 2026 floor. Reason to record: "original dates assumed every item in a workstream ran in parallel" |
+| 4 | WS12 weight and owner | 10%; owner "Transformation Lead", sponsor "Management" (same as WS01); item owner "Workstream owner (to be confirmed)" until real roles are assigned |
+| 5 | How to record | Audit log only (one entry per changed field, citing CR-2026-01) |
 
-## Open questions
+## How to apply (nothing has been run on a real database)
 
-1. **CR-01:** owner and sponsor for WS06, WS07, WS09 and WS11.
-2. **CR-01:** is my reading of WS10 right (owner "Product Owner / Tech Lead", sponsor "CSI HOD")?
-3. **CR-02:** do you approve staggering inside the existing windows, with the 31 Dec 2026 floor? Or would you prefer to keep the baseline and add the staggering as forecast dates only?
-4. **CR-02:** are you comfortable that the headline flips from behind to ahead, and with the reason wording suggested above?
-5. **CR-03:** is 10% the right weight for Years 4–5 (or 5%)? Are the eight factors and their weights right?
-6. **CR-03:** owner role for WS12 items, and WS12's owner and sponsor.
-7. **Records:** audit log only (A), or field-level change-request rows too (B)?
+The scripts are in [`sql/`](sql/). Each one is a single transaction and has a matching revert.
+
+| Order | Apply | Revert | What it does |
+|---|---|---|---|
+| 1 | `CR-01_apply.sql` | `CR-01_revert.sql` | 22 field changes on the 11 workstreams |
+| 2 | `CR-02_apply.sql` | `CR-02_revert.sql` | New dates on 198 items |
+| 3 | `CR-03_apply.sql` | `CR-03_revert.sql` | WS12 added (1 initiative, 8 factors, 16 items); 11 weights ×0.90 |
+
+**Do this first:** merge the S-Curve PR, run migration 057 and restart the app, so you can see the before and after on the real dashboard. Take a snapshot just before CR-02, so the Actual line starts from an unchanged baseline.
+
+**Rehearse each script first.** The dry-run switch does everything and then rolls it all back:
+
+```bash
+sudo -u postgres psql -d csidop -v ON_ERROR_STOP=1 -v dry_run=1 -f - < docs/cmp-transformation/change-requests/sql/CR-01_apply.sql
+```
+
+Run it from the repo root on the VM. Then run the same line without `-v dry_run=1` to apply for real. Run them while nobody is saving in the app, so the audit log stays in order. A dry run still has to read the real plan, so it also proves the guards pass on production data.
+
+**What the scripts protect against (all tested)**
+- A guard failure aborts and changes nothing: wrong database, plan not Locked or Approved, a value that was edited since the proposal (an owner, a date, a weight), WS12 already present, item codes IT199 to IT214 already in use.
+- Running a script twice is refused.
+- They never touch progress updates or evidence. Each script compares a checksum of both tables before and after and aborts if it differs.
+- Every changed field is written to `audit_log` with its hash link. I recomputed all 1,186 entries from a full test run the way the app does, with 0 mismatches, so the app can keep appending after them. The audit entries are attributed to the HOD who locked the baseline (`cmp_plans.locked_by`), with the reason "approved by HOD; applied by script".
+- Reverts: CR-01 and CR-02 restore the previous values exactly (tested: the data matched the starting state afterwards). CR-03's revert refuses if anyone has already recorded progress, evidence or an issue on a WS12 item, so it can never delete real data.
+
+**After applying**
+- Open the dashboard: 12 workstreams, Year 3 gate at 90%, Y5 Q4 at 100%.
+- KPI targets for the five WS12 KPI items are set by their owner in the next progress update; owner roles for WS12 items are still "to be confirmed".
+- Screenshot of the result on the test copy: `../scurve/after-all-three-crs-scratch-copy.jpg`.
+
+## Test record (scratch copy of the dev CMP data, no real database)
+
+- Dry runs: rolled back, data identical to before.
+- Apply, apply again (CR-01, CR-02 and CR-03 all refused the second run), tamper with a weight (CR-03 refused), revert, re-apply: all as expected.
+- Revert with progress recorded on a WS12 item: refused.
+- Revert CR-02 and CR-01 after applying: data identical to the starting state (checksum).
+- After all three: 12 workstreams, 96 factors, 214 items, workstream weights total exactly 1.0000; readiness scaled by exactly 0.90; baseline 90.0% at the Year 3 gate and 100.0% at Y5 Q4.
