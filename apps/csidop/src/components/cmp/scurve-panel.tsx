@@ -7,7 +7,6 @@ import type { Plugin, TooltipItem } from "chart.js";
 import { apiPost } from "@/lib/api/fetcher";
 
 const BASELINE = "#9CA3AF";
-const FORECAST = "#f59e0b";
 const ACTUAL = "#2563eb";
 const GATE = "#7c3aed";
 
@@ -88,7 +87,6 @@ export default function SCurvePanel({
   const snapshots = scurve.snapshots;
 
   const baselineData: Pt[] = quarters.map((q) => ({ x: q.x, y: q.baseline * 100, note: `${q.label} · ${q.calendarLabel}` }));
-  const forecastData: Pt[] = quarters.map((q) => ({ x: q.x, y: q.forecast * 100, note: `${q.label} · ${q.calendarLabel}` }));
   const actualData: Pt[] = actual.map((a) => ({
     x: a.x,
     y: a.readiness * 100,
@@ -128,7 +126,7 @@ export default function SCurvePanel({
     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">S-Curve: Baseline vs Forecast vs Actual</h3>
+          <h3 className="text-sm font-semibold text-gray-900">S-Curve: Plan vs Actual</h3>
           <p className="mt-0.5 text-xs text-gray-400">Overall CMP readiness by quarter, Y1 Q1 (Q3 2026) to Y5 Q4 (Q2 2031)</p>
         </div>
         {canSnapshot && (
@@ -147,21 +145,17 @@ export default function SCurvePanel({
       )}
 
       {today && (
-        <div className="mt-4 grid grid-cols-2 divide-x divide-gray-100 text-center sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-3 divide-x divide-gray-100 text-center">
           <div className="px-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Baseline (today)</p>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Plan (today)</p>
             <p className="mt-0.5 text-lg font-bold text-gray-500">{pct(today.baseline)}</p>
-          </div>
-          <div className="px-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Forecast (today)</p>
-            <p className="mt-0.5 text-lg font-bold" style={{ color: FORECAST }}>{pct(today.forecast)}</p>
           </div>
           <div className="px-2">
             <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Actual (today)</p>
             <p className="mt-0.5 text-lg font-bold" style={{ color: ACTUAL }}>{pct(today.readiness)}</p>
           </div>
           <div className="px-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Actual vs baseline</p>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Actual vs plan</p>
             <p className={`mt-0.5 text-lg font-bold ${gapColor(today.readiness - today.baseline)}`}>{gapWords(today.readiness - today.baseline)}</p>
           </div>
         </div>
@@ -171,8 +165,7 @@ export default function SCurvePanel({
         <Line
           data={{
             datasets: [
-              { label: "Baseline", data: baselineData, borderColor: BASELINE, backgroundColor: BASELINE, borderWidth: 5, pointRadius: 2, tension: 0.25, order: 3 },
-              { label: "Forecast", data: forecastData, borderColor: FORECAST, backgroundColor: FORECAST, borderWidth: 2, borderDash: [6, 4], pointRadius: 2, tension: 0.25, order: 2 },
+              { label: "Plan", data: baselineData, borderColor: BASELINE, backgroundColor: BASELINE, borderWidth: 3, pointRadius: 2, tension: 0.25, order: 2 },
               {
                 label: "Actual", data: actualData, borderColor: ACTUAL, backgroundColor: ACTUAL, borderWidth: 2.5,
                 pointRadius: (ctx) => (actual[ctx.dataIndex]?.source === "Today" ? 6 : 4), tension: 0, order: 1,
@@ -214,8 +207,7 @@ export default function SCurvePanel({
 
       <div className="mt-3 space-y-1 text-[11px] leading-relaxed text-gray-500">
         <p>
-          <span className="font-semibold text-gray-600">Baseline</span> is the approved plan. <span className="font-semibold text-gray-600">Forecast</span> is the same
-          calculation using each item&apos;s forecast date (its baseline target date when none is entered).{" "}
+          <span className="font-semibold text-gray-600">Plan</span> is the approved baseline, calculated from each item&apos;s weight and dates.{" "}
           <span className="font-semibold text-gray-600">Actual</span> is real history only: one point per quarterly snapshot, plus today&apos;s live value.
         </p>
         {snapshots.length === 0 ? (
