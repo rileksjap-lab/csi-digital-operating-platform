@@ -74,8 +74,10 @@ interface Issue {
 }
 
 function scheduleWords(varianceFraction: number): string {
-  const points = Math.round(Math.abs(varianceFraction) * 100);
-  if (points === 0) return "on schedule";
+  // One decimal (trailing ".0" dropped), so a 2.5 point gap reads "2.5", not a rounded "3".
+  const raw = Math.abs(varianceFraction) * 100;
+  if (raw < 0.05) return "on schedule";
+  const points = Number(raw.toFixed(1));
   return varianceFraction < 0 ? `${points} points behind schedule` : `${points} points ahead of schedule`;
 }
 
@@ -219,8 +221,8 @@ export default function CmpDashboardPage() {
           {/* Headline */}
           <div className={`rounded-lg border px-5 py-4 ${dashboard.overallVariance < -0.1 ? "border-red-200 bg-red-50" : dashboard.overallVariance < -0.05 ? "border-amber-200 bg-amber-50" : "border-green-200 bg-green-50"}`}>
             <p className="text-base text-gray-800">
-              The transformation program is <span className="font-bold">{(dashboard.overallReadiness * 100).toFixed(0)}% complete</span>,
-              against a planned <span className="font-bold">{(dashboard.overallPlannedReadiness * 100).toFixed(0)}%</span> for this point in the 5-year timeline —
+              The transformation program is <span className="font-bold">{(dashboard.overallReadiness * 100).toFixed(1)}% complete</span>,
+              against a planned <span className="font-bold">{(dashboard.overallPlannedReadiness * 100).toFixed(1)}%</span> for this point in the 5-year timeline —
               overall, that is{" "}
               <span className={`font-bold ${varianceColor(dashboard.overallVariance)}`}>{scheduleWords(dashboard.overallVariance)}</span>.
             </p>
