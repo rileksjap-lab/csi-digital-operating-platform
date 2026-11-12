@@ -1,9 +1,9 @@
 -- ══════════════════════════════════════════════════════════════════════════════
--- Risk Register and Action Log: apply the starter entries
+-- Risk Register and Action Log: load the starter entries (7 risks, 7 actions)
 -- Plan: CSI-5 Year Transformation Plan (71878149-378d-477a-a916-6cc4ef01b5c8)
 -- Source: docs/cmp-transformation/risk-action-log/README.md
 --
--- Adds 11 risks (type Issue, shown in the Risk Register) and 9 actions (type Decision, shown in the Action Log) to the CMP issue log.
+-- Removes any earlier starter entries (the first version or the plain-language version) and loads 7 risks (type Issue, Risk Register) and 7 actions (type Decision, Action Log). Entries added by hand are never touched. Safe to run on an empty log too.
 --
 -- Run on the VM from the repo root, as postgres, in the production database, after the HOD has
 -- reviewed the entries. Rehearse first with the dry-run switch (everything
@@ -53,29 +53,23 @@ END $$;
 CREATE TEMP TABLE _log (type text, ws text, descr text, sev text, owner text, due date, status text, impact text,
                         support text, decision text, decision_owner text, recovery text) ON COMMIT DROP;
 INSERT INTO _log VALUES
-  ('Issue', 'Foundation workstreams', 'The groundwork workstreams (New Co, pricing, finance, organisation and governance) are running behind plan, while the subsidiaries are due to start soon and rely on them.', 'High', 'CSI HOD / Management', '2026-12-31'::date, 'Open', 'The subsidiaries could start without an approved mandate, pricing and financial case, so launch effort may be wasted or delayed.', 'Management to prioritise the approvals that the subsidiaries depend on.', NULL, NULL, 'A recovery plan for each Red workstream at the December review, and no subsidiary approved until its groundwork is in place.'),
-  ('Issue', 'Financial & Break-Even', 'The financial case for the subsidiaries is not yet signed off, and every subsidiary investment decision depends on it.', 'High', 'Finance Representative', '2026-12-15'::date, 'Open', 'Without a validated break-even view, management cannot responsibly commit investment to any subsidiary.', 'Finance and Management time to review and approve the model.', NULL, NULL, 'Finish and validate the multi-year financial model and budget for each subsidiary before it is approved.'),
-  ('Issue', 'Cloud / BIM / Cybersecurity', 'Cloud, BIM and Cybersecurity are all scheduled to start and finish together, with no agreed order of priority.', 'High', 'CSI HOD / Management', '2026-12-15'::date, 'Open', 'One team is stretched across three launches at once, so none of them may be ready to go live on time.', 'Management to confirm the priority and sequence.', NULL, NULL, 'Agree the order, then stagger the subsidiaries through an approved plan change.'),
-  ('Issue', 'Cross-workstream', 'Almost every workstream is active at the same time in the first half of 2027, which is more than the team can comfortably carry.', 'High', 'CSI HOD / HR', '2026-12-31'::date, 'Open', 'Delivery capacity and management attention are likely to run out at the peak, and progress updates and evidence will slip.', 'A capacity plan for the busy period, and temporary or external help if needed.', NULL, NULL, 'Review capacity before the peak begins and postpone lower-priority work inside each workstream.'),
-  ('Issue', 'Cloud / BIM / Cybersecurity', 'Some subsidiary work is recorded as started even though the plan has not begun and no evidence is attached.', 'Medium', 'CSI HOD', '2026-11-27'::date, 'Open', 'Management may be shown more progress than is really there, which makes it harder to trust the comparison with the plan.', 'Workstream owners to confirm what has really started and attach evidence.', NULL, NULL, 'Check each item with its owner: reset it where no real work has started, or bring the planned start forward where work has genuinely begun.'),
-  ('Issue', 'Cross-workstream', 'A large part of the plan has no progress entered yet, so the readiness picture rests on incomplete information.', 'Medium', 'CSI HOD', '2026-12-05'::date, 'Open', 'Some items look Red only because nobody has updated them, which invites argument about the numbers.', 'Workstream owners to update CSIDOP every month.', NULL, NULL, 'A fixed monthly update routine (owners early in the month, HOD review) and follow-up on missing updates.'),
-  ('Issue', 'Cross-workstream', 'Every item in a workstream currently shares the same dates, which makes the groundwork workstreams look further behind than they really are.', 'Medium', 'CSI HOD', '2026-11-30'::date, 'Open', 'The numbers get disputed instead of the real issues being discussed.', 'Approval to spread the item dates, which is already prepared.', NULL, NULL, 'Spread the item dates sensibly inside each workstream''s existing window.'),
-  ('Issue', 'Cross-workstream', 'No workstream has a named owner or sponsor recorded yet.', 'Medium', 'CSI HOD', '2026-11-20'::date, 'Open', 'It is unclear who answers for a workstream that is behind.', 'None: the owner and sponsor titles are already approved.', NULL, NULL, 'Enter the approved owner and sponsor names in CSIDOP.'),
-  ('Issue', 'Governance, Risk & Decisions', 'The governance workstream finishes well before the subsidiaries have launched, although decisions and gates continue much longer.', 'Medium', 'CSI HOD / Management', '2027-03-31'::date, 'Open', 'A governance gap while the subsidiaries are still launching.', 'Management to confirm the review rhythm until the Year 3 gate.', NULL, NULL, 'Keep the monthly and quarterly reviews running to the Year 3 gate, with a standing governance item.'),
-  ('Issue', 'Sustain & Expand (Years 4-5)', 'The approved plan stops at the end of 2028, so nothing is planned for the later years.', 'Medium', 'CSI HOD', '2026-12-31'::date, 'Open', 'The progress curve reads as complete from then on, which hides the recurring revenue, renewals and margin work still to be delivered.', 'None: the structure and weight are already approved.', NULL, NULL, 'Add a workstream covering the later years: keeping revenue, renewals and margin healthy and growing.'),
-  ('Issue', 'CSIDOP CMP Engine', 'Workstream owners are still getting used to updating progress in CSIDOP.', 'Low', 'CSIDOP Product Owner', '2026-12-15'::date, 'Open', 'Late or missing updates weaken the dashboard the chairman relies on.', 'A short how-to guide and a training slot for each owner.', NULL, NULL, 'A short walkthrough with each workstream owner, and the HOD follows up on missing updates.'),
-  ('Decision', 'Cloud / BIM / Cybersecurity', 'In what order should the three subsidiaries launch, and should their start dates be staggered?', 'High', 'CSI HOD', '2026-12-15'::date, 'Open', 'Stops three launches competing for the same team.', NULL, 'Decide which subsidiary launches first: Cloud, BIM or Cybersecurity.', 'Management', NULL),
-  ('Decision', 'Cross-workstream', 'Can the team carry all the workstreams together, or which work should be postponed?', 'High', 'CSI HOD / HR', '2026-12-15'::date, 'Open', 'Decides whether the peak period is realistic.', NULL, 'Agree the team''s capacity for the busy first half of 2027.', 'Management', NULL),
-  ('Decision', 'Cross-workstream', 'Enter the approved owners and sponsors, the spread-out dates and the later-years workstream in CSIDOP.', 'Medium', 'CSI HOD', '2026-11-20'::date, 'In Progress', 'Gives every workstream an accountable owner, a realistic plan and a view beyond 2028.', NULL, 'Apply the approved plan changes in CSIDOP.', 'CSI HOD', NULL),
-  ('Decision', 'Cloud / BIM / Cybersecurity', 'If the work is real, bring the planned start forward. If not, reset the items to Not Started.', 'Medium', 'CSI HOD', '2026-11-27'::date, 'Open', 'Settles why those workstreams show progress before their planned start.', NULL, 'Confirm whether the recorded progress on the three subsidiaries is real work.', 'CSI HOD', NULL),
-  ('Decision', 'Foundation workstreams', 'Each Red workstream owner records what is blocking them and what help is needed, before the review.', 'Medium', 'Workstream owners (Red workstreams)', '2026-11-27'::date, 'Open', 'Gives the review the reasons behind each Red, not only the status.', NULL, 'Ask every Red workstream owner to log blockers and the support needed.', 'CSI HOD', NULL),
-  ('Decision', 'New Co / Financial & Break-Even', 'Approve the rule that a subsidiary can only be set up as a company once the New Co mandate and the financial case are approved.', 'Medium', 'Transformation Lead', '2026-12-15'::date, 'Open', 'Prevents a subsidiary being approved on unvalidated numbers.', NULL, 'Agree that a subsidiary is approved only after its groundwork is.', 'Management', NULL),
-  ('Decision', 'Cross-workstream', 'Confirm who updates, by when each month, and who reviews.', 'Medium', 'CSI HOD', '2026-12-05'::date, 'Open', 'Keeps the dashboard current and credible.', NULL, 'Start a monthly progress update routine.', 'CSI HOD', NULL),
-  ('Decision', 'Governance, Risk & Decisions', 'Confirm who meets, how often, and for how long.', 'Medium', 'CSI HOD', '2027-03-31'::date, 'Open', 'Avoids a governance gap while the subsidiaries launch.', NULL, 'Keep governance running until the Year 3 gate.', 'Management', NULL),
-  ('Decision', 'Sustain & Expand (Years 4-5)', 'Name an owner for each item in the new workstream and set targets for the measurable ones.', 'Low', 'Transformation Lead', '2027-01-31'::date, 'Open', 'Makes the new workstream measurable from the start.', NULL, 'Name owners and targets for the later-years work.', 'CSI HOD', NULL);
+  ('Issue', 'Cross-workstream', 'Staff competency: the team may not yet have all the skills the new subsidiaries need (cloud, BIM, cybersecurity, healthcare).', 'High', 'CSI HOD / HR', '2027-01-31'::date, 'Open', 'Work is slower or quality is uneven, or outside help has to be bought in.', 'Budget and time for training, or approval to hire.', NULL, NULL, 'Check the skills needed for each subsidiary, then train, hire or partner where there are gaps.'),
+  ('Issue', 'Cross-workstream', 'High workload: the same people must run day-to-day work and deliver the transformation at the same time, and the first half of 2027 is the busiest period.', 'High', 'CSI HOD / HR', '2026-12-15'::date, 'Open', 'Tiredness, delayed work, and updates and evidence not being done.', 'A realistic workload plan, and temporary help if needed.', NULL, NULL, 'Agree what goes ahead and what waits in the busy first half of 2027.'),
+  ('Issue', 'Cross-workstream', 'Reliance on a few key people: much of the knowledge and decision-making sits with a small number of people.', 'Medium', 'CSI HOD', '2027-01-31'::date, 'Open', 'If one of them is unavailable, the work stops.', 'Time from key people to write down what they know.', NULL, NULL, 'Name a back-up for each key role and document the critical know-how.'),
+  ('Issue', 'Cloud / BIM / Cybersecurity', 'Unclear priorities: Cloud, BIM and Cybersecurity are all planned to start together, with no agreed order.', 'High', 'CSI HOD / Management', '2026-12-15'::date, 'Open', 'One team is split three ways and none of the subsidiaries is ready on time.', 'Management to confirm the order.', NULL, NULL, 'Agree which subsidiary goes first and stagger the others.'),
+  ('Issue', 'Foundation workstreams', 'Groundwork not ready: the mandate, pricing and financial case are behind plan, but the subsidiaries depend on them.', 'High', 'CSI HOD / Management', '2026-12-15'::date, 'Open', 'A subsidiary could start or be approved without a firm foundation.', 'Management to prioritise the approvals the subsidiaries depend on.', NULL, NULL, 'Finish the mandate, pricing and financial case first, and approve a subsidiary only once they are in place.'),
+  ('Issue', 'Cross-workstream', 'Unclear ownership and reporting: workstreams do not yet have a named owner, and progress updates are incomplete.', 'Medium', 'CSI HOD', '2026-12-05'::date, 'Open', 'No one is clearly accountable, and management cannot see the true picture.', 'Workstream owners to update CSIDOP every month.', NULL, NULL, 'Name an owner and sponsor for every workstream and run a monthly update with HOD review.'),
+  ('Issue', 'Cloud / BIM / Cybersecurity', 'Customer demand not yet proven: customers may take longer to buy than expected.', 'Medium', 'Commercial Lead', '2027-02-28'::date, 'Open', 'Money is invested before income is secure.', 'The commercial team to line up first customers or pilots.', NULL, NULL, 'Confirm early customers or pilots for each subsidiary before committing investment.'),
+  ('Decision', 'Cross-workstream', 'Which skills are missing, and will we train, hire or partner to fill them?', 'High', 'CSI HOD / HR', '2027-01-31'::date, 'Open', 'Makes sure the team can deliver what the subsidiaries need.', NULL, 'Check the skills gap for each subsidiary and agree a training or hiring plan.', 'Management', NULL),
+  ('Decision', 'Cross-workstream', 'Can the team carry everything at once, or which work should wait?', 'High', 'CSI HOD / HR', '2026-12-15'::date, 'Open', 'Keeps the busiest period realistic.', NULL, 'Agree the workload for the first half of 2027: what goes ahead and what waits.', 'Management', NULL),
+  ('Decision', 'Cloud / BIM / Cybersecurity', 'In what order should Cloud, BIM and Cybersecurity launch?', 'High', 'CSI HOD', '2026-12-15'::date, 'Open', 'Stops three launches competing for the same team.', NULL, 'Decide which subsidiary launches first.', 'Management', NULL),
+  ('Decision', 'Cross-workstream', 'Who covers each key role, and what must be written down?', 'Medium', 'CSI HOD', '2027-01-31'::date, 'Open', 'Work carries on when a key person is away.', NULL, 'Name a back-up for each key role and write down the critical know-how.', 'CSI HOD', NULL),
+  ('Decision', 'New Co / Financial & Break-Even', 'Do we adopt this rule for every subsidiary?', 'Medium', 'Transformation Lead', '2026-12-15'::date, 'Open', 'Prevents approval on an unfinished foundation.', NULL, 'Agree the rule: a subsidiary is approved only after its mandate and financial case are approved.', 'Management', NULL),
+  ('Decision', 'Cross-workstream', 'Who owns and sponsors each workstream, and who updates and reviews each month?', 'Medium', 'CSI HOD', '2026-12-05'::date, 'Open', 'Makes it clear who answers for each workstream and keeps the picture current.', NULL, 'Name an owner and sponsor for every workstream and start a monthly progress update.', 'CSI HOD', NULL),
+  ('Decision', 'Cloud / BIM / Cybersecurity', 'Which customers or pilots will confirm demand before money is committed?', 'Medium', 'Commercial Lead', '2027-02-28'::date, 'Open', 'Shows demand is real before investment is made.', NULL, 'Test customer demand early: list the first customers or pilots for each subsidiary before investing.', 'Management', NULL);
 
-CREATE TEMP TABLE _old (descr text) ON COMMIT DROP;
-INSERT INTO _old VALUES
+CREATE TEMP TABLE _earlier (descr text) ON COMMIT DROP;
+INSERT INTO _earlier VALUES
   ('Five of eleven workstreams are behind plan (16 to 28 points at 12 Nov 2026), yet the three subsidiaries start in Jan 2027 and depend on them.'),
   ('Financial & Break-Even is about 28 points behind plan, and its approvals (three-year P&L, budget envelope) gate every subsidiary investment decision.'),
   ('The three subsidiaries are planned to start together in Jan 2027 and finish together in Jun 2028, with no agreed launch order.'),
@@ -95,16 +89,46 @@ INSERT INTO _old VALUES
   ('Approve the rule that a subsidiary''s incorporation decision needs both approvals first.'),
   ('Confirm the cadence: owners update by day 5 of each month, HOD reviews, quarter-end snapshot taken.'),
   ('Confirm who meets, how often, and until when.'),
-  ('Name the owner of each of the 16 items and set targets for the five KPI items.');
+  ('Name the owner of each of the 16 items and set targets for the five KPI items.'),
+  ('The groundwork workstreams (New Co, pricing, finance, organisation and governance) are running behind plan, while the subsidiaries are due to start soon and rely on them.'),
+  ('The financial case for the subsidiaries is not yet signed off, and every subsidiary investment decision depends on it.'),
+  ('Cloud, BIM and Cybersecurity are all scheduled to start and finish together, with no agreed order of priority.'),
+  ('Almost every workstream is active at the same time in the first half of 2027, which is more than the team can comfortably carry.'),
+  ('Some subsidiary work is recorded as started even though the plan has not begun and no evidence is attached.'),
+  ('A large part of the plan has no progress entered yet, so the readiness picture rests on incomplete information.'),
+  ('Every item in a workstream currently shares the same dates, which makes the groundwork workstreams look further behind than they really are.'),
+  ('No workstream has a named owner or sponsor recorded yet.'),
+  ('The governance workstream finishes well before the subsidiaries have launched, although decisions and gates continue much longer.'),
+  ('The approved plan stops at the end of 2028, so nothing is planned for the later years.'),
+  ('Workstream owners are still getting used to updating progress in CSIDOP.'),
+  ('In what order should the three subsidiaries launch, and should their start dates be staggered?'),
+  ('Can the team carry all the workstreams together, or which work should be postponed?'),
+  ('Enter the approved owners and sponsors, the spread-out dates and the later-years workstream in CSIDOP.'),
+  ('If the work is real, bring the planned start forward. If not, reset the items to Not Started.'),
+  ('Each Red workstream owner records what is blocking them and what help is needed, before the review.'),
+  ('Approve the rule that a subsidiary can only be set up as a company once the New Co mandate and the financial case are approved.'),
+  ('Confirm who updates, by when each month, and who reviews.'),
+  ('Confirm who meets, how often, and for how long.'),
+  ('Name an owner for each item in the new workstream and set targets for the measurable ones.');
 
 DO $$
-DECLARE v_plan uuid := '71878149-378d-477a-a916-6cc4ef01b5c8'; v_hod uuid; r record; v_next int; v_id uuid; n int := 0;
+DECLARE v_plan uuid := '71878149-378d-477a-a916-6cc4ef01b5c8'; v_hod uuid; r record; v_next int; v_id uuid; n int := 0; n_del int := 0;
 BEGIN
   SELECT locked_by INTO v_hod FROM cmp_plans WHERE id = v_plan;
   IF v_hod IS NULL THEN RAISE EXCEPTION 'The plan has no locked_by staff id to attribute the entries to'; END IF;
-  IF EXISTS (SELECT 1 FROM cmp_issue_log l WHERE l.plan_id = v_plan AND (l.description IN (SELECT descr FROM _log) OR l.description IN (SELECT descr FROM _old))) THEN
-    RAISE EXCEPTION 'Some of these entries already exist in the log; refusing to add them twice';
+  IF EXISTS (SELECT 1 FROM cmp_issue_log l WHERE l.plan_id = v_plan AND l.description IN (SELECT descr FROM _log)) THEN
+    RAISE EXCEPTION 'These entries are already in the log; refusing to add them twice';
   END IF;
+
+  -- 1. Remove the earlier starter entries (matched by their exact text; anything added or edited by hand stays).
+  FOR r IN SELECT l.id, l.log_code, l.description FROM cmp_issue_log l WHERE l.plan_id = v_plan AND l.description IN (SELECT descr FROM _earlier) ORDER BY l.log_code LOOP
+    PERFORM pg_temp.cr_audit('cmp_issue_log', r.id, 'Delete', NULL, r.log_code || ' ' || left(r.description, 120), NULL,
+            'Earlier starter entry replaced by the revised set', v_hod);
+    DELETE FROM cmp_issue_log WHERE id = r.id;
+    n_del := n_del + 1;
+  END LOOP;
+
+  -- 2. Load the new set.
   SELECT coalesce(max(substring(log_code from 4)::int), 0) INTO v_next FROM cmp_issue_log WHERE log_code ~ '^LOG[0-9]+$';
   FOR r IN SELECT * FROM _log ORDER BY (type = 'Decision'), ctid LOOP
     v_next := v_next + 1;
@@ -115,11 +139,11 @@ BEGIN
             r.support, r.decision, r.decision_owner, r.recovery, v_hod)
     RETURNING id INTO v_id;
     PERFORM pg_temp.cr_audit('cmp_issue_log', v_id, 'Insert', NULL, NULL, 'LOG' || lpad(v_next::text, 3, '0') || ' ' || r.type || ': ' || left(r.descr, 120),
-            'Starter entries for the management presentation; applied by script', v_hod);
+            'Starter entries for the management presentation (revised set); applied by script', v_hod);
     n := n + 1;
   END LOOP;
-  IF n <> 20 THEN RAISE EXCEPTION 'Expected to add 20 entries, added %', n; END IF;
-  RAISE NOTICE 'Added % entries (11 risks, 9 actions).', n;
+  IF n <> 14 THEN RAISE EXCEPTION 'Expected to add 14 entries, added %', n; END IF;
+  RAISE NOTICE 'Removed % earlier starter entries and added % entries (7 risks, 7 actions).', n_del, n;
 END $$;
 
 DO $$

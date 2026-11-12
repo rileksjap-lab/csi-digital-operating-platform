@@ -3,7 +3,7 @@
 -- Plan: CSI-5 Year Transformation Plan (71878149-378d-477a-a916-6cc4ef01b5c8)
 -- Source: docs/cmp-transformation/risk-action-log/README.md
 --
--- Deletes exactly the entries that LOG_seed_apply.sql (either wording version) added, matched by their text. Entries added by hand are never touched.
+-- Deletes the starter entries (this revised set and the earlier versions), matched by their exact text. Entries added by hand are never touched.
 --
 -- Run on the VM from the repo root, as postgres, in the production database, after the HOD has
 -- reviewed the entries. Rehearse first with the dry-run switch (everything
@@ -47,26 +47,20 @@ SELECT (SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t.item_id), '')) FR
 
 CREATE TEMP TABLE _log (descr text) ON COMMIT DROP;
 INSERT INTO _log VALUES
-  ('The groundwork workstreams (New Co, pricing, finance, organisation and governance) are running behind plan, while the subsidiaries are due to start soon and rely on them.'),
-  ('The financial case for the subsidiaries is not yet signed off, and every subsidiary investment decision depends on it.'),
-  ('Cloud, BIM and Cybersecurity are all scheduled to start and finish together, with no agreed order of priority.'),
-  ('Almost every workstream is active at the same time in the first half of 2027, which is more than the team can comfortably carry.'),
-  ('Some subsidiary work is recorded as started even though the plan has not begun and no evidence is attached.'),
-  ('A large part of the plan has no progress entered yet, so the readiness picture rests on incomplete information.'),
-  ('Every item in a workstream currently shares the same dates, which makes the groundwork workstreams look further behind than they really are.'),
-  ('No workstream has a named owner or sponsor recorded yet.'),
-  ('The governance workstream finishes well before the subsidiaries have launched, although decisions and gates continue much longer.'),
-  ('The approved plan stops at the end of 2028, so nothing is planned for the later years.'),
-  ('Workstream owners are still getting used to updating progress in CSIDOP.'),
-  ('In what order should the three subsidiaries launch, and should their start dates be staggered?'),
-  ('Can the team carry all the workstreams together, or which work should be postponed?'),
-  ('Enter the approved owners and sponsors, the spread-out dates and the later-years workstream in CSIDOP.'),
-  ('If the work is real, bring the planned start forward. If not, reset the items to Not Started.'),
-  ('Each Red workstream owner records what is blocking them and what help is needed, before the review.'),
-  ('Approve the rule that a subsidiary can only be set up as a company once the New Co mandate and the financial case are approved.'),
-  ('Confirm who updates, by when each month, and who reviews.'),
-  ('Confirm who meets, how often, and for how long.'),
-  ('Name an owner for each item in the new workstream and set targets for the measurable ones.'),
+  ('Staff competency: the team may not yet have all the skills the new subsidiaries need (cloud, BIM, cybersecurity, healthcare).'),
+  ('High workload: the same people must run day-to-day work and deliver the transformation at the same time, and the first half of 2027 is the busiest period.'),
+  ('Reliance on a few key people: much of the knowledge and decision-making sits with a small number of people.'),
+  ('Unclear priorities: Cloud, BIM and Cybersecurity are all planned to start together, with no agreed order.'),
+  ('Groundwork not ready: the mandate, pricing and financial case are behind plan, but the subsidiaries depend on them.'),
+  ('Unclear ownership and reporting: workstreams do not yet have a named owner, and progress updates are incomplete.'),
+  ('Customer demand not yet proven: customers may take longer to buy than expected.'),
+  ('Which skills are missing, and will we train, hire or partner to fill them?'),
+  ('Can the team carry everything at once, or which work should wait?'),
+  ('In what order should Cloud, BIM and Cybersecurity launch?'),
+  ('Who covers each key role, and what must be written down?'),
+  ('Do we adopt this rule for every subsidiary?'),
+  ('Who owns and sponsors each workstream, and who updates and reviews each month?'),
+  ('Which customers or pilots will confirm demand before money is committed?'),
   ('Five of eleven workstreams are behind plan (16 to 28 points at 12 Nov 2026), yet the three subsidiaries start in Jan 2027 and depend on them.'),
   ('Financial & Break-Even is about 28 points behind plan, and its approvals (three-year P&L, budget envelope) gate every subsidiary investment decision.'),
   ('The three subsidiaries are planned to start together in Jan 2027 and finish together in Jun 2028, with no agreed launch order.'),
@@ -86,13 +80,33 @@ INSERT INTO _log VALUES
   ('Approve the rule that a subsidiary''s incorporation decision needs both approvals first.'),
   ('Confirm the cadence: owners update by day 5 of each month, HOD reviews, quarter-end snapshot taken.'),
   ('Confirm who meets, how often, and until when.'),
-  ('Name the owner of each of the 16 items and set targets for the five KPI items.');
+  ('Name the owner of each of the 16 items and set targets for the five KPI items.'),
+  ('The groundwork workstreams (New Co, pricing, finance, organisation and governance) are running behind plan, while the subsidiaries are due to start soon and rely on them.'),
+  ('The financial case for the subsidiaries is not yet signed off, and every subsidiary investment decision depends on it.'),
+  ('Cloud, BIM and Cybersecurity are all scheduled to start and finish together, with no agreed order of priority.'),
+  ('Almost every workstream is active at the same time in the first half of 2027, which is more than the team can comfortably carry.'),
+  ('Some subsidiary work is recorded as started even though the plan has not begun and no evidence is attached.'),
+  ('A large part of the plan has no progress entered yet, so the readiness picture rests on incomplete information.'),
+  ('Every item in a workstream currently shares the same dates, which makes the groundwork workstreams look further behind than they really are.'),
+  ('No workstream has a named owner or sponsor recorded yet.'),
+  ('The governance workstream finishes well before the subsidiaries have launched, although decisions and gates continue much longer.'),
+  ('The approved plan stops at the end of 2028, so nothing is planned for the later years.'),
+  ('Workstream owners are still getting used to updating progress in CSIDOP.'),
+  ('In what order should the three subsidiaries launch, and should their start dates be staggered?'),
+  ('Can the team carry all the workstreams together, or which work should be postponed?'),
+  ('Enter the approved owners and sponsors, the spread-out dates and the later-years workstream in CSIDOP.'),
+  ('If the work is real, bring the planned start forward. If not, reset the items to Not Started.'),
+  ('Each Red workstream owner records what is blocking them and what help is needed, before the review.'),
+  ('Approve the rule that a subsidiary can only be set up as a company once the New Co mandate and the financial case are approved.'),
+  ('Confirm who updates, by when each month, and who reviews.'),
+  ('Confirm who meets, how often, and for how long.'),
+  ('Name an owner for each item in the new workstream and set targets for the measurable ones.');
 
 DO $$
 DECLARE v_plan uuid := '71878149-378d-477a-a916-6cc4ef01b5c8'; v_hod uuid; r record; n int := 0;
 BEGIN
   SELECT locked_by INTO v_hod FROM cmp_plans WHERE id = v_plan;
-  FOR r IN SELECT l.id, l.log_code, l.description FROM cmp_issue_log l JOIN _log t ON t.descr = l.description WHERE l.plan_id = v_plan LOOP
+  FOR r IN SELECT l.id, l.log_code, l.description FROM cmp_issue_log l WHERE l.plan_id = v_plan AND l.description IN (SELECT descr FROM _log) ORDER BY l.log_code LOOP
     PERFORM pg_temp.cr_audit('cmp_issue_log', r.id, 'Delete', NULL, r.log_code || ' ' || left(r.description, 120), NULL, 'Starter entries removed', v_hod);
     DELETE FROM cmp_issue_log WHERE id = r.id;
     n := n + 1;
