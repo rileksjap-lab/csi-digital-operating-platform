@@ -200,8 +200,21 @@ export default function CmpDashboardPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load dashboard"));
   }, [planId]);
 
-  const riskRegister = issues?.filter((i) => i.type === "Issue" || i.type === "Blocker") ?? [];
-  const actionLog = issues?.filter((i) => i.type === "Decision") ?? [];
+  // Management reads these top-down, so the order matters: open items first; risks by severity
+  // (most serious first) then nearest due date; actions by nearest due date. The API returns newest first.
+  const SEVERITY_RANK: Record<Issue["severity"], number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+  const closedLast = (a: Issue, b: Issue) => Number(a.status === "Closed") - Number(b.status === "Closed");
+  const dueKey = (i: Issue) => i.dueDate ?? "9999-12-31";
+  const riskRegister = (issues?.filter((i) => i.type === "Issue" || i.type === "Blocker") ?? []).sort(
+    (a, b) =>
+      closedLast(a, b) ||
+      SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+      dueKey(a).localeCompare(dueKey(b)) ||
+      a.logCode.localeCompare(b.logCode)
+  );
+  const actionLog = (issues?.filter((i) => i.type === "Decision") ?? []).sort(
+    (a, b) => closedLast(a, b) || dueKey(a).localeCompare(dueKey(b)) || a.logCode.localeCompare(b.logCode)
+  );
 
   return (
     <div className="space-y-4">
