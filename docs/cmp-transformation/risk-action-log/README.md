@@ -2,7 +2,7 @@
 
 Prepared 12 Nov 2026 for the management presentation. The Risk Register and Action Log on the CMP dashboard were empty.
 
-**These are drafts for the HOD to review.** Every entry is drawn from something visible in the plan, the dashboard or the change requests, not from outside business knowledge. Edit any wording, owner or date in the Issues screen after loading them, or change the script before running it.
+**These are drafts for the HOD to review, written in plain language rather than figures.** Every entry is drawn from something visible in the plan, the dashboard or the change requests, not from outside business knowledge. Edit any wording, owner or date in the Issues screen after loading them, or change the script before running it.
 
 ## What is added
 
@@ -35,6 +35,16 @@ sudo -u postgres psql -d csidop -v ON_ERROR_STOP=1 -v dry_run=1 -f - < docs/cmp-
 ```
 
 Then the real run (drop `-v dry_run=1`). Expect "Added 20 entries (11 risks, 9 actions)". A second run is refused, and `LOG_seed_revert.sql` removes exactly these entries and nothing added by hand. Each run is one transaction, writes an audit entry per row, and aborts if progress updates or evidence would change.
+
+## If the first version is already loaded
+
+The first version used figures in the wording ("about 28 points behind", "54% of items"). `LOG_seed_reword.sql` rewrites those same entries in plain language, in place. Codes, owners, due dates and status stay as they are, and anything you edited by hand in other entries is untouched.
+
+```bash
+sudo -u postgres psql -d csidop -v ON_ERROR_STOP=1 -v dry_run=1 -f - < docs/cmp-transformation/risk-action-log/LOG_seed_reword.sql
+```
+
+Expect `Reworded 20 of 20 entries.` and `DRY RUN: rolling everything back.`, then run it again without `-v dry_run=1`. If you had already edited the wording of one of the starter entries yourself, that entry is skipped (it no longer matches), so the count will be lower than 20. `LOG_seed_apply.sql` now loads the plain-language version directly and refuses to run if either version is already there. `LOG_seed_revert.sql` removes either version.
 
 ## Dashboard ordering
 
